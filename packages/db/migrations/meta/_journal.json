@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1780515608935,
+      "tag": "0000_robust_karen_page",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1780519455472,
+      "tag": "0001_content_workflow_seo_ai",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780526441155,
+      "tag": "0002_old_overlord",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1780584777193,
+      "tag": "0003_clumsy_crystal",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1780589541413,
+      "tag": "0004_harsh_speed_demon",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1780590376787,
+      "tag": "0005_aromatic_lethal_legion",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1780591152692,
+      "tag": "0006_jittery_sharon_carter",
+      "breakpoints": true
+    }
+  ]
+}

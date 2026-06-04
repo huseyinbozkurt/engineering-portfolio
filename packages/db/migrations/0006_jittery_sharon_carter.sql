@@ -1,0 +1,1 @@
+ALTER TABLE "llm_tasks" ADD COLUMN "finish_reason" varchar(120);

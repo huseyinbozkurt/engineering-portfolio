@@ -1,0 +1,773 @@
+import { and, asc, desc, eq, or, sql, type InferSelectModel } from "drizzle-orm";
+
+import { getDb, hasDatabaseUrl, type PortfolioDb } from "./client";
+import {
+  caseStudies,
+  caseStudyExperiences,
+  caseStudyLenses,
+  caseStudyPrinciples,
+  caseStudyProjects,
+  caseStudySkills,
+  caseStudyTags,
+  contactSubmissions,
+  decisionPatternPrinciples,
+  decisionPatterns,
+  experienceLenses,
+  experiencePrinciples,
+  experiences,
+  experienceSkills,
+  experienceTags,
+  lenses,
+  principles,
+  projectLenses,
+  projectPrinciples,
+  projects,
+  projectSkills,
+  projectTags,
+  skills,
+  tags,
+} from "./schema";
+
+export type LensRecord = InferSelectModel<typeof lenses>;
+export type PrincipleRecord = InferSelectModel<typeof principles>;
+export type DecisionPatternRecord = InferSelectModel<typeof decisionPatterns>;
+export type ExperienceRecord = InferSelectModel<typeof experiences>;
+export type ProjectRecord = InferSelectModel<typeof projects>;
+export type CaseStudyRecord = InferSelectModel<typeof caseStudies>;
+export type SkillRecord = InferSelectModel<typeof skills>;
+export type TagRecord = InferSelectModel<typeof tags>;
+export type ContactSubmissionRecord = InferSelectModel<typeof contactSubmissions>;
+
+// Admin "edit" records bundle a single entity with the ids of its current
+// relationships so an edit form can pre-select the related checkboxes.
+export interface DecisionPatternEditRecord extends DecisionPatternRecord {
+  principleIds: string[];
+}
+
+export interface ExperienceEditRecord extends ExperienceRecord {
+  lensIds: string[];
+  principleIds: string[];
+  skillIds: string[];
+  tagIds: string[];
+}
+
+export interface ProjectEditRecord extends ProjectRecord {
+  lensIds: string[];
+  principleIds: string[];
+  skillIds: string[];
+  tagIds: string[];
+}
+
+export interface CaseStudyEditRecord extends CaseStudyRecord {
+  lensIds: string[];
+  principleIds: string[];
+  experienceIds: string[];
+  projectIds: string[];
+  skillIds: string[];
+  tagIds: string[];
+}
+
+export interface HomeContentRecord {
+  lenses: LensRecord[];
+  principles: PrincipleRecord[];
+  decisionPatterns: DecisionPatternRecord[];
+  experiences: ExperienceRecord[];
+  projects: ProjectRecord[];
+  caseStudies: CaseStudyRecord[];
+}
+
+export interface CaseStudyDetailRecord {
+  caseStudy: CaseStudyRecord;
+  lenses: LensRecord[];
+  principles: PrincipleRecord[];
+  experiences: ExperienceRecord[];
+  projects: ProjectRecord[];
+  skills: SkillRecord[];
+  tags: TagRecord[];
+}
+
+export interface LensDetailRecord {
+  lens: LensRecord;
+  caseStudies: CaseStudyRecord[];
+  experiences: ExperienceRecord[];
+  projects: ProjectRecord[];
+  principles: PrincipleRecord[];
+}
+
+export interface ExperienceDetailRecord {
+  experience: ExperienceRecord;
+  lenses: LensRecord[];
+  principles: PrincipleRecord[];
+  caseStudies: CaseStudyRecord[];
+  projects: ProjectRecord[];
+  skills: SkillRecord[];
+  tags: TagRecord[];
+}
+
+export interface AdminContentIndexRecord extends HomeContentRecord {
+  skills: SkillRecord[];
+  tags: TagRecord[];
+}
+
+async function readArray<T>(reader: (db: PortfolioDb) => Promise<T[]>): Promise<T[]> {
+  if (!hasDatabaseUrl()) {
+    return [];
+  }
+
+  return reader(getDb());
+}
+
+async function readOne<T>(reader: (db: PortfolioDb) => Promise<T | undefined>): Promise<T | null> {
+  if (!hasDatabaseUrl()) {
+    return null;
+  }
+
+  return (await reader(getDb())) ?? null;
+}
+
+// Admin-facing list queries return every status (draft, published, archived).
+// Their `getPublished*` counterparts below restrict to published content and
+// power the public site, where drafts and archived records must never appear.
+
+export async function getLenses(): Promise<LensRecord[]> {
+  return readArray((db) =>
+    db.select().from(lenses).orderBy(asc(lenses.position), asc(lenses.name)),
+  );
+}
+
+export async function getPublishedLenses(): Promise<LensRecord[]> {
+  return readArray((db) =>
+    db
+      .select()
+      .from(lenses)
+      .where(eq(lenses.status, "published"))
+      .orderBy(asc(lenses.position), asc(lenses.name)),
+  );
+}
+
+export async function getPrinciples(): Promise<PrincipleRecord[]> {
+  return readArray((db) =>
+    db.select().from(principles).orderBy(asc(principles.position), asc(principles.title)),
+  );
+}
+
+export async function getPublishedPrinciples(): Promise<PrincipleRecord[]> {
+  return readArray((db) =>
+    db
+      .select()
+      .from(principles)
+      .where(eq(principles.status, "published"))
+      .orderBy(asc(principles.position), asc(principles.title)),
+  );
+}
+
+export async function getDecisionPatterns(): Promise<DecisionPatternRecord[]> {
+  return readArray((db) =>
+    db
+      .select()
+      .from(decisionPatterns)
+      .orderBy(asc(decisionPatterns.position), asc(decisionPatterns.title)),
+  );
+}
+
+export async function getPublishedDecisionPatterns(): Promise<DecisionPatternRecord[]> {
+  return readArray((db) =>
+    db
+      .select()
+      .from(decisionPatterns)
+      .where(eq(decisionPatterns.status, "published"))
+      .orderBy(asc(decisionPatterns.position), asc(decisionPatterns.title)),
+  );
+}
+
+export async function getExperiences(): Promise<ExperienceRecord[]> {
+  return readArray((db) =>
+    db
+      .select()
+      .from(experiences)
+      .orderBy(...reverseChronologicalExperienceOrder()),
+  );
+}
+
+export async function getPublishedExperiences(): Promise<ExperienceRecord[]> {
+  return readArray((db) =>
+    db
+      .select()
+      .from(experiences)
+      .where(eq(experiences.status, "published"))
+      .orderBy(...reverseChronologicalExperienceOrder()),
+  );
+}
+
+export async function getPublishedProjects(): Promise<ProjectRecord[]> {
+  return readArray((db) =>
+    db
+      .select()
+      .from(projects)
+      .where(eq(projects.status, "published"))
+      .orderBy(asc(projects.position), asc(projects.name)),
+  );
+}
+
+export async function getPublishedCaseStudies(): Promise<CaseStudyRecord[]> {
+  return readArray((db) =>
+    db
+      .select()
+      .from(caseStudies)
+      .where(eq(caseStudies.status, "published"))
+      .orderBy(asc(caseStudies.position), desc(caseStudies.publishedAt), desc(caseStudies.createdAt)),
+  );
+}
+
+export async function getHomeContent(): Promise<HomeContentRecord> {
+  const [
+    lensRows,
+    principleRows,
+    decisionPatternRows,
+    experienceRows,
+    projectRows,
+    caseStudyRows,
+  ] = await Promise.all([
+    getPublishedLenses(),
+    getPublishedPrinciples(),
+    getPublishedDecisionPatterns(),
+    getPublishedExperiences(),
+    getPublishedProjects(),
+    getPublishedCaseStudies(),
+  ]);
+
+  return {
+    lenses: lensRows,
+    principles: principleRows,
+    decisionPatterns: decisionPatternRows,
+    experiences: experienceRows,
+    projects: projectRows,
+    caseStudies: caseStudyRows,
+  };
+}
+
+export async function getAllProjects(): Promise<ProjectRecord[]> {
+  return readArray((db) =>
+    db.select().from(projects).orderBy(asc(projects.position), asc(projects.name)),
+  );
+}
+
+export async function getAllCaseStudies(): Promise<CaseStudyRecord[]> {
+  return readArray((db) =>
+    db.select().from(caseStudies).orderBy(asc(caseStudies.position), asc(caseStudies.title)),
+  );
+}
+
+export async function getSkills(): Promise<SkillRecord[]> {
+  return readArray((db) =>
+    db
+      .select()
+      .from(skills)
+      .orderBy(sql`${skills.category} asc nulls last`, asc(skills.position), asc(skills.name)),
+  );
+}
+
+export async function getTags(): Promise<TagRecord[]> {
+  return readArray((db) =>
+    db.select().from(tags).orderBy(sql`${tags.category} asc nulls last`, asc(tags.name)),
+  );
+}
+
+export async function getAdminContentIndex(): Promise<AdminContentIndexRecord> {
+  const [
+    lensRows,
+    principleRows,
+    decisionPatternRows,
+    experienceRows,
+    projectRows,
+    caseStudyRows,
+    skillRows,
+    tagRows,
+  ] = await Promise.all([
+    getLenses(),
+    getPrinciples(),
+    getDecisionPatterns(),
+    getExperiences(),
+    getAllProjects(),
+    getAllCaseStudies(),
+    getSkills(),
+    getTags(),
+  ]);
+
+  return {
+    lenses: lensRows,
+    principles: principleRows,
+    decisionPatterns: decisionPatternRows,
+    experiences: experienceRows,
+    projects: projectRows,
+    caseStudies: caseStudyRows,
+    skills: skillRows,
+    tags: tagRows,
+  };
+}
+
+export async function getContactSubmissions(): Promise<ContactSubmissionRecord[]> {
+  return readArray((db) =>
+    db.select().from(contactSubmissions).orderBy(desc(contactSubmissions.createdAt)),
+  );
+}
+
+export async function getCaseStudyBySlug(
+  slug: string,
+): Promise<CaseStudyDetailRecord | null> {
+  return readOne(async (db) => {
+    const [caseStudy] = await db
+      .select()
+      .from(caseStudies)
+      .where(and(eq(caseStudies.slug, slug), eq(caseStudies.status, "published")))
+      .limit(1);
+
+    if (!caseStudy) {
+      return undefined;
+    }
+
+    const [
+      lensRows,
+      principleRows,
+      experienceRows,
+      projectRows,
+      skillRows,
+      tagRows,
+    ] = await Promise.all([
+      db
+        .select({ lens: lenses })
+        .from(caseStudyLenses)
+        .innerJoin(lenses, eq(caseStudyLenses.lensId, lenses.id))
+        .where(
+          and(eq(caseStudyLenses.caseStudyId, caseStudy.id), eq(lenses.status, "published")),
+        )
+        .orderBy(asc(lenses.position), asc(lenses.name)),
+      db
+        .select({ principle: principles })
+        .from(caseStudyPrinciples)
+        .innerJoin(principles, eq(caseStudyPrinciples.principleId, principles.id))
+        .where(
+          and(
+            eq(caseStudyPrinciples.caseStudyId, caseStudy.id),
+            eq(principles.status, "published"),
+          ),
+        )
+        .orderBy(asc(principles.position), asc(principles.title)),
+      db
+        .select({ experience: experiences })
+        .from(caseStudyExperiences)
+        .innerJoin(experiences, eq(caseStudyExperiences.experienceId, experiences.id))
+        .where(
+          and(
+            eq(caseStudyExperiences.caseStudyId, caseStudy.id),
+            eq(experiences.status, "published"),
+          ),
+        )
+        .orderBy(...reverseChronologicalExperienceOrder()),
+      db
+        .select({ project: projects })
+        .from(caseStudyProjects)
+        .innerJoin(projects, eq(caseStudyProjects.projectId, projects.id))
+        .where(
+          and(
+            eq(caseStudyProjects.caseStudyId, caseStudy.id),
+            eq(projects.status, "published"),
+          ),
+        )
+        .orderBy(asc(projects.position), asc(projects.name)),
+      db
+        .select({ skill: skills })
+        .from(caseStudySkills)
+        .innerJoin(skills, eq(caseStudySkills.skillId, skills.id))
+        .where(
+          and(eq(caseStudySkills.caseStudyId, caseStudy.id), eq(skills.status, "published")),
+        )
+        .orderBy(sql`${skills.category} asc nulls last`, asc(skills.position), asc(skills.name)),
+      db
+        .select({ tag: tags })
+        .from(caseStudyTags)
+        .innerJoin(tags, eq(caseStudyTags.tagId, tags.id))
+        .where(and(eq(caseStudyTags.caseStudyId, caseStudy.id), eq(tags.status, "published")))
+        .orderBy(sql`${tags.category} asc nulls last`, asc(tags.name)),
+    ]);
+
+    return {
+      caseStudy,
+      lenses: lensRows.map((row) => row.lens),
+      principles: principleRows.map((row) => row.principle),
+      experiences: experienceRows.map((row) => row.experience),
+      projects: projectRows.map((row) => row.project),
+      skills: skillRows.map((row) => row.skill),
+      tags: tagRows.map((row) => row.tag),
+    };
+  });
+}
+
+export async function getExperienceBySlug(
+  slug: string,
+): Promise<ExperienceDetailRecord | null> {
+  return readOne(async (db) => {
+    const identifierCondition = isUuid(slug)
+      ? or(eq(experiences.slug, slug), eq(experiences.id, slug))
+      : eq(experiences.slug, slug);
+
+    const [experience] = await db
+      .select()
+      .from(experiences)
+      .where(and(eq(experiences.status, "published"), identifierCondition))
+      .limit(1);
+
+    if (!experience) {
+      return undefined;
+    }
+
+    const [lensRows, principleRows, caseStudyRows, projectRows, skillRows, tagRows] =
+      await Promise.all([
+        db
+          .select({ lens: lenses })
+          .from(experienceLenses)
+          .innerJoin(lenses, eq(experienceLenses.lensId, lenses.id))
+          .where(
+            and(eq(experienceLenses.experienceId, experience.id), eq(lenses.status, "published")),
+          )
+          .orderBy(asc(lenses.position), asc(lenses.name)),
+        db
+          .select({ principle: principles })
+          .from(experiencePrinciples)
+          .innerJoin(principles, eq(experiencePrinciples.principleId, principles.id))
+          .where(
+            and(
+              eq(experiencePrinciples.experienceId, experience.id),
+              eq(principles.status, "published"),
+            ),
+          )
+          .orderBy(asc(principles.position), asc(principles.title)),
+        db
+          .select({ caseStudy: caseStudies })
+          .from(caseStudyExperiences)
+          .innerJoin(caseStudies, eq(caseStudyExperiences.caseStudyId, caseStudies.id))
+          .where(
+            and(
+              eq(caseStudyExperiences.experienceId, experience.id),
+              eq(caseStudies.status, "published"),
+            ),
+          )
+          .orderBy(asc(caseStudies.position), desc(caseStudies.publishedAt), desc(caseStudies.createdAt)),
+        db
+          .select({ project: projects })
+          .from(caseStudyExperiences)
+          .innerJoin(caseStudies, eq(caseStudyExperiences.caseStudyId, caseStudies.id))
+          .innerJoin(caseStudyProjects, eq(caseStudyProjects.caseStudyId, caseStudies.id))
+          .innerJoin(projects, eq(caseStudyProjects.projectId, projects.id))
+          .where(
+            and(
+              eq(caseStudyExperiences.experienceId, experience.id),
+              eq(caseStudies.status, "published"),
+              eq(projects.status, "published"),
+            ),
+          )
+          .orderBy(asc(projects.position), asc(projects.name)),
+        db
+          .select({ skill: skills })
+          .from(experienceSkills)
+          .innerJoin(skills, eq(experienceSkills.skillId, skills.id))
+          .where(
+            and(eq(experienceSkills.experienceId, experience.id), eq(skills.status, "published")),
+          )
+          .orderBy(sql`${skills.category} asc nulls last`, asc(skills.position), asc(skills.name)),
+        db
+          .select({ tag: tags })
+          .from(experienceTags)
+          .innerJoin(tags, eq(experienceTags.tagId, tags.id))
+          .where(and(eq(experienceTags.experienceId, experience.id), eq(tags.status, "published")))
+          .orderBy(sql`${tags.category} asc nulls last`, asc(tags.name)),
+      ]);
+
+    return {
+      experience,
+      lenses: lensRows.map((row) => row.lens),
+      principles: principleRows.map((row) => row.principle),
+      caseStudies: caseStudyRows.map((row) => row.caseStudy),
+      projects: uniqueById(projectRows.map((row) => row.project)),
+      skills: skillRows.map((row) => row.skill),
+      tags: tagRows.map((row) => row.tag),
+    };
+  });
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
+export async function getLensBySlug(slug: string): Promise<LensDetailRecord | null> {
+  return readOne(async (db) => {
+    const [lens] = await db
+      .select()
+      .from(lenses)
+      .where(and(eq(lenses.slug, slug), eq(lenses.status, "published")))
+      .limit(1);
+
+    if (!lens) {
+      return undefined;
+    }
+
+    const [caseStudyRows, experienceRows, projectRows, principleRows] = await Promise.all([
+      db
+        .select({ caseStudy: caseStudies })
+        .from(caseStudyLenses)
+        .innerJoin(caseStudies, eq(caseStudyLenses.caseStudyId, caseStudies.id))
+        .where(and(eq(caseStudyLenses.lensId, lens.id), eq(caseStudies.status, "published")))
+        .orderBy(asc(caseStudies.position), desc(caseStudies.publishedAt)),
+      db
+        .select({ experience: experiences })
+        .from(caseStudyExperiences)
+        .innerJoin(experiences, eq(caseStudyExperiences.experienceId, experiences.id))
+        .innerJoin(caseStudies, eq(caseStudyExperiences.caseStudyId, caseStudies.id))
+        .innerJoin(caseStudyLenses, eq(caseStudyLenses.caseStudyId, caseStudies.id))
+        .where(
+          and(
+            eq(caseStudyLenses.lensId, lens.id),
+            eq(caseStudies.status, "published"),
+            eq(experiences.status, "published"),
+          ),
+        )
+        .orderBy(...reverseChronologicalExperienceOrder()),
+      db
+        .select({ project: projects })
+        .from(caseStudyProjects)
+        .innerJoin(projects, eq(caseStudyProjects.projectId, projects.id))
+        .innerJoin(caseStudies, eq(caseStudyProjects.caseStudyId, caseStudies.id))
+        .innerJoin(caseStudyLenses, eq(caseStudyLenses.caseStudyId, caseStudies.id))
+        .where(
+          and(
+            eq(caseStudyLenses.lensId, lens.id),
+            eq(caseStudies.status, "published"),
+            eq(projects.status, "published"),
+          ),
+        )
+        .orderBy(asc(projects.position), asc(projects.name)),
+      db
+        .select({ principle: principles })
+        .from(caseStudyPrinciples)
+        .innerJoin(principles, eq(caseStudyPrinciples.principleId, principles.id))
+        .innerJoin(caseStudies, eq(caseStudyPrinciples.caseStudyId, caseStudies.id))
+        .innerJoin(caseStudyLenses, eq(caseStudyLenses.caseStudyId, caseStudies.id))
+        .where(
+          and(
+            eq(caseStudyLenses.lensId, lens.id),
+            eq(caseStudies.status, "published"),
+            eq(principles.status, "published"),
+          ),
+        )
+        .orderBy(asc(principles.position), asc(principles.title)),
+    ]);
+
+    return {
+      lens,
+      caseStudies: caseStudyRows.map((row) => row.caseStudy),
+      experiences: uniqueById(experienceRows.map((row) => row.experience)),
+      projects: uniqueById(projectRows.map((row) => row.project)),
+      principles: uniqueById(principleRows.map((row) => row.principle)),
+    };
+  });
+}
+
+function uniqueById<T extends { id: string }>(records: T[]): T[] {
+  const seen = new Set<string>();
+  return records.filter((record) => {
+    if (seen.has(record.id)) {
+      return false;
+    }
+
+    seen.add(record.id);
+    return true;
+  });
+}
+
+function reverseChronologicalExperienceOrder() {
+  return [
+    desc(experiences.isCurrent),
+    sql`${experiences.startDate} desc nulls last`,
+    sql`${experiences.endDate} desc nulls last`,
+    desc(experiences.createdAt),
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Admin single-record lookups (any status) used to populate edit forms.
+// ---------------------------------------------------------------------------
+
+export async function getLensById(id: string): Promise<LensRecord | null> {
+  return readOne(async (db) => {
+    const [row] = await db.select().from(lenses).where(eq(lenses.id, id)).limit(1);
+    return row;
+  });
+}
+
+export async function getPrincipleById(id: string): Promise<PrincipleRecord | null> {
+  return readOne(async (db) => {
+    const [row] = await db.select().from(principles).where(eq(principles.id, id)).limit(1);
+    return row;
+  });
+}
+
+export async function getSkillById(id: string): Promise<SkillRecord | null> {
+  return readOne(async (db) => {
+    const [row] = await db.select().from(skills).where(eq(skills.id, id)).limit(1);
+    return row;
+  });
+}
+
+export async function getTagById(id: string): Promise<TagRecord | null> {
+  return readOne(async (db) => {
+    const [row] = await db.select().from(tags).where(eq(tags.id, id)).limit(1);
+    return row;
+  });
+}
+
+export async function getDecisionPatternById(
+  id: string,
+): Promise<DecisionPatternEditRecord | null> {
+  return readOne(async (db) => {
+    const [record] = await db
+      .select()
+      .from(decisionPatterns)
+      .where(eq(decisionPatterns.id, id))
+      .limit(1);
+
+    if (!record) {
+      return undefined;
+    }
+
+    const principleRows = await db
+      .select({ id: decisionPatternPrinciples.principleId })
+      .from(decisionPatternPrinciples)
+      .where(eq(decisionPatternPrinciples.decisionPatternId, id));
+
+    return { ...record, principleIds: principleRows.map((row) => row.id) };
+  });
+}
+
+export async function getExperienceById(id: string): Promise<ExperienceEditRecord | null> {
+  return readOne(async (db) => {
+    const [record] = await db.select().from(experiences).where(eq(experiences.id, id)).limit(1);
+
+    if (!record) {
+      return undefined;
+    }
+
+    const [lensRows, principleRows, skillRows, tagRows] = await Promise.all([
+      db
+        .select({ id: experienceLenses.lensId })
+        .from(experienceLenses)
+        .where(eq(experienceLenses.experienceId, id)),
+      db
+        .select({ id: experiencePrinciples.principleId })
+        .from(experiencePrinciples)
+        .where(eq(experiencePrinciples.experienceId, id)),
+      db
+        .select({ id: experienceSkills.skillId })
+        .from(experienceSkills)
+        .where(eq(experienceSkills.experienceId, id)),
+      db
+        .select({ id: experienceTags.tagId })
+        .from(experienceTags)
+        .where(eq(experienceTags.experienceId, id)),
+    ]);
+
+    return {
+      ...record,
+      lensIds: lensRows.map((row) => row.id),
+      principleIds: principleRows.map((row) => row.id),
+      skillIds: skillRows.map((row) => row.id),
+      tagIds: tagRows.map((row) => row.id),
+    };
+  });
+}
+
+export async function getProjectById(id: string): Promise<ProjectEditRecord | null> {
+  return readOne(async (db) => {
+    const [record] = await db.select().from(projects).where(eq(projects.id, id)).limit(1);
+
+    if (!record) {
+      return undefined;
+    }
+
+    const [lensRows, principleRows, skillRows, tagRows] = await Promise.all([
+      db
+        .select({ id: projectLenses.lensId })
+        .from(projectLenses)
+        .where(eq(projectLenses.projectId, id)),
+      db
+        .select({ id: projectPrinciples.principleId })
+        .from(projectPrinciples)
+        .where(eq(projectPrinciples.projectId, id)),
+      db
+        .select({ id: projectSkills.skillId })
+        .from(projectSkills)
+        .where(eq(projectSkills.projectId, id)),
+      db
+        .select({ id: projectTags.tagId })
+        .from(projectTags)
+        .where(eq(projectTags.projectId, id)),
+    ]);
+
+    return {
+      ...record,
+      lensIds: lensRows.map((row) => row.id),
+      principleIds: principleRows.map((row) => row.id),
+      skillIds: skillRows.map((row) => row.id),
+      tagIds: tagRows.map((row) => row.id),
+    };
+  });
+}
+
+export async function getCaseStudyById(id: string): Promise<CaseStudyEditRecord | null> {
+  return readOne(async (db) => {
+    const [record] = await db.select().from(caseStudies).where(eq(caseStudies.id, id)).limit(1);
+
+    if (!record) {
+      return undefined;
+    }
+
+    const [lensRows, principleRows, experienceRows, projectRows, skillRows, tagRows] =
+      await Promise.all([
+        db
+          .select({ id: caseStudyLenses.lensId })
+          .from(caseStudyLenses)
+          .where(eq(caseStudyLenses.caseStudyId, id)),
+        db
+          .select({ id: caseStudyPrinciples.principleId })
+          .from(caseStudyPrinciples)
+          .where(eq(caseStudyPrinciples.caseStudyId, id)),
+        db
+          .select({ id: caseStudyExperiences.experienceId })
+          .from(caseStudyExperiences)
+          .where(eq(caseStudyExperiences.caseStudyId, id)),
+        db
+          .select({ id: caseStudyProjects.projectId })
+          .from(caseStudyProjects)
+          .where(eq(caseStudyProjects.caseStudyId, id)),
+        db
+          .select({ id: caseStudySkills.skillId })
+          .from(caseStudySkills)
+          .where(eq(caseStudySkills.caseStudyId, id)),
+        db
+          .select({ id: caseStudyTags.tagId })
+          .from(caseStudyTags)
+          .where(eq(caseStudyTags.caseStudyId, id)),
+      ]);
+
+    return {
+      ...record,
+      lensIds: lensRows.map((row) => row.id),
+      principleIds: principleRows.map((row) => row.id),
+      experienceIds: experienceRows.map((row) => row.id),
+      projectIds: projectRows.map((row) => row.id),
+      skillIds: skillRows.map((row) => row.id),
+      tagIds: tagRows.map((row) => row.id),
+    };
+  });
+}
