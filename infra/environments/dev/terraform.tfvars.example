@@ -1,0 +1,18 @@
+env_file_path = "../../../.env"
+
+# Existing issued ACM certificate for huseyinbozkurt.dev / *.huseyinbozkurt.dev.
+# Store the real ARN in your local terraform.tfvars.
+acm_certificate_arn = "<issued-acm-certificate-arn>"
+
+# Match the policy already attached to the live ALB listener unless intentionally changing it.
+alb_https_ssl_policy = "<alb-https-ssl-policy-name>"
+
+# Optional. Use when the production DATABASE_URL secret does not include sslmode.
+# Leave null when DATABASE_URL already includes sslmode=require or when SSL is not required.
+database_ssl_mode = null
+
+# Keep public-site requests from hanging when the remote database is unavailable.
+database_connect_timeout_seconds = 3
+
+# Docker image path for the root global-bundle.pem CA bundle.
+database_ssl_ca_file = "/app/global-bundle.pem"
