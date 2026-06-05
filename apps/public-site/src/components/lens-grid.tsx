@@ -6,20 +6,13 @@ import Link from "next/link";
 
 import type { Lens } from "@portfolio/types";
 
-import { EmptyState } from "@/components/empty-state";
-
 interface LensGridProps {
   lenses: Lens[];
 }
 
 export function LensGrid({ lenses }: LensGridProps) {
   if (lenses.length === 0) {
-    return (
-      <EmptyState
-        title="Content coming soon"
-        description="The portfolio lenses are being prepared. Once content is added, this area will let visitors explore the work through different modes of engineering."
-      />
-    );
+    return null;
   }
 
   return (
@@ -43,9 +36,9 @@ export function LensGrid({ lenses }: LensGridProps) {
               style={{ backgroundColor: "var(--lens-accent)" }}
             />
             <h3 className="text-xl font-semibold text-ink">{lens.name}</h3>
-            <p className="mt-4 text-sm leading-6 text-muted">
-              {lens.summary || "Lens details coming soon."}
-            </p>
+            {lens.summary ? (
+              <p className="mt-4 text-sm leading-6 text-muted">{lens.summary}</p>
+            ) : null}
           </Link>
         </motion.div>
       ))}

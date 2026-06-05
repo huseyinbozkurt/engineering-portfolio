@@ -5,6 +5,7 @@ import { getCaseStudyBySlug, getPublishedCaseStudies } from "@portfolio/db/queri
 
 import { RichText } from "@/components/rich-text";
 import { StatusPill } from "@/components/status-pill";
+import { getComingSoonFallback } from "@/lib/coming-soon-gate";
 import { siteConfig } from "@/lib/site";
 
 interface CaseStudyPageProps {
@@ -55,6 +56,12 @@ export async function generateMetadata({ params }: CaseStudyPageProps): Promise<
 }
 
 export default async function CaseStudyPage({ params }: CaseStudyPageProps) {
+  const comingSoon = await getComingSoonFallback();
+
+  if (comingSoon) {
+    return comingSoon;
+  }
+
   const { slug } = await params;
   const detail = await getCaseStudyBySlug(slug);
 
@@ -70,7 +77,7 @@ export default async function CaseStudyPage({ params }: CaseStudyPageProps) {
     { title: "Trade-offs", value: detail.caseStudy.tradeoffs, accent: "text-amber-200" },
     { title: "Outcome", value: detail.caseStudy.outcome, accent: "text-teal-100" },
     { title: "What I Learned", value: detail.caseStudy.learning, accent: "text-sky-200" },
-  ];
+  ].filter((section) => section.value.trim().length > 0);
 
   return (
     <article className="mx-auto flex min-h-screen max-w-7xl flex-col px-5 py-5 lg:h-[calc(100vh-4.5rem)] lg:min-h-[calc(100vh-4.5rem)] lg:px-8">
@@ -175,11 +182,7 @@ function CaseStudySectionCard({
         </span>
       </div>
       <div className="mt-3 min-h-0 flex-1 overflow-y-auto pr-1 [&_.rich-text]:gap-2 [&_.rich-text]:text-sm [&_.rich-text]:leading-6">
-        {section.value.trim() ? (
-          <RichText value={section.value} />
-        ) : (
-          <p className="text-sm leading-6 text-muted">Section content coming soon.</p>
-        )}
+        <RichText value={section.value} />
       </div>
     </section>
   );

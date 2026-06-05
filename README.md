@@ -6,7 +6,7 @@ A production-oriented, data-driven engineering portfolio for `huseyinbozkurt.dev
 
 - `apps/public-site`: read-only Next.js 15 App Router site for public visitors, SEO, navigation, lenses, case studies, and empty states.
 - `apps/admin`: separate minimal Next.js 15 admin application for future content management and initial content entry.
-- `packages/db`: Drizzle ORM schema, migrations, read queries, and admin mutations for PostgreSQL/Neon.
+- `packages/db`: Drizzle ORM schema, migrations, read queries, and admin mutations for PostgreSQL.
 - `packages/types`: shared TypeScript models inferred from the database schema.
 - `packages/validators`: shared Zod validators for admin forms and content contracts.
 
@@ -83,8 +83,8 @@ CUSTOM_LLM_CONNECTIONS='[{"id":"ollama","name":"Ollama","provider":"custom","bas
 ## Local Database
 
 The local database runs in Docker and is intended only for development. Production
-uses Neon PostgreSQL through `DATABASE_URL`; no production database should run
-through Docker.
+uses a remote PostgreSQL database through `DATABASE_URL`; no production database
+should run through Docker.
 
 Start PostgreSQL locally:
 
@@ -105,6 +105,9 @@ The default local connection string is:
 
 ```bash
 DATABASE_URL="postgresql://portfolio:portfolio@localhost:5432/engineering_portfolio"
+DATABASE_SSL_MODE="disable"
+DATABASE_SSL_CA_FILE="global-bundle.pem"
+DATABASE_CONNECT_TIMEOUT_SECONDS="3"
 ```
 
 If port `5432` is already used on your machine, override the host port and
@@ -143,12 +146,12 @@ pnpm db:studio
 ```
 
 Drizzle Studio reads the same `DATABASE_URL`, so it works with local Docker
-PostgreSQL or Neon depending on the environment.
+PostgreSQL or the remote PostgreSQL database depending on the environment.
 
 ## Database
 
 The schema is defined in `packages/db/src/schema.ts` with Drizzle ORM and is
-designed for PostgreSQL 17 locally and Neon PostgreSQL in production. It uses
+designed for PostgreSQL 17 locally and remote PostgreSQL in production. It uses
 relational tables, foreign keys, and junction tables for relationships. There
 are no JSON blobs for entity relationships.
 
@@ -675,12 +678,24 @@ MDX or a richer editor later without changing relationship modeling.
 
 ## Deployment Notes
 
-- Public site target: Vercel.
-- Database target: PostgreSQL with Neon-compatible connection strings.
+- Public site target: AWS ECS Fargate behind an AWS Application Load Balancer.
+- Domain: `huseyinbozkurt.dev`.
+- Cloudflare DNS points the main site to the ALB DNS name with a proxied CNAME.
+- ALB DNS name: `portfolio-dev-alb-2138299774.ca-central-1.elb.amazonaws.com`.
+- Cloudflare SSL mode should be `Full (strict)`.
+- Keep the main site CNAME proxied. Keep ACM DNS validation CNAME records DNS Only.
+- Database target: remote PostgreSQL via `DATABASE_URL`.
 - Public site has no admin routes, no write APIs, and no embedded CMS.
-- Set `DATABASE_URL` and `NEXT_PUBLIC_SITE_URL` in Vercel.
-- Set `DATABASE_URL` to the Neon connection string in production, usually with
-  `sslmode=require`.
+- Set `DATABASE_URL` and `NEXT_PUBLIC_SITE_URL` in AWS Secrets Manager for ECS.
+- Set `DATABASE_URL` to the remote PostgreSQL connection string in production.
+  If the remote database requires SSL, include `sslmode=require` in the URL or
+  set non-secret `DATABASE_SSL_MODE=require` for the ECS task. The Postgres
+  client verifies the server certificate with the root `global-bundle.pem`
+  bundle through `DATABASE_SSL_CA_FILE`.
+- Public-site reads treat a missing or unreachable database as empty content, so
+  the app renders the Coming Soon view instead of crashing. The connection
+  timeout defaults to 3 seconds and can be tuned with
+  `DATABASE_CONNECT_TIMEOUT_SECONDS`.
 - Keep Docker Compose limited to local development.
 
 ## Future Extensions

@@ -3,7 +3,7 @@ export const siteConfig = {
   title: "Huseyin Bozkurt | Engineering Portfolio",
   description:
     "A professional engineering portfolio organized around lenses, operating principles, decisions, projects, experience, and case studies.",
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://huseyinbozkurt.dev",
+  url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
 };
 
 export const navItems = [

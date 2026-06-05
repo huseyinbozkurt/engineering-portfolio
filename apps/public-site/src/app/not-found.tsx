@@ -1,8 +1,15 @@
 import Link from "next/link";
 
 import { EmptyState } from "@/components/empty-state";
+import { getComingSoonFallback } from "@/lib/coming-soon-gate";
 
-export default function NotFound() {
+export default async function NotFound() {
+  const comingSoon = await getComingSoonFallback();
+
+  if (comingSoon) {
+    return comingSoon;
+  }
+
   return (
     <section className="mx-auto max-w-3xl px-5 py-20 lg:px-8">
       <EmptyState

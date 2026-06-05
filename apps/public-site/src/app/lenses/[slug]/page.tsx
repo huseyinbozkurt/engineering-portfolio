@@ -4,8 +4,8 @@ import { notFound } from "next/navigation";
 import { getLensBySlug, getPublishedLenses } from "@portfolio/db/queries";
 
 import { ContentCard } from "@/components/content-card";
-import { EmptyState } from "@/components/empty-state";
 import { SectionHeading } from "@/components/section-heading";
+import { getComingSoonFallback } from "@/lib/coming-soon-gate";
 import { siteConfig } from "@/lib/site";
 
 interface LensPageProps {
@@ -50,6 +50,12 @@ export async function generateMetadata({ params }: LensPageProps): Promise<Metad
 }
 
 export default async function LensPage({ params }: LensPageProps) {
+  const comingSoon = await getComingSoonFallback();
+
+  if (comingSoon) {
+    return comingSoon;
+  }
+
   const { slug } = await params;
   const detail = await getLensBySlug(slug);
 
@@ -64,18 +70,13 @@ export default async function LensPage({ params }: LensPageProps) {
         <h1 className="max-w-4xl text-4xl font-semibold text-ink md:text-6xl">
           {detail.lens.name}
         </h1>
-        <p className="mt-6 max-w-3xl text-lg leading-8 text-muted">
-          {detail.lens.summary || "Lens details coming soon."}
-        </p>
+        {detail.lens.summary ? (
+          <p className="mt-6 max-w-3xl text-lg leading-8 text-muted">{detail.lens.summary}</p>
+        ) : null}
       </section>
-      <section className="mx-auto max-w-7xl px-5 pb-16 lg:px-8">
-        <SectionHeading title="Related Case Studies" />
-        {detail.caseStudies.length === 0 ? (
-          <EmptyState
-            title="Related case studies coming soon"
-            description="Published case studies connected to this lens will appear here."
-          />
-        ) : (
+      {detail.caseStudies.length > 0 ? (
+        <section className="mx-auto max-w-7xl px-5 pb-16 lg:px-8">
+          <SectionHeading title="Related Case Studies" />
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {detail.caseStudies.map((caseStudy) => (
               <ContentCard
@@ -87,8 +88,8 @@ export default async function LensPage({ params }: LensPageProps) {
               />
             ))}
           </div>
-        )}
-      </section>
+        </section>
+      ) : null}
     </>
   );
 }

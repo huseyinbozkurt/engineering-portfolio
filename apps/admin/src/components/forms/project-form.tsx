@@ -5,17 +5,19 @@ import {
   CheckboxGroup,
   Field,
   SeoFields,
+  SelectField,
   StatusSelect,
   SubmitButton,
-  TextArea,
 } from "@/components/form-controls";
 
+import { RichTextField } from "./rich-text-field";
 import type { FormAction, RelationOption } from "./types";
 
 interface ProjectFormProps {
   action: FormAction;
   title: string;
   submitLabel: string;
+  experienceOptions: RelationOption[];
   lensOptions: RelationOption[];
   principleOptions: RelationOption[];
   skillOptions: RelationOption[];
@@ -27,6 +29,7 @@ export function ProjectForm({
   action,
   title,
   submitLabel,
+  experienceOptions,
   lensOptions,
   principleOptions,
   skillOptions,
@@ -34,6 +37,11 @@ export function ProjectForm({
   defaults,
 }: ProjectFormProps) {
   const isEditing = Boolean(defaults);
+  // A project belongs to at most one position; "" maps back to null server-side.
+  const positionOptions = [
+    { label: "— No related position —", value: "" },
+    ...experienceOptions.map((option) => ({ label: option.label, value: option.id })),
+  ];
 
   return (
     <ConfirmedForm
@@ -71,11 +79,25 @@ export function ProjectForm({
           type="number"
           defaultValue={defaults ? String(defaults.position) : undefined}
         />
-        <TextArea
+        <RichTextField
           label="Description"
           name="description"
-          rows={7}
+          rows={6}
           defaultValue={defaults?.description}
+          hint="Short summary shown on project cards and at the top of the project page."
+        />
+        <RichTextField
+          label="Details"
+          name="details"
+          rows={14}
+          defaultValue={defaults?.details}
+          hint="Long-form, in-depth content shown on the project detail page."
+        />
+        <SelectField
+          label="Related position"
+          name="experienceId"
+          options={positionOptions}
+          defaultValue={defaults?.experienceId ?? ""}
         />
         <CheckboxGroup
           label="Related lenses"

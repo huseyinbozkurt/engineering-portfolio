@@ -2,21 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import {
-  getExperienceBySlug,
-  getPublishedExperiences,
-} from "@portfolio/db/queries";
+import { getProjectBySlug, getPublishedProjects } from "@portfolio/db/queries";
 
 import { ContentCard } from "@/components/content-card";
 import { RichText } from "@/components/rich-text";
 import { SectionHeading } from "@/components/section-heading";
 import { StatusPill } from "@/components/status-pill";
-import { formatDateRange } from "@/lib/format";
 import { getComingSoonFallback } from "@/lib/coming-soon-gate";
 import { experienceHref, projectHref } from "@/lib/paths";
 import { siteConfig } from "@/lib/site";
 
-interface ExperienceDetailPageProps {
+interface ProjectDetailPageProps {
   params: Promise<{
     slug: string;
   }>;
@@ -25,19 +21,19 @@ interface ExperienceDetailPageProps {
 export const revalidate = 3600;
 
 export async function generateStaticParams(): Promise<Array<{ slug: string }>> {
-  const experiences = await getPublishedExperiences();
-  return experiences.map((experience) => ({ slug: experience.slug || experience.id }));
+  const projects = await getPublishedProjects();
+  return projects.map((project) => ({ slug: project.slug }));
 }
 
 export async function generateMetadata({
   params,
-}: ExperienceDetailPageProps): Promise<Metadata> {
+}: ProjectDetailPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const detail = await getExperienceBySlug(slug);
+  const detail = await getProjectBySlug(slug);
 
   if (!detail) {
     return {
-      title: "Experience",
+      title: "Project",
       robots: {
         index: false,
         follow: false,
@@ -45,23 +41,23 @@ export async function generateMetadata({
     };
   }
 
-  const title = `${detail.experience.role} at ${detail.experience.company}`;
-  const description = detail.experience.seoDescription || detail.experience.summary || siteConfig.description;
+  const description =
+    detail.project.seoDescription || detail.project.description || siteConfig.description;
 
   return {
-    title: detail.experience.seoTitle || title,
+    title: detail.project.seoTitle || detail.project.name,
     description,
     alternates: {
-      canonical: experienceHref(detail.experience),
+      canonical: projectHref(detail.project),
     },
     openGraph: {
-      title,
+      title: detail.project.name,
       description,
-      url: experienceHref(detail.experience),
+      url: projectHref(detail.project),
     },
     twitter: {
       card: "summary_large_image",
-      title,
+      title: detail.project.name,
       description,
     },
   };
@@ -100,7 +96,7 @@ function MetaGroup({ title, items }: { title: string; items: MetaItem[] }) {
   );
 }
 
-export default async function ExperienceDetailPage({ params }: ExperienceDetailPageProps) {
+export default async function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   const comingSoon = await getComingSoonFallback();
 
   if (comingSoon) {
@@ -108,78 +104,110 @@ export default async function ExperienceDetailPage({ params }: ExperienceDetailP
   }
 
   const { slug } = await params;
-  const detail = await getExperienceBySlug(slug);
+  const detail = await getProjectBySlug(slug);
 
   if (!detail) {
     notFound();
   }
 
-  const { experience } = detail;
-  const dateRange = formatDateRange(
-    experience.startDate,
-    experience.endDate,
-    experience.isCurrent,
-  );
-  const hasSummary = experience.summary.trim().length > 0;
-  const hasDetails = experience.details.trim().length > 0;
+  const { project } = detail;
+  const hasDescription = project.description.trim().length > 0;
+  const hasDetails = project.details.trim().length > 0;
   const hasMeta =
+    Boolean(detail.experience) ||
     detail.lenses.length > 0 ||
     detail.skills.length > 0 ||
     detail.principles.length > 0 ||
     detail.tags.length > 0;
+  const hasLinks = Boolean(project.url || project.githubUrl);
 
   return (
     <>
       <article className="mx-auto max-w-6xl px-5 py-16 lg:px-8 lg:py-20">
         <Link
-          href="/experience"
+          href="/projects"
           className="inline-flex items-center gap-2 text-sm text-muted transition hover:text-ink"
         >
-          <span aria-hidden>←</span> All experience
+          <span aria-hidden>←</span> All projects
         </Link>
 
         <header className="mt-8">
-          <p className="text-sm font-medium text-teal-200">Experience</p>
-          <h1 className="mt-4 text-4xl font-semibold text-ink md:text-6xl">{experience.role}</h1>
-          <p className="mt-3 text-xl text-muted">{experience.company}</p>
-          {dateRange || experience.location ? (
-            <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-              {dateRange ? <span className="text-amber-200">{dateRange}</span> : null}
-              {dateRange && experience.location ? (
-                <span className="text-muted/50" aria-hidden>
-                  •
-                </span>
+          <p className="text-sm font-medium text-teal-200">Project</p>
+          <h1 className="mt-4 text-4xl font-semibold text-ink md:text-6xl">{project.name}</h1>
+          {detail.experience ? (
+            <p className="mt-3 text-sm text-muted">
+              Built during{" "}
+              <Link
+                href={experienceHref(detail.experience)}
+                className="text-amber-200 underline-offset-4 transition hover:underline"
+              >
+                {detail.experience.role} at {detail.experience.company}
+              </Link>
+            </p>
+          ) : null}
+          {hasLinks ? (
+            <div className="mt-6 flex flex-wrap gap-3">
+              {project.url ? (
+                <a
+                  href={project.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-lg bg-teal-200 px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-teal-100"
+                >
+                  Visit project ↗
+                </a>
               ) : null}
-              {experience.location ? (
-                <span className="text-muted">{experience.location}</span>
+              {project.githubUrl ? (
+                <a
+                  href={project.githubUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-lg border border-line px-5 py-2.5 text-sm font-semibold text-ink transition hover:border-teal-300/50 hover:bg-white/[0.06]"
+                >
+                  View source ↗
+                </a>
               ) : null}
             </div>
           ) : null}
         </header>
 
-        {hasSummary || hasDetails || hasMeta ? (
+        {hasDescription || hasDetails || hasMeta ? (
           <div
             className={
               hasMeta ? "mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]" : "mt-10"
             }
           >
             <div className="grid min-w-0 gap-6">
-              {hasSummary ? (
+              {hasDescription ? (
                 <section className="glass-panel rounded-lg p-6 lg:p-8">
-                  <h2 className="mb-5 text-2xl font-semibold text-ink">Summary</h2>
-                  <RichText value={experience.summary} />
+                  <h2 className="mb-5 text-2xl font-semibold text-ink">Overview</h2>
+                  <RichText value={project.description} />
                 </section>
               ) : null}
               {hasDetails ? (
                 <section className="glass-panel rounded-lg p-6 lg:p-8">
                   <h2 className="mb-5 text-2xl font-semibold text-ink">Details</h2>
-                  <RichText value={experience.details} />
+                  <RichText value={project.details} />
                 </section>
               ) : null}
             </div>
 
             {hasMeta ? (
               <aside className="grid content-start gap-6">
+                <MetaGroup
+                  title="Position"
+                  items={
+                    detail.experience
+                      ? [
+                          {
+                            id: detail.experience.id,
+                            label: `${detail.experience.role} at ${detail.experience.company}`,
+                            href: experienceHref(detail.experience),
+                          },
+                        ]
+                      : []
+                  }
+                />
                 <MetaGroup
                   title="Lenses"
                   items={detail.lenses.map((lens) => ({
@@ -224,23 +252,6 @@ export default async function ExperienceDetailPage({ params }: ExperienceDetailP
                 />
               ))}
             </div>
-          </div>
-        </section>
-      ) : null}
-
-      {detail.projects.length > 0 ? (
-        <section className="mx-auto max-w-7xl px-5 py-14 lg:px-8">
-          <SectionHeading title="Related Projects" />
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {detail.projects.map((project) => (
-              <ContentCard
-                key={project.id}
-                href={projectHref(project)}
-                title={project.name}
-                description={project.description}
-                meta="Project"
-              />
-            ))}
           </div>
         </section>
       ) : null}

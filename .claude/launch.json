@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "public-site",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@portfolio/public-site", "dev"],
+      "port": 3000
+    },
+    {
+      "name": "admin",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@portfolio/admin", "dev"],
+      "port": 3001
+    }
+  ]
+}

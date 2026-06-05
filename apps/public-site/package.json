@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@next/env": "15.5.19",
     "@portfolio/db": "workspace:*",
     "@portfolio/types": "workspace:*",
     "@portfolio/validators": "workspace:*",

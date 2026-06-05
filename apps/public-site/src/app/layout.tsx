@@ -1,11 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
+import { ComingSoon } from "@/components/coming-soon";
 import { Footer } from "@/components/footer";
 import { Nav } from "@/components/nav";
+import { getPublicSiteAvailability } from "@/lib/site-availability";
 import { siteConfig } from "@/lib/site";
 
 import "./globals.css";
+
+export const revalidate = 3600;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
@@ -36,17 +40,27 @@ export const viewport: Viewport = {
   colorScheme: "dark",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: ReactNode;
 }>) {
+  const { shouldShowComingSoon } = await getPublicSiteAvailability();
+
   return (
     <html lang="en">
       <body>
-        <Nav />
-        <main>{children}</main>
-        <Footer />
+        {shouldShowComingSoon ? (
+          <main>
+            <ComingSoon />
+          </main>
+        ) : (
+          <>
+            <Nav />
+            <main>{children}</main>
+            <Footer />
+          </>
+        )}
       </body>
     </html>
   );

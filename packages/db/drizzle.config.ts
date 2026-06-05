@@ -3,6 +3,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { getDrizzleDbCredentials } from "./src/database-url";
+
 const packageDir = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = join(packageDir, "../..");
 
@@ -19,9 +21,9 @@ if (!databaseUrl && !allowsMissingDatabaseUrl) {
   throw new Error(
     [
       "DATABASE_URL is required to run Drizzle database commands.",
-      "Create /Users/huseyin/Documents/engineering-portfolio/.env and set DATABASE_URL to a real PostgreSQL or Neon connection string.",
+      "Create /Users/huseyin/Documents/engineering-portfolio/.env and set DATABASE_URL to a real PostgreSQL connection string.",
       "Local Docker example: DATABASE_URL=\"postgresql://portfolio:portfolio@localhost:5432/engineering_portfolio\"",
-      "Production Neon example: DATABASE_URL=\"postgresql://user:password@host.neon.tech/database?sslmode=require\"",
+      "Production example: DATABASE_URL=\"postgresql://<user>:<password>@<db-host>:5432/<database>?sslmode=require\"",
     ].join("\n"),
   );
 }
@@ -30,9 +32,7 @@ export default defineConfig({
   dialect: "postgresql",
   schema: "./src/schema.ts",
   out: "./migrations",
-  dbCredentials: {
-    url: databaseUrl,
-  },
+  dbCredentials: getDrizzleDbCredentials(databaseUrl),
   strict: true,
   verbose: true,
 });

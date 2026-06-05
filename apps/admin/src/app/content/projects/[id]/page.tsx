@@ -52,6 +52,10 @@ export default async function EditProjectPage({ params }: EditPageProps) {
               action={updateProjectAction}
               title={project.name}
               submitLabel="Save changes"
+              experienceOptions={content.experiences.map((experience) => ({
+                id: experience.id,
+                label: `${experience.role} at ${experience.company}`,
+              }))}
               lensOptions={content.lenses.map((lens) => ({ id: lens.id, label: lens.name }))}
               principleOptions={content.principles.map((principle) => ({
                 id: principle.id,

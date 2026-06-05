@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { PageHeader } from "@/components/page-header";
+import { getComingSoonFallback } from "@/lib/coming-soon-gate";
 
 import { ContactForm } from "./contact-form";
 
@@ -12,7 +13,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default function ContactPage() {
+export default async function ContactPage() {
+  const comingSoon = await getComingSoonFallback();
+
+  if (comingSoon) {
+    return comingSoon;
+  }
+
   return (
     <>
       <PageHeader

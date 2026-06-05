@@ -148,6 +148,8 @@ export const experiences = pgTable(
     endDate: date("end_date", { mode: "string" }),
     isCurrent: boolean("is_current").notNull().default(false),
     summary: text("summary").notNull().default(""),
+    // Long-form rich text (markdown) shown on the experience detail page.
+    details: text("details").notNull().default(""),
     ...workflow,
     ...seo,
     ...aiMetadata,
@@ -169,8 +171,15 @@ export const projects = pgTable(
     slug: varchar("slug", { length: 120 }).notNull(),
     name: varchar("name", { length: 180 }).notNull(),
     description: text("description").notNull().default(""),
+    // Long-form rich text (markdown) shown on the project detail page.
+    details: text("details").notNull().default(""),
     url: text("url"),
     githubUrl: text("github_url"),
+    // Optional "position" a project was built during. Nullable: a project need
+    // not belong to an experience, and removing the experience just unlinks it.
+    experienceId: uuid("experience_id").references(() => experiences.id, {
+      onDelete: "set null",
+    }),
     ...workflow,
     ...seo,
     ...aiMetadata,
@@ -181,6 +190,7 @@ export const projects = pgTable(
     slugIdx: uniqueIndex("projects_slug_idx").on(table.slug),
     statusIdx: index("projects_status_idx").on(table.status),
     positionIdx: index("projects_position_idx").on(table.position),
+    experienceIdx: index("projects_experience_idx").on(table.experienceId),
   }),
 );
 

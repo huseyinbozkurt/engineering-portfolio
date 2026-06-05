@@ -104,17 +104,36 @@ export interface ExperienceDetailRecord {
   tags: TagRecord[];
 }
 
+export interface ProjectDetailRecord {
+  project: ProjectRecord;
+  experience: ExperienceRecord | null;
+  lenses: LensRecord[];
+  principles: PrincipleRecord[];
+  skills: SkillRecord[];
+  tags: TagRecord[];
+  caseStudies: CaseStudyRecord[];
+}
+
 export interface AdminContentIndexRecord extends HomeContentRecord {
   skills: SkillRecord[];
   tags: TagRecord[];
 }
 
+// A missing DATABASE_URL or a failed connection are treated the same way: the
+// site has nothing to render, so reads resolve to "empty" rather than throwing.
+// This is what lets the public site fall back to a single "Coming Soon" landing
+// page (whole DB empty or unreachable) instead of crashing on every route.
 async function readArray<T>(reader: (db: PortfolioDb) => Promise<T[]>): Promise<T[]> {
   if (!hasDatabaseUrl()) {
     return [];
   }
 
-  return reader(getDb());
+  try {
+    return await reader(getDb());
+  } catch (error) {
+    console.error("[db] read failed; treating as empty:", error);
+    return [];
+  }
 }
 
 async function readOne<T>(reader: (db: PortfolioDb) => Promise<T | undefined>): Promise<T | null> {
@@ -122,7 +141,12 @@ async function readOne<T>(reader: (db: PortfolioDb) => Promise<T | undefined>): 
     return null;
   }
 
-  return (await reader(getDb())) ?? null;
+  try {
+    return (await reader(getDb())) ?? null;
+  } catch (error) {
+    console.error("[db] read failed; treating as missing:", error);
+    return null;
+  }
 }
 
 // Admin-facing list queries return every status (draft, published, archived).
@@ -421,8 +445,15 @@ export async function getExperienceBySlug(
       return undefined;
     }
 
-    const [lensRows, principleRows, caseStudyRows, projectRows, skillRows, tagRows] =
-      await Promise.all([
+    const [
+      lensRows,
+      principleRows,
+      caseStudyRows,
+      projectRows,
+      directProjectRows,
+      skillRows,
+      tagRows,
+    ] = await Promise.all([
         db
           .select({ lens: lenses })
           .from(experienceLenses)
@@ -467,6 +498,14 @@ export async function getExperienceBySlug(
             ),
           )
           .orderBy(asc(projects.position), asc(projects.name)),
+        // Projects linked directly to this experience via the optional "position".
+        db
+          .select()
+          .from(projects)
+          .where(
+            and(eq(projects.experienceId, experience.id), eq(projects.status, "published")),
+          )
+          .orderBy(asc(projects.position), asc(projects.name)),
         db
           .select({ skill: skills })
           .from(experienceSkills)
@@ -488,9 +527,90 @@ export async function getExperienceBySlug(
       lenses: lensRows.map((row) => row.lens),
       principles: principleRows.map((row) => row.principle),
       caseStudies: caseStudyRows.map((row) => row.caseStudy),
-      projects: uniqueById(projectRows.map((row) => row.project)),
+      projects: uniqueById([
+        ...directProjectRows,
+        ...projectRows.map((row) => row.project),
+      ]),
       skills: skillRows.map((row) => row.skill),
       tags: tagRows.map((row) => row.tag),
+    };
+  });
+}
+
+export async function getProjectBySlug(slug: string): Promise<ProjectDetailRecord | null> {
+  return readOne(async (db) => {
+    const [project] = await db
+      .select()
+      .from(projects)
+      .where(and(eq(projects.slug, slug), eq(projects.status, "published")))
+      .limit(1);
+
+    if (!project) {
+      return undefined;
+    }
+
+    const [lensRows, principleRows, skillRows, tagRows, caseStudyRows] = await Promise.all([
+      db
+        .select({ lens: lenses })
+        .from(projectLenses)
+        .innerJoin(lenses, eq(projectLenses.lensId, lenses.id))
+        .where(and(eq(projectLenses.projectId, project.id), eq(lenses.status, "published")))
+        .orderBy(asc(lenses.position), asc(lenses.name)),
+      db
+        .select({ principle: principles })
+        .from(projectPrinciples)
+        .innerJoin(principles, eq(projectPrinciples.principleId, principles.id))
+        .where(
+          and(eq(projectPrinciples.projectId, project.id), eq(principles.status, "published")),
+        )
+        .orderBy(asc(principles.position), asc(principles.title)),
+      db
+        .select({ skill: skills })
+        .from(projectSkills)
+        .innerJoin(skills, eq(projectSkills.skillId, skills.id))
+        .where(and(eq(projectSkills.projectId, project.id), eq(skills.status, "published")))
+        .orderBy(sql`${skills.category} asc nulls last`, asc(skills.position), asc(skills.name)),
+      db
+        .select({ tag: tags })
+        .from(projectTags)
+        .innerJoin(tags, eq(projectTags.tagId, tags.id))
+        .where(and(eq(projectTags.projectId, project.id), eq(tags.status, "published")))
+        .orderBy(sql`${tags.category} asc nulls last`, asc(tags.name)),
+      db
+        .select({ caseStudy: caseStudies })
+        .from(caseStudyProjects)
+        .innerJoin(caseStudies, eq(caseStudyProjects.caseStudyId, caseStudies.id))
+        .where(
+          and(eq(caseStudyProjects.projectId, project.id), eq(caseStudies.status, "published")),
+        )
+        .orderBy(
+          asc(caseStudies.position),
+          desc(caseStudies.publishedAt),
+          desc(caseStudies.createdAt),
+        ),
+    ]);
+
+    // The optional "position" the project was built during (published only).
+    let experience: ExperienceRecord | null = null;
+    if (project.experienceId) {
+      const [row] = await db
+        .select()
+        .from(experiences)
+        .where(
+          and(eq(experiences.id, project.experienceId), eq(experiences.status, "published")),
+        )
+        .limit(1);
+      experience = row ?? null;
+    }
+
+    return {
+      project,
+      experience,
+      lenses: lensRows.map((row) => row.lens),
+      principles: principleRows.map((row) => row.principle),
+      skills: skillRows.map((row) => row.skill),
+      tags: tagRows.map((row) => row.tag),
+      caseStudies: caseStudyRows.map((row) => row.caseStudy),
     };
   });
 }

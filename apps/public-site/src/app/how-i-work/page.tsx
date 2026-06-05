@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import { getPublishedDecisionPatterns, getPublishedPrinciples } from "@portfolio/db/queries";
 
 import { ContentCard } from "@/components/content-card";
-import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { SectionHeading } from "@/components/section-heading";
+import { getComingSoonFallback } from "@/lib/coming-soon-gate";
 
 export const metadata: Metadata = {
   title: "How I Work",
@@ -18,6 +18,12 @@ export const metadata: Metadata = {
 export const revalidate = 3600;
 
 export default async function HowIWorkPage() {
+  const comingSoon = await getComingSoonFallback();
+
+  if (comingSoon) {
+    return comingSoon;
+  }
+
   const [principles, decisionPatterns] = await Promise.all([
     getPublishedPrinciples(),
     getPublishedDecisionPatterns(),
@@ -30,14 +36,9 @@ export default async function HowIWorkPage() {
         title="Principles first. Decisions in context."
         description="This page shows how problems are approached, which trade-offs matter, and how operating principles connect to real work."
       />
-      <section className="mx-auto max-w-7xl px-5 pb-14 lg:px-8">
-        <SectionHeading title="Operating Principles" />
-        {principles.length === 0 ? (
-          <EmptyState
-            title="Operating principles coming soon"
-            description="Principles are fully data-driven and will appear here once authored."
-          />
-        ) : (
+      {principles.length > 0 ? (
+        <section className="mx-auto max-w-7xl px-5 pb-14 lg:px-8">
+          <SectionHeading title="Operating Principles" />
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {principles.map((principle) => (
               <ContentCard
@@ -47,17 +48,12 @@ export default async function HowIWorkPage() {
               />
             ))}
           </div>
-        )}
-      </section>
-      <section className="border-y border-line bg-white/[0.025]">
-        <div className="mx-auto max-w-7xl px-5 py-14 lg:px-8">
-          <SectionHeading title="Decision Patterns" />
-          {decisionPatterns.length === 0 ? (
-            <EmptyState
-              title="Decision patterns coming soon"
-              description="Decision patterns will be managed as content and connected to operating principles."
-            />
-          ) : (
+        </section>
+      ) : null}
+      {decisionPatterns.length > 0 ? (
+        <section className="border-y border-line bg-white/[0.025]">
+          <div className="mx-auto max-w-7xl px-5 py-14 lg:px-8">
+            <SectionHeading title="Decision Patterns" />
             <div className="grid gap-4 md:grid-cols-2">
               {decisionPatterns.map((pattern) => (
                 <ContentCard
@@ -67,9 +63,9 @@ export default async function HowIWorkPage() {
                 />
               ))}
             </div>
-          )}
-        </div>
-      </section>
+          </div>
+        </section>
+      ) : null}
     </>
   );
 }

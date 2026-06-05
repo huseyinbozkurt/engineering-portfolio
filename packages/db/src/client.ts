@@ -1,9 +1,12 @@
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres, { type Sql } from "postgres";
 
+import { getPostgresSslOptions } from "./database-url";
 import * as schema from "./schema";
 
 export type PortfolioDb = PostgresJsDatabase<typeof schema>;
+
+const defaultConnectTimeoutSeconds = 3;
 
 let cachedConnection: { client: Sql; db: PortfolioDb } | undefined;
 
@@ -20,8 +23,10 @@ export function getDb(): PortfolioDb {
 
   if (!cachedConnection) {
     const client = postgres(connectionString, {
+      connect_timeout: getConnectTimeoutSeconds(),
       max: 10,
       prepare: false,
+      ...getPostgresSslOptions(connectionString),
     });
 
     cachedConnection = {
@@ -31,6 +36,22 @@ export function getDb(): PortfolioDb {
   }
 
   return cachedConnection.db;
+}
+
+function getConnectTimeoutSeconds(): number {
+  const rawTimeout = process.env.DATABASE_CONNECT_TIMEOUT_SECONDS?.trim();
+
+  if (!rawTimeout) {
+    return defaultConnectTimeoutSeconds;
+  }
+
+  const timeout = Number(rawTimeout);
+
+  if (!Number.isInteger(timeout) || timeout < 1) {
+    throw new Error("DATABASE_CONNECT_TIMEOUT_SECONDS must be a positive integer.");
+  }
+
+  return timeout;
 }
 
 export async function closeDb(): Promise<void> {

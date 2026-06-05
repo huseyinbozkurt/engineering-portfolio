@@ -6,6 +6,45 @@ dist
 .turbo
 coverage
 *.tsbuildinfo
+
+# Local environment and secret files
 .env
+.env.*
 .env*.local
 !.env.example
+.envrc
+
+# Terraform local state and private variable files
+**/.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.tfstate.lock.info
+*.tfplan
+*.tfplan.json
+tfplan
+tfplan.*
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Local cloud credentials and secret bundles
+/.aws/
+/.ssh/
+/.secrets/
+/secrets/
+
+# Private keys and certificates
+*.pem
+!global-bundle.pem
+*.key
+*.p8
+*.p12
+*.pfx
+*.crt
+*.csr

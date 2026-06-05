@@ -34,6 +34,12 @@ export const nullableUrlSchema = z.preprocess(
   z.string().url().nullable().default(null),
 );
 
+/** Optional single relation id — an empty selection submits "" and stores null. */
+export const nullableUuidSchema = z.preprocess(
+  emptyStringToNull,
+  uuidSchema.nullable().default(null),
+);
+
 export const nullableEmailSchema = z.preprocess(
   emptyStringToNull,
   z.string().trim().email("Enter a valid email address.").max(320).nullable().default(null),
@@ -105,6 +111,7 @@ export const createExperienceSchema = z.object({
   endDate: nullableDateSchema,
   isCurrent: z.coerce.boolean().default(false),
   summary: richTextSchema,
+  details: richTextSchema,
   status: contentStatusSchema.default("draft"),
   ...seoFields,
   lensIds: relationIdsSchema,
@@ -118,10 +125,12 @@ export const createProjectSchema = z.object({
   slug: slugSchema,
   name: z.string().trim().min(1).max(180),
   description: richTextSchema,
+  details: richTextSchema,
   status: contentStatusSchema.default("draft"),
   url: nullableUrlSchema,
   githubUrl: nullableUrlSchema,
   ...seoFields,
+  experienceId: nullableUuidSchema,
   lensIds: relationIdsSchema,
   principleIds: relationIdsSchema,
   skillIds: relationIdsSchema,

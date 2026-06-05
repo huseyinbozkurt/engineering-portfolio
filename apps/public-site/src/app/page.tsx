@@ -1,24 +1,29 @@
 import Link from "next/link";
 
-import { getHomeContent } from "@portfolio/db/queries";
-
+import { ComingSoon } from "@/components/coming-soon";
 import { ContentCard } from "@/components/content-card";
-import { EmptyState } from "@/components/empty-state";
 import { LensGrid } from "@/components/lens-grid";
 import { SectionHeading } from "@/components/section-heading";
-import { formatDateRange } from "@/lib/format";
-import { experienceHref } from "@/lib/paths";
+import { projectHref } from "@/lib/paths";
+import { getPublicSiteAvailability } from "@/lib/site-availability";
 
 export const revalidate = 3600;
 
 export default async function HomePage() {
-  const content = await getHomeContent();
+  const { content, shouldShowComingSoon } = await getPublicSiteAvailability();
+
+  // RootLayout owns the global gate, but keep this fallback so the page stays
+  // self-contained if rendered outside the normal app shell.
+  if (shouldShowComingSoon) {
+    return <ComingSoon />;
+  }
+
   const totals = [
     { label: "Lenses", value: content.lenses.length, href: "#lenses" },
     { label: "Principles", value: content.principles.length, href: "#principles" },
     { label: "Case studies", value: content.caseStudies.length, href: "#case-studies" },
     { label: "Projects", value: content.projects.length, href: "#projects" },
-  ];
+  ].filter((item) => item.value > 0);
 
   return (
     <>
@@ -49,38 +54,42 @@ export default async function HomePage() {
               </Link>
             </div>
           </div>
-          <div className="grid content-end gap-3">
-            {totals.map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                className="glass-panel group rounded-lg p-5 transition hover:border-teal-300/40 hover:bg-white/8"
-              >
-                <p className="text-4xl font-semibold text-ink">{item.value}</p>
-                <p className="mt-2 text-sm text-muted transition group-hover:text-ink">
-                  {item.label}
-                </p>
-              </Link>
-            ))}
-          </div>
+          {totals.length > 0 ? (
+            <div className="grid content-end gap-3">
+              {totals.map((item) => (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className="glass-panel group rounded-lg p-5 transition hover:border-teal-300/40 hover:bg-white/8"
+                >
+                  <p className="text-4xl font-semibold text-ink">{item.value}</p>
+                  <p className="mt-2 text-sm text-muted transition group-hover:text-ink">
+                    {item.label}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          ) : null}
         </div>
       </section>
 
-      <section id="lenses" className="mx-auto max-w-7xl scroll-mt-24 px-5 py-14 lg:px-8 lg:py-20">
-        <SectionHeading
-          title="Explore By Lens"
-          description="Each lens frames the same body of work from a different engineering responsibility."
-        />
-        <LensGrid lenses={content.lenses} />
-      </section>
-
-      <section id="case-studies" className="scroll-mt-24 border-y border-line bg-white/[0.025]">
-        <div className="mx-auto max-w-7xl px-5 py-14 lg:px-8 lg:py-20">
+      {content.lenses.length > 0 ? (
+        <section id="lenses" className="mx-auto max-w-7xl scroll-mt-24 px-5 py-14 lg:px-8 lg:py-20">
           <SectionHeading
-            title="Case Study Highlights"
-            description="Decisions, trade-offs, and outcomes will appear here as published case studies are added."
+            title="Explore By Lens"
+            description="Each lens frames the same body of work from a different engineering responsibility."
           />
-          {content.caseStudies.length > 0 ? (
+          <LensGrid lenses={content.lenses} />
+        </section>
+      ) : null}
+
+      {content.caseStudies.length > 0 ? (
+        <section id="case-studies" className="scroll-mt-24 border-y border-line bg-white/[0.025]">
+          <div className="mx-auto max-w-7xl px-5 py-14 lg:px-8 lg:py-20">
+            <SectionHeading
+              title="Case Study Highlights"
+              description="Decisions, trade-offs, and outcomes from published case studies."
+            />
             <div className="grid gap-4 md:grid-cols-3">
               {content.caseStudies.slice(0, 3).map((caseStudy) => (
                 <ContentCard
@@ -92,46 +101,36 @@ export default async function HomePage() {
                 />
               ))}
             </div>
-          ) : (
-            <EmptyState
-              title="Case studies are currently being prepared"
-              description="The platform is ready to render case studies as soon as real content is published."
-            />
-          )}
-        </div>
-      </section>
+          </div>
+        </section>
+      ) : null}
 
-      <section id="projects" className="mx-auto max-w-7xl scroll-mt-24 px-5 py-14 lg:px-8 lg:py-20">
-        <SectionHeading
-          title="Projects"
-          description="Projects connect implementation work to lenses, operating principles, and case studies."
-        />
-        {content.projects.length > 0 ? (
+      {content.projects.length > 0 ? (
+        <section id="projects" className="mx-auto max-w-7xl scroll-mt-24 px-5 py-14 lg:px-8 lg:py-20">
+          <SectionHeading
+            title="Projects"
+            description="Projects connect implementation work to lenses, operating principles, and case studies."
+          />
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {content.projects.slice(0, 3).map((project) => (
               <ContentCard
                 key={project.id}
                 title={project.name}
                 description={project.description}
-                href={project.url ?? project.githubUrl ?? "/projects"}
+                href={projectHref(project)}
                 meta="Project"
               />
             ))}
           </div>
-        ) : (
-          <EmptyState
-            title="Projects will appear here"
-            description="Published projects will be listed here once real project records are ready."
-          />
-        )}
-      </section>
+        </section>
+      ) : null}
 
-      <section id="principles" className="mx-auto max-w-7xl scroll-mt-24 px-5 py-14 lg:px-8 lg:py-20">
-        <SectionHeading
-          title="Operating Principles"
-          description="Principles are managed as content and connected to experience, projects, and case studies."
-        />
-        {content.principles.length > 0 ? (
+      {content.principles.length > 0 ? (
+        <section id="principles" className="mx-auto max-w-7xl scroll-mt-24 px-5 py-14 lg:px-8 lg:py-20">
+          <SectionHeading
+            title="Operating Principles"
+            description="Principles are managed as content and connected to experience, projects, and case studies."
+          />
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {content.principles.slice(0, 4).map((principle) => (
               <ContentCard
@@ -141,13 +140,8 @@ export default async function HomePage() {
               />
             ))}
           </div>
-        ) : (
-          <EmptyState
-            title="Operating principles coming soon"
-            description="Principles will appear here once they are written in the admin application."
-          />
-        )}
-      </section>
+        </section>
+      ) : null}
     </>
   );
 }

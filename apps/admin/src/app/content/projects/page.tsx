@@ -15,7 +15,7 @@ export default async function ProjectsPage() {
     <main className="px-5 py-8 lg:px-8">
       <PageTitle
         title="Projects"
-        description="Projects can be prepared as drafts, published publicly, and related to lenses, principles, skills, and tags."
+        description="Projects can be prepared as drafts, published publicly, and related to a position, lenses, principles, skills, and tags."
         actions={
           <ModalPanel
             triggerLabel="Create project"
@@ -27,6 +27,10 @@ export default async function ProjectsPage() {
               action={createProjectAction}
               title="Create project"
               submitLabel="Create Project"
+              experienceOptions={content.experiences.map((experience) => ({
+                id: experience.id,
+                label: `${experience.role} at ${experience.company}`,
+              }))}
               lensOptions={content.lenses.map((lens) => ({ id: lens.id, label: lens.name }))}
               principleOptions={content.principles.map((principle) => ({
                 id: principle.id,

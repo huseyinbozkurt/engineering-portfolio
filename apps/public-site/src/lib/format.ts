@@ -1,16 +1,18 @@
+// Returns "" when there is nothing meaningful to show so callers can omit the
+// element entirely rather than rendering a placeholder.
 export function formatDateRange(
   startDate: string | null,
   endDate: string | null,
   isCurrent: boolean,
 ): string {
-  if (!startDate && !endDate) {
-    return "Timeline coming soon";
+  const start = startDate ? formatDate(startDate) : null;
+  const end = isCurrent ? "Present" : endDate ? formatDate(endDate) : null;
+
+  if (start && end) {
+    return `${start} - ${end}`;
   }
 
-  const start = startDate ? formatDate(startDate) : "Start date coming soon";
-  const end = isCurrent ? "Present" : endDate ? formatDate(endDate) : "End date coming soon";
-
-  return `${start} - ${end}`;
+  return start ?? end ?? "";
 }
 
 function formatDate(value: string): string {

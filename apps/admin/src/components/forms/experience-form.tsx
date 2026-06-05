@@ -8,9 +8,9 @@ import {
   SeoFields,
   StatusSelect,
   SubmitButton,
-  TextArea,
 } from "@/components/form-controls";
 
+import { RichTextField } from "./rich-text-field";
 import type { FormAction, RelationOption } from "./types";
 
 interface ExperienceFormProps {
@@ -75,7 +75,20 @@ export function ExperienceForm({
         </div>
         <Checkbox label="Current role" name="isCurrent" defaultChecked={defaults?.isCurrent ?? false} />
         <StatusSelect defaultValue={defaults?.status} />
-        <TextArea label="Summary" name="summary" rows={7} defaultValue={defaults?.summary} />
+        <RichTextField
+          label="Summary"
+          name="summary"
+          rows={6}
+          defaultValue={defaults?.summary}
+          hint="Short overview shown at the top of the experience page."
+        />
+        <RichTextField
+          label="Details"
+          name="details"
+          rows={14}
+          defaultValue={defaults?.details}
+          hint="Long-form, in-depth content shown lower on the experience detail page."
+        />
         <CheckboxGroup
           label="Related lenses"
           name="lensIds"

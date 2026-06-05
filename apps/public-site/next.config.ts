@@ -12,6 +12,8 @@ import type { NextConfig } from "next";
 loadEnvConfig(join(process.cwd(), "..", ".."), process.env.NODE_ENV !== "production");
 
 const nextConfig: NextConfig = {
+  output: "standalone",
+  outputFileTracingRoot: join(process.cwd(), "..", ".."),
   reactStrictMode: true,
   transpilePackages: ["@portfolio/db", "@portfolio/types", "@portfolio/validators"],
 };
