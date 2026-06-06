@@ -6,7 +6,7 @@ import * as schema from "./schema";
 
 export type PortfolioDb = PostgresJsDatabase<typeof schema>;
 
-const defaultConnectTimeoutSeconds = 3;
+const defaultConnectTimeoutSeconds = 10;
 
 let cachedConnection: { client: Sql; db: PortfolioDb } | undefined;
 

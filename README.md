@@ -107,7 +107,8 @@ The default local connection string is:
 DATABASE_URL="postgresql://portfolio:portfolio@localhost:5432/engineering_portfolio"
 DATABASE_SSL_MODE="disable"
 DATABASE_SSL_CA_FILE="global-bundle.pem"
-DATABASE_CONNECT_TIMEOUT_SECONDS="3"
+DATABASE_SSL_CA_URL="https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem"
+DATABASE_CONNECT_TIMEOUT_SECONDS="10"
 ```
 
 If port `5432` is already used on your machine, override the host port and
@@ -691,10 +692,11 @@ MDX or a richer editor later without changing relationship modeling.
   If the remote database requires SSL, include `sslmode=require` in the URL or
   set non-secret `DATABASE_SSL_MODE=require` for the ECS task. The Postgres
   client verifies the server certificate with the root `global-bundle.pem`
-  bundle through `DATABASE_SSL_CA_FILE`.
+  bundle through `DATABASE_SSL_CA_FILE`. The public-site container downloads the
+  bundle from `DATABASE_SSL_CA_URL` if the file is missing.
 - Public-site reads treat a missing or unreachable database as empty content, so
   the app renders the Coming Soon view instead of crashing. The connection
-  timeout defaults to 3 seconds and can be tuned with
+  timeout defaults to 10 seconds and can be tuned with
   `DATABASE_CONNECT_TIMEOUT_SECONDS`.
 - Keep Docker Compose limited to local development.
 

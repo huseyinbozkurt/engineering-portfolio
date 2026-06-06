@@ -61,7 +61,7 @@ variable "database_ssl_mode" {
 variable "database_connect_timeout_seconds" {
   description = "DATABASE_CONNECT_TIMEOUT_SECONDS passed to ECS so public-site reads fall back quickly when the remote database is unavailable."
   type        = number
-  default     = 3
+  default     = 10
 
   validation {
     condition     = var.database_connect_timeout_seconds >= 1 && floor(var.database_connect_timeout_seconds) == var.database_connect_timeout_seconds
@@ -77,5 +77,16 @@ variable "database_ssl_ca_file" {
   validation {
     condition     = length(trimspace(var.database_ssl_ca_file)) > 0
     error_message = "database_ssl_ca_file must not be empty."
+  }
+}
+
+variable "database_ssl_ca_url" {
+  description = "DATABASE_SSL_CA_URL passed to ECS. The public-site container downloads this CA bundle if DATABASE_SSL_CA_FILE is missing."
+  type        = string
+  default     = "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem"
+
+  validation {
+    condition     = startswith(var.database_ssl_ca_url, "https://")
+    error_message = "database_ssl_ca_url must be an HTTPS URL."
   }
 }

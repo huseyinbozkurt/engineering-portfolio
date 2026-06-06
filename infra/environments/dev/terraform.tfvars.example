@@ -12,7 +12,10 @@ alb_https_ssl_policy = "<alb-https-ssl-policy-name>"
 database_ssl_mode = null
 
 # Keep public-site requests from hanging when the remote database is unavailable.
-database_connect_timeout_seconds = 3
+database_connect_timeout_seconds = 10
 
 # Docker image path for the root global-bundle.pem CA bundle.
 database_ssl_ca_file = "/app/global-bundle.pem"
+
+# Download source used by the public-site container when database_ssl_ca_file is missing.
+database_ssl_ca_url = "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem"

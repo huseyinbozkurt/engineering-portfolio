@@ -36,9 +36,14 @@ ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV DATABASE_SSL_CA_FILE=/app/global-bundle.pem
+ENV DATABASE_SSL_CA_URL=https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
 
-RUN addgroup -S nextjs && adduser -S nextjs -G nextjs
+RUN apk add --no-cache ca-certificates wget \
+  && addgroup -S nextjs \
+  && adduser -S nextjs -G nextjs \
+  && chown nextjs:nextjs /app
 
+COPY --chown=nextjs:nextjs apps/public-site/docker-entrypoint.sh ./docker-entrypoint.sh
 COPY --chown=nextjs:nextjs global-bundle.pem ./global-bundle.pem
 COPY --from=builder --chown=nextjs:nextjs /app/apps/public-site/.next/standalone ./
 COPY --from=builder --chown=nextjs:nextjs /app/apps/public-site/.next/static ./apps/public-site/.next/static
@@ -50,4 +55,5 @@ EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD wget -qO- "http://127.0.0.1:${PORT}/api/health" >/dev/null || exit 1
 
+ENTRYPOINT ["sh", "./docker-entrypoint.sh"]
 CMD ["node", "apps/public-site/server.js"]
