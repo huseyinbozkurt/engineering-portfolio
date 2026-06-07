@@ -64,6 +64,41 @@
       "when": 1780603806284,
       "tag": "0008_third_dust",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1780712281761,
+      "tag": "0009_ai_generated_stories",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1780713000000,
+      "tag": "0010_ai_story_apply_target",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1780850327879,
+      "tag": "0011_purple_captain_universe",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1780855160691,
+      "tag": "0012_calm_doctor_faustus",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1780856238884,
+      "tag": "0013_pale_stellaris",
+      "breakpoints": true
     }
   ]
 }

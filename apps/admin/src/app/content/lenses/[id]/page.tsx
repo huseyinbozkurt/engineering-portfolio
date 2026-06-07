@@ -1,14 +1,18 @@
-import Link from "next/link";
+import { Pencil } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { getLensById } from "@portfolio/db/queries";
 
-import { deleteLensAction, updateLensAction } from "@/app/actions";
+import { deleteLensAction, patchLensAction } from "@/app/actions";
 import { DeleteForm } from "@/components/delete-form";
-import { LensForm } from "@/components/forms/lens-form";
+import { DetailHeader } from "@/components/detail/detail-header";
+import { SectionCard } from "@/components/detail/section-card";
+import { SectionEditForm } from "@/components/detail/section-edit-form";
+import { SettingsModal } from "@/components/detail/settings-modal";
+import { Field, SeoFields } from "@/components/form-controls";
+import { RichTextField } from "@/components/forms/rich-text-field";
 import { ModalPanel } from "@/components/modal-panel";
-import { PageTitle } from "@/components/page-title";
-import { RecordOverview } from "@/components/record-overview";
+import { publicHrefs } from "@/lib/public-site";
 
 export const dynamic = "force-dynamic";
 
@@ -24,41 +28,95 @@ export default async function EditLensPage({ params }: EditPageProps) {
     notFound();
   }
 
+  const settings = (
+    <SettingsModal
+      id={lens.id}
+      action={patchLensAction}
+      size="md"
+      fields={["slug", "position", "accentColor", "seoTitle", "seoDescription", "ogImage"]}
+    >
+      <Field label="Slug" name="slug" required defaultValue={lens.slug} />
+      <Field
+        label="Order (lower shows first)"
+        name="position"
+        type="number"
+        defaultValue={String(lens.position)}
+      />
+      <Field
+        label="Accent color"
+        name="accentColor"
+        placeholder="#7dd3fc"
+        defaultValue={lens.accentColor}
+      />
+      <SeoFields defaults={lens} />
+    </SettingsModal>
+  );
+
+  const headerEdit = (
+    <ModalPanel
+      title="Edit name"
+      triggerLabel="Edit name"
+      size="md"
+      triggerClassName="inline-flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-xs font-medium text-muted transition hover:border-teal-300/50 hover:text-ink"
+      triggerContent={
+        <>
+          <Pencil className="size-3.5" /> Edit
+        </>
+      }
+    >
+      <SectionEditForm action={patchLensAction} id={lens.id} fields="name">
+        <Field label="Name" name="name" required defaultValue={lens.name} />
+      </SectionEditForm>
+    </ModalPanel>
+  );
+
   return (
-    <main className="mx-auto max-w-2xl px-5 py-8 lg:px-8">
-      <Link href="/content/lenses" className="text-sm text-muted transition hover:text-ink">
-        ← Back to lenses
-      </Link>
-      <div className="mt-4">
-        <PageTitle title="Edit lens" description="Update this lens and control its visibility." />
-      </div>
-      <RecordOverview
+    <main className="mx-auto max-w-3xl px-5 py-8 lg:px-8">
+      <DetailHeader
+        backHref="/content/lenses"
+        backLabel="All lenses"
+        eyebrow="Lens"
         title={lens.name}
-        description={lens.summary}
-        details={[
-          { label: "Status", value: lens.status },
-          { label: "Slug", value: lens.slug },
-          { label: "Accent color", value: lens.accentColor },
-          { label: "Position", value: lens.position },
-        ]}
-        action={
-          <ModalPanel
-            triggerLabel="Edit lens"
-            title="Edit lens"
-            description="Make changes in the form, then confirm before saving."
-            size="md"
-          >
-            <LensForm
-              action={updateLensAction}
-              title={lens.name}
-              submitLabel="Save changes"
-              defaults={lens}
+        id={lens.id}
+        status={lens.status}
+        statusAction={patchLensAction}
+        publicHref={lens.status === "published" ? publicHrefs.lens(lens.slug) : null}
+        settings={settings}
+        headerEdit={headerEdit}
+        subtitle={
+          <span className="inline-flex items-center gap-2">
+            <span
+              aria-hidden
+              className="size-3 rounded-full border border-line"
+              style={{ backgroundColor: lens.accentColor }}
             />
-          </ModalPanel>
+            <span className="text-muted">{lens.accentColor}</span>
+          </span>
         }
       />
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-white/[0.02] p-4">
-        <p className="text-sm text-muted">Permanently remove this lens and its relationships.</p>
+
+      <div className="mt-8 grid gap-6">
+        <SectionCard
+          title="Summary"
+          id={lens.id}
+          action={patchLensAction}
+          fields="summary"
+          value={lens.summary}
+          addLabel="Add a summary"
+          formFields={
+            <RichTextField
+              label="Summary"
+              name="summary"
+              rows={6}
+              defaultValue={lens.summary}
+              hint="Short description of this lens, shown on the public lens page."
+            />
+          }
+        />
+      </div>
+
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-400/20 bg-rose-500/[0.04] p-4">
+        <p className="text-sm text-muted">Permanently remove this lens.</p>
         <DeleteForm action={deleteLensAction} id={lens.id} label="Delete lens" />
       </div>
     </main>

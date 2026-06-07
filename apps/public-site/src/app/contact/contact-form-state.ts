@@ -1,6 +1,15 @@
+import type { ContactIntent } from "@portfolio/validators";
+
 export interface ContactFormValues {
+  intent: ContactIntent;
   name: string;
   email: string;
+  company: string;
+  roleTitle: string;
+  techStack: string;
+  problem: string;
+  desiredOutcome: string;
+  timeline: string;
   message: string;
   wantsResponse: boolean;
 }
@@ -18,10 +27,17 @@ export const initialContactFormState: ContactFormState = {
   status: "idle",
   message: "",
   values: {
+    intent: "technicalConsultation",
     name: "",
     email: "",
+    company: "",
+    roleTitle: "",
+    techStack: "",
+    problem: "",
+    desiredOutcome: "",
+    timeline: "",
     message: "",
-    wantsResponse: false,
+    wantsResponse: true,
   },
   fieldErrors: {},
   version: 0,

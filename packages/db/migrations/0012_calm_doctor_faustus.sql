@@ -1,0 +1,1 @@
+ALTER TABLE "experiences" ADD COLUMN "awards" text DEFAULT '' NOT NULL;

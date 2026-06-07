@@ -31,7 +31,7 @@ export default async function ProjectsPage() {
       <PageHeader
         eyebrow="Projects"
         title="Projects with the decisions attached."
-        description="Project entries are managed as real content and can connect to technologies, principles, lenses, and case studies."
+        description=""
       />
       {projects.length > 0 ? (
         <section className="mx-auto max-w-7xl px-5 pb-16 lg:px-8">

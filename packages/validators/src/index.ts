@@ -112,6 +112,8 @@ export const createExperienceSchema = z.object({
   isCurrent: z.coerce.boolean().default(false),
   summary: richTextSchema,
   details: richTextSchema,
+  // Short "Awards & Recognition" briefs, one per line (only first 3 shown).
+  awards: z.string().trim().max(2000).default(""),
   status: contentStatusSchema.default("draft"),
   ...seoFields,
   lensIds: relationIdsSchema,
@@ -126,6 +128,11 @@ export const createProjectSchema = z.object({
   name: z.string().trim().min(1).max(180),
   description: richTextSchema,
   details: richTextSchema,
+  architecture: richTextSchema,
+  developmentTechStack: richTextSchema,
+  qaTechStack: richTextSchema,
+  aiIntegrationTechStack: richTextSchema,
+  deploymentTechStack: richTextSchema,
   status: contentStatusSchema.default("draft"),
   url: nullableUrlSchema,
   githubUrl: nullableUrlSchema,
@@ -178,9 +185,31 @@ export const createTagSchema = z.object({
 
 export const createContactSubmissionSchema = z
   .object({
+    intent: z
+      .enum([
+        "hiring",
+        "technicalConsultation",
+        "architecture",
+        "aiAutomation",
+        "frontendProduct",
+        "collaboration",
+        "buildProduct",
+        "improveProcess",
+        "technicalLeadership",
+        "exploreAI",
+        "deliveryIssues",
+        'other'
+      ])
+      .default("collaboration"),
     name: z.string().trim().min(1, "Name is required.").max(160),
     email: nullableEmailSchema,
     wantsResponse: z.coerce.boolean().default(false),
+    company: nullableTextSchema,
+    roleTitle: nullableTextSchema,
+    techStack: nullableTextSchema,
+    problem: z.string().trim().min(1, "Problem is required.").max(5000),
+    desiredOutcome: nullableTextSchema,
+    timeline: nullableTextSchema,
     message: z.string().trim().min(1, "Message is required.").max(5000),
   })
   .superRefine((value, context) => {
@@ -192,6 +221,22 @@ export const createContactSubmissionSchema = z
       });
     }
   });
+
+export const contactProfileSchema = z.object({
+  locationLabel: nullableTextSchema,
+  availabilityLabel: nullableTextSchema,
+  timezoneLabel: nullableTextSchema,
+  responseTimeLabel: nullableTextSchema,
+  linkedinUrl: nullableUrlSchema,
+  githubUrl: nullableUrlSchema,
+  emailAddress: nullableEmailSchema,
+  resumeUrl: nullableUrlSchema,
+  shortContactIntro: nullableTextSchema,
+  openToItems: z
+    .array(z.string().trim().min(1).max(160))
+    .max(12, "Add no more than 12 open-to items.")
+    .default([]),
+});
 
 export const bulkSkillsSchema = z.object({
   items: z.array(createSkillSchema).min(1, "Add at least one skill."),
@@ -210,6 +255,10 @@ export type CreateCaseStudyInput = z.infer<typeof createCaseStudySchema>;
 export type CreateSkillInput = z.infer<typeof createSkillSchema>;
 export type CreateTagInput = z.infer<typeof createTagSchema>;
 export type CreateContactSubmissionInput = z.infer<typeof createContactSubmissionSchema>;
+export type ContactMode = CreateContactSubmissionInput["mode"];
+export type ContactIntent = CreateContactSubmissionInput["intent"];
+export type ContactSubmission = CreateContactSubmissionInput;
+export type ContactProfile = z.infer<typeof contactProfileSchema>;
 export type BulkSkillsInput = z.infer<typeof bulkSkillsSchema>;
 export type BulkTagsInput = z.infer<typeof bulkTagsSchema>;
 
@@ -232,6 +281,31 @@ export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 export type UpdateCaseStudyInput = z.infer<typeof updateCaseStudySchema>;
 export type UpdateSkillInput = z.infer<typeof updateSkillSchema>;
 export type UpdateTagInput = z.infer<typeof updateTagSchema>;
+
+// Patch schemas power per-section ("inline") editing in the admin: every field
+// is optional, so a section form can submit just the fields it owns (plus the
+// id) and leave everything else untouched. The admin action layer reads a
+// `__fields` manifest to decide which keys to validate and apply, and relation
+// arrays are only re-written when their key is among the declared fields.
+export const patchLensSchema = createLensSchema.partial().extend({ id: uuidSchema });
+export const patchPrincipleSchema = createPrincipleSchema.partial().extend({ id: uuidSchema });
+export const patchDecisionPatternSchema = createDecisionPatternSchema
+  .partial()
+  .extend({ id: uuidSchema });
+export const patchExperienceSchema = createExperienceSchema.partial().extend({ id: uuidSchema });
+export const patchProjectSchema = createProjectSchema.partial().extend({ id: uuidSchema });
+export const patchCaseStudySchema = createCaseStudySchema.partial().extend({ id: uuidSchema });
+export const patchSkillSchema = createSkillSchema.partial().extend({ id: uuidSchema });
+export const patchTagSchema = createTagSchema.partial().extend({ id: uuidSchema });
+
+export type PatchLensInput = z.infer<typeof patchLensSchema>;
+export type PatchPrincipleInput = z.infer<typeof patchPrincipleSchema>;
+export type PatchDecisionPatternInput = z.infer<typeof patchDecisionPatternSchema>;
+export type PatchExperienceInput = z.infer<typeof patchExperienceSchema>;
+export type PatchProjectInput = z.infer<typeof patchProjectSchema>;
+export type PatchCaseStudyInput = z.infer<typeof patchCaseStudySchema>;
+export type PatchSkillInput = z.infer<typeof patchSkillSchema>;
+export type PatchTagInput = z.infer<typeof patchTagSchema>;
 
 /** Minimal schema for actions that only need a record id (e.g. delete). */
 export const idInputSchema = z.object({ id: uuidSchema });

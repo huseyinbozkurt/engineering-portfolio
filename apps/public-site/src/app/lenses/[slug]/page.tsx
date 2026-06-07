@@ -6,7 +6,6 @@ import { getLensBySlug, getPublishedLenses } from "@portfolio/db/queries";
 import { ContentCard } from "@/components/content-card";
 import { SectionHeading } from "@/components/section-heading";
 import { getComingSoonFallback } from "@/lib/coming-soon-gate";
-import { siteConfig } from "@/lib/site";
 
 interface LensPageProps {
   params: Promise<{
@@ -37,13 +36,13 @@ export async function generateMetadata({ params }: LensPageProps): Promise<Metad
 
   return {
     title: detail.lens.name,
-    description: detail.lens.summary || siteConfig.description,
+    description: detail.lens.summary,
     alternates: {
       canonical: `/lenses/${detail.lens.slug}`,
     },
     openGraph: {
       title: detail.lens.name,
-      description: detail.lens.summary || siteConfig.description,
+      description: detail.lens.summary,
       url: `/lenses/${detail.lens.slug}`,
     },
   };

@@ -7,6 +7,7 @@ import {
   getPublishedExperiences,
 } from "@portfolio/db/queries";
 
+import { CaseStoryCard } from "@/components/case-story-card";
 import { ContentCard } from "@/components/content-card";
 import { RichText } from "@/components/rich-text";
 import { SectionHeading } from "@/components/section-heading";
@@ -122,11 +123,14 @@ export default async function ExperienceDetailPage({ params }: ExperienceDetailP
   );
   const hasSummary = experience.summary.trim().length > 0;
   const hasDetails = experience.details.trim().length > 0;
+  const awardsRecognition = getAwardsRecognitionItems(experience.awards);
+  const hasAwardsRecognition = awardsRecognition.length > 0;
   const hasMeta =
     detail.lenses.length > 0 ||
     detail.skills.length > 0 ||
     detail.principles.length > 0 ||
     detail.tags.length > 0;
+  const hasSidebar = hasAwardsRecognition || hasMeta;
 
   return (
     <>
@@ -157,10 +161,10 @@ export default async function ExperienceDetailPage({ params }: ExperienceDetailP
           ) : null}
         </header>
 
-        {hasSummary || hasDetails || hasMeta ? (
+        {hasSummary || hasDetails || hasSidebar ? (
           <div
             className={
-              hasMeta ? "mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]" : "mt-10"
+              hasSidebar ? "mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]" : "mt-10"
             }
           >
             <div className="grid min-w-0 gap-6">
@@ -178,8 +182,9 @@ export default async function ExperienceDetailPage({ params }: ExperienceDetailP
               ) : null}
             </div>
 
-            {hasMeta ? (
+            {hasSidebar ? (
               <aside className="grid content-start gap-6">
+                <AwardsRecognition items={awardsRecognition} />
                 <MetaGroup
                   title="Lenses"
                   items={detail.lenses.map((lens) => ({
@@ -212,16 +217,13 @@ export default async function ExperienceDetailPage({ params }: ExperienceDetailP
       {detail.caseStudies.length > 0 ? (
         <section className="border-y border-line bg-white/[0.025]">
           <div className="mx-auto max-w-7xl px-5 py-14 lg:px-8">
-            <SectionHeading title="Related Case Studies" />
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <SectionHeading
+              title="Case Story Highlights"
+              description="Short problem-to-outcome summaries from related case studies. Open a case story for the full context, constraints, and trade-offs."
+            />
+            <div className="grid gap-4 lg:grid-cols-2">
               {detail.caseStudies.map((caseStudy) => (
-                <ContentCard
-                  key={caseStudy.id}
-                  href={`/case-studies/${caseStudy.slug}`}
-                  title={caseStudy.title}
-                  description={caseStudy.excerpt}
-                  meta="Case study"
-                />
+                <CaseStoryCard key={caseStudy.id} caseStudy={caseStudy} />
               ))}
             </div>
           </div>
@@ -246,4 +248,36 @@ export default async function ExperienceDetailPage({ params }: ExperienceDetailP
       ) : null}
     </>
   );
+}
+
+function AwardsRecognition({ items }: { items: string[] }) {
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="glass-panel rounded-lg p-4">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-amber-200">
+        Awards &amp; Recognition
+      </h2>
+      <ol className="mt-4 grid gap-3">
+        {items.map((item, index) => (
+          <li key={`${index}-${item}`} className="flex gap-3">
+            <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border border-line bg-white/[0.04] text-xs font-semibold text-teal-200">
+              {index + 1}
+            </span>
+            <p className="text-sm leading-6 text-muted">{item}</p>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+function getAwardsRecognitionItems(value: string): string[] {
+  return value
+    .split(/\r?\n/)
+    .map((item) => item.trim().replace(/^(?:[-*]|\d+[.)])\s+/, ""))
+    .filter((item) => item.length > 0)
+    .slice(0, 3);
 }

@@ -8,7 +8,14 @@ export type PortfolioDb = PostgresJsDatabase<typeof schema>;
 
 const defaultConnectTimeoutSeconds = 10;
 
-let cachedConnection: { client: Sql; db: PortfolioDb } | undefined;
+type CachedConnection = {
+  client: Sql;
+  db: PortfolioDb;
+};
+
+const globalForDb = globalThis as unknown as {
+  portfolioDbConnection: CachedConnection | undefined;
+};
 
 export function hasDatabaseUrl(): boolean {
   return Boolean(process.env.DATABASE_URL);
@@ -21,21 +28,22 @@ export function getDb(): PortfolioDb {
     throw new Error("DATABASE_URL is required for database access.");
   }
 
-  if (!cachedConnection) {
+  if (!globalForDb.portfolioDbConnection) {
     const client = postgres(connectionString, {
       connect_timeout: getConnectTimeoutSeconds(),
-      max: 10,
+      max: process.env.NODE_ENV === "production" ? 10 : 3,
+      idle_timeout: 10,
       prepare: false,
       ...getPostgresSslOptions(connectionString),
     });
 
-    cachedConnection = {
+    globalForDb.portfolioDbConnection = {
       client,
       db: drizzle(client, { schema }),
     };
   }
 
-  return cachedConnection.db;
+  return globalForDb.portfolioDbConnection.db;
 }
 
 function getConnectTimeoutSeconds(): number {
@@ -55,10 +63,12 @@ function getConnectTimeoutSeconds(): number {
 }
 
 export async function closeDb(): Promise<void> {
-  if (!cachedConnection) {
+  const connection = globalForDb.portfolioDbConnection;
+
+  if (!connection) {
     return;
   }
 
-  await cachedConnection.client.end();
-  cachedConnection = undefined;
+  await connection.client.end();
+  globalForDb.portfolioDbConnection = undefined;
 }

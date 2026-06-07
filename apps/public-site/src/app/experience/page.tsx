@@ -33,7 +33,7 @@ export default async function ExperiencePage() {
       <PageHeader
         eyebrow="Experience"
         title="Experience as context, not a resume dump."
-        description="Roles are connected to the principles, lenses, skills, and case studies that explain how decisions were made."
+        description=""
       />
       {experiences.length > 0 ? (
         <section className="mx-auto max-w-5xl px-5 pb-16 lg:px-8">

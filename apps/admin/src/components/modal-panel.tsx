@@ -9,9 +9,13 @@ interface ModalPanelProps {
   triggerLabel: string;
   title: string;
   children: ReactNode;
-  description?: string;
-  size?: ModalSize;
-  triggerVariant?: TriggerVariant;
+  description?: string | undefined;
+  size?: ModalSize | undefined;
+  triggerContent?: ReactNode | undefined;
+  triggerDisabled?: boolean | undefined;
+  triggerVariant?: TriggerVariant | undefined;
+  /** Fully replaces the variant classes — used for icon / dashed "add" / gear triggers. */
+  triggerClassName?: string | undefined;
 }
 
 const sizeClasses: Record<ModalSize, string> = {
@@ -34,7 +38,10 @@ export function ModalPanel({
   description,
   children,
   size = "md",
+  triggerContent,
+  triggerDisabled = false,
   triggerVariant = "primary",
+  triggerClassName,
 }: ModalPanelProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -44,10 +51,13 @@ export function ModalPanel({
     <>
       <button
         type="button"
-        className={triggerClasses[triggerVariant]}
+        className={`${triggerClassName ?? triggerClasses[triggerVariant]} disabled:cursor-not-allowed disabled:opacity-40`}
+        aria-label={triggerContent ? triggerLabel : undefined}
+        disabled={triggerDisabled}
+        title={triggerContent ? triggerLabel : undefined}
         onClick={() => dialogRef.current?.showModal()}
       >
-        {triggerLabel}
+        {triggerContent ?? triggerLabel}
       </button>
       <dialog
         ref={dialogRef}

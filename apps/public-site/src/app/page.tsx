@@ -6,17 +6,19 @@ import { LensGrid } from "@/components/lens-grid";
 import { SectionHeading } from "@/components/section-heading";
 import { projectHref } from "@/lib/paths";
 import { getPublicSiteAvailability } from "@/lib/site-availability";
+import { getCachedHomeContent } from "@portfolio/db/cached-queries";
 
 export const revalidate = 3600;
 
 export default async function HomePage() {
-  const { content, shouldShowComingSoon } = await getPublicSiteAvailability();
+  const { shouldShowComingSoon } = await getPublicSiteAvailability();
 
   // RootLayout owns the global gate, but keep this fallback so the page stays
   // self-contained if rendered outside the normal app shell.
   if (shouldShowComingSoon) {
     return <ComingSoon />;
   }
+  const content = await getCachedHomeContent();
 
   const totals = [
     { label: "Lenses", value: content.lenses.length, href: "#lenses" },
@@ -35,10 +37,6 @@ export default async function HomePage() {
               Engineers wear different hats.
               <span className="mt-3 block text-muted">What problem are we solving today?</span>
             </h1>
-            <p className="mt-7 max-w-2xl text-lg leading-8 text-muted">
-              Explore the work through lenses that reveal how decisions are made,
-              systems are shaped, and outcomes are produced.
-            </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <Link
                 href="/how-i-work"
@@ -77,7 +75,6 @@ export default async function HomePage() {
         <section id="lenses" className="mx-auto max-w-7xl scroll-mt-24 px-5 py-14 lg:px-8 lg:py-20">
           <SectionHeading
             title="Explore By Lens"
-            description="Each lens frames the same body of work from a different engineering responsibility."
           />
           <LensGrid lenses={content.lenses} />
         </section>
@@ -88,7 +85,6 @@ export default async function HomePage() {
           <div className="mx-auto max-w-7xl px-5 py-14 lg:px-8 lg:py-20">
             <SectionHeading
               title="Case Study Highlights"
-              description="Decisions, trade-offs, and outcomes from published case studies."
             />
             <div className="grid gap-4 md:grid-cols-3">
               {content.caseStudies.slice(0, 3).map((caseStudy) => (
@@ -109,7 +105,6 @@ export default async function HomePage() {
         <section id="projects" className="mx-auto max-w-7xl scroll-mt-24 px-5 py-14 lg:px-8 lg:py-20">
           <SectionHeading
             title="Projects"
-            description="Projects connect implementation work to lenses, operating principles, and case studies."
           />
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {content.projects.slice(0, 3).map((project) => (
@@ -129,7 +124,6 @@ export default async function HomePage() {
         <section id="principles" className="mx-auto max-w-7xl scroll-mt-24 px-5 py-14 lg:px-8 lg:py-20">
           <SectionHeading
             title="Operating Principles"
-            description="Principles are managed as content and connected to experience, projects, and case studies."
           />
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {content.principles.slice(0, 4).map((principle) => (

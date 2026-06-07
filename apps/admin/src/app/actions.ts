@@ -22,6 +22,14 @@ import {
   deleteProject,
   deleteSkill,
   deleteTag,
+  patchCaseStudy,
+  patchDecisionPattern,
+  patchExperience,
+  patchLens,
+  patchPrinciple,
+  patchProject,
+  patchSkill,
+  patchTag,
   updateCaseStudy,
   updateDecisionPattern,
   updateExperience,
@@ -30,10 +38,22 @@ import {
   updateProject,
   updateSkill,
   updateTag,
+  upsertContactProfile,
 } from "@portfolio/db/admin";
+import type {
+  CreateCaseStudyInput,
+  CreateDecisionPatternInput,
+  CreateExperienceInput,
+  CreateLensInput,
+  CreatePrincipleInput,
+  CreateProjectInput,
+  CreateSkillInput,
+  CreateTagInput,
+} from "@portfolio/validators";
 import {
   bulkSkillsSchema,
   bulkTagsSchema,
+  contactProfileSchema,
   createCaseStudySchema,
   createDecisionPatternSchema,
   createExperienceSchema,
@@ -43,6 +63,14 @@ import {
   createSkillSchema,
   createTagSchema,
   idInputSchema,
+  patchCaseStudySchema,
+  patchDecisionPatternSchema,
+  patchExperienceSchema,
+  patchLensSchema,
+  patchPrincipleSchema,
+  patchProjectSchema,
+  patchSkillSchema,
+  patchTagSchema,
   updateCaseStudySchema,
   updateDecisionPatternSchema,
   updateExperienceSchema,
@@ -52,6 +80,7 @@ import {
   updateSkillSchema,
   updateTagSchema,
 } from "@portfolio/validators";
+import type { z } from "zod";
 
 function text(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -222,6 +251,7 @@ export async function createExperienceAction(formData: FormData): Promise<void> 
       isCurrent: formData.get("isCurrent") === "on",
       summary: text(formData, "summary"),
       details: text(formData, "details"),
+      awards: text(formData, "awards"),
       status: status(formData),
       ...seo(formData),
       lensIds: ids(formData, "lensIds"),
@@ -243,6 +273,11 @@ export async function createProjectAction(formData: FormData): Promise<void> {
       name: text(formData, "name"),
       description: text(formData, "description"),
       details: text(formData, "details"),
+      architecture: text(formData, "architecture"),
+      developmentTechStack: text(formData, "developmentTechStack"),
+      qaTechStack: text(formData, "qaTechStack"),
+      aiIntegrationTechStack: text(formData, "aiIntegrationTechStack"),
+      deploymentTechStack: text(formData, "deploymentTechStack"),
       status: status(formData),
       url: text(formData, "url"),
       githubUrl: text(formData, "githubUrl"),
@@ -341,6 +376,27 @@ export async function bulkUpsertTagsAction(formData: FormData): Promise<void> {
   redirect("/content/tags");
 }
 
+export async function upsertContactProfileAction(formData: FormData): Promise<void> {
+  await upsertContactProfile(
+    contactProfileSchema.parse({
+      locationLabel: text(formData, "locationLabel"),
+      availabilityLabel: text(formData, "availabilityLabel"),
+      timezoneLabel: text(formData, "timezoneLabel"),
+      responseTimeLabel: text(formData, "responseTimeLabel"),
+      linkedinUrl: text(formData, "linkedinUrl"),
+      githubUrl: text(formData, "githubUrl"),
+      emailAddress: text(formData, "emailAddress"),
+      resumeUrl: text(formData, "resumeUrl"),
+      shortContactIntro: text(formData, "shortContactIntro"),
+      openToItems: bulkLines(text(formData, "openToItems")),
+    }),
+  );
+
+  revalidatePath("/contact");
+  refresh("/content/contact-profile");
+  redirect("/content/contact-profile");
+}
+
 // ---------------------------------------------------------------------------
 // Update actions. Each parses the form (now including the record id) and
 // redirects back to the list on success.
@@ -414,6 +470,7 @@ export async function updateExperienceAction(formData: FormData): Promise<void> 
       isCurrent: formData.get("isCurrent") === "on",
       summary: text(formData, "summary"),
       details: text(formData, "details"),
+      awards: text(formData, "awards"),
       status: status(formData),
       ...seo(formData),
       lensIds: ids(formData, "lensIds"),
@@ -436,6 +493,11 @@ export async function updateProjectAction(formData: FormData): Promise<void> {
       name: text(formData, "name"),
       description: text(formData, "description"),
       details: text(formData, "details"),
+      architecture: text(formData, "architecture"),
+      developmentTechStack: text(formData, "developmentTechStack"),
+      qaTechStack: text(formData, "qaTechStack"),
+      aiIntegrationTechStack: text(formData, "aiIntegrationTechStack"),
+      deploymentTechStack: text(formData, "deploymentTechStack"),
       status: status(formData),
       url: text(formData, "url"),
       githubUrl: text(formData, "githubUrl"),
@@ -513,6 +575,233 @@ export async function updateTagAction(formData: FormData): Promise<void> {
 
   refresh("/content/tags");
   redirect("/content/tags");
+}
+
+// ---------------------------------------------------------------------------
+// Patch actions. These power per-section ("inline") editing on the detail
+// pages: a section form declares the field names it owns in a hidden `__fields`
+// input and submits only those values (plus the id). The action validates and
+// writes exactly those fields — every other column and relationship is left
+// untouched. Unlike create/update, patches do NOT redirect, so the editor stays
+// on the detail page and the saved section refreshes in place.
+// ---------------------------------------------------------------------------
+
+function declaredFields(formData: FormData): Set<string> {
+  return new Set(text(formData, "__fields").split(/\s+/).filter((field) => field.length > 0));
+}
+
+async function applyPatch(
+  formData: FormData,
+  options: {
+    schema: z.ZodTypeAny;
+    scalarKeys: readonly string[];
+    relationKeys: readonly string[];
+    listPath: string;
+    run: (args: {
+      id: string;
+      set: Record<string, unknown>;
+      relations: Record<string, string[]>;
+    }) => Promise<void>;
+  },
+): Promise<void> {
+  const id = text(formData, "id");
+  const declared = declaredFields(formData);
+
+  // Only fields the section explicitly declared are read and validated.
+  const rawScalars: Record<string, string> = {};
+  for (const key of options.scalarKeys) {
+    if (declared.has(key)) {
+      rawScalars[key] = text(formData, key);
+    }
+  }
+
+  const parsed = options.schema.parse({ id, ...rawScalars }) as Record<string, unknown>;
+
+  const set: Record<string, unknown> = {};
+  for (const key of options.scalarKeys) {
+    if (declared.has(key) && parsed[key] !== undefined) {
+      set[key] = parsed[key];
+    }
+  }
+
+  // A declared-but-empty relation group submits no checkboxes; we still pass an
+  // empty array so the mutation clears it. Undeclared relations stay untouched.
+  const relations: Record<string, string[]> = {};
+  for (const key of options.relationKeys) {
+    if (declared.has(key)) {
+      relations[key] = ids(formData, key);
+    }
+  }
+
+  await options.run({ id, set, relations });
+
+  revalidatePath("/");
+  revalidatePath(options.listPath);
+  revalidatePath(`${options.listPath}/${id}`);
+}
+
+export async function patchLensAction(formData: FormData): Promise<void> {
+  await applyPatch(formData, {
+    schema: patchLensSchema,
+    scalarKeys: [
+      "slug",
+      "name",
+      "summary",
+      "accentColor",
+      "status",
+      "seoTitle",
+      "seoDescription",
+      "ogImage",
+      "position",
+    ],
+    relationKeys: [],
+    listPath: "/content/lenses",
+    run: ({ id, set }) => patchLens({ id, set: set as Partial<CreateLensInput> }),
+  });
+}
+
+export async function patchPrincipleAction(formData: FormData): Promise<void> {
+  await applyPatch(formData, {
+    schema: patchPrincipleSchema,
+    scalarKeys: [
+      "slug",
+      "title",
+      "summary",
+      "body",
+      "status",
+      "seoTitle",
+      "seoDescription",
+      "ogImage",
+      "position",
+    ],
+    relationKeys: [],
+    listPath: "/content/principles",
+    run: ({ id, set }) => patchPrinciple({ id, set: set as Partial<CreatePrincipleInput> }),
+  });
+}
+
+export async function patchDecisionPatternAction(formData: FormData): Promise<void> {
+  await applyPatch(formData, {
+    schema: patchDecisionPatternSchema,
+    scalarKeys: [
+      "slug",
+      "title",
+      "summary",
+      "body",
+      "status",
+      "seoTitle",
+      "seoDescription",
+      "ogImage",
+      "position",
+    ],
+    relationKeys: ["principleIds"],
+    listPath: "/content/decision-patterns",
+    run: ({ id, set, relations }) =>
+      patchDecisionPattern({ id, set: set as Partial<CreateDecisionPatternInput>, relations }),
+  });
+}
+
+export async function patchExperienceAction(formData: FormData): Promise<void> {
+  await applyPatch(formData, {
+    schema: patchExperienceSchema,
+    scalarKeys: [
+      "slug",
+      "company",
+      "role",
+      "location",
+      "startDate",
+      "endDate",
+      "isCurrent",
+      "summary",
+      "details",
+      "awards",
+      "status",
+      "seoTitle",
+      "seoDescription",
+      "ogImage",
+      "position",
+    ],
+    relationKeys: ["lensIds", "principleIds", "skillIds", "tagIds"],
+    listPath: "/content/experiences",
+    run: ({ id, set, relations }) =>
+      patchExperience({ id, set: set as Partial<CreateExperienceInput>, relations }),
+  });
+}
+
+export async function patchProjectAction(formData: FormData): Promise<void> {
+  await applyPatch(formData, {
+    schema: patchProjectSchema,
+    scalarKeys: [
+      "slug",
+      "name",
+      "description",
+      "details",
+      "architecture",
+      "developmentTechStack",
+      "qaTechStack",
+      "aiIntegrationTechStack",
+      "deploymentTechStack",
+      "status",
+      "url",
+      "githubUrl",
+      "experienceId",
+      "seoTitle",
+      "seoDescription",
+      "ogImage",
+      "position",
+    ],
+    relationKeys: ["lensIds", "principleIds", "skillIds", "tagIds"],
+    listPath: "/content/projects",
+    run: ({ id, set, relations }) =>
+      patchProject({ id, set: set as Partial<CreateProjectInput>, relations }),
+  });
+}
+
+export async function patchCaseStudyAction(formData: FormData): Promise<void> {
+  await applyPatch(formData, {
+    schema: patchCaseStudySchema,
+    scalarKeys: [
+      "slug",
+      "title",
+      "excerpt",
+      "context",
+      "problem",
+      "constraints",
+      "action",
+      "tradeoffs",
+      "outcome",
+      "learning",
+      "status",
+      "seoTitle",
+      "seoDescription",
+      "ogImage",
+      "position",
+    ],
+    relationKeys: ["lensIds", "principleIds", "experienceIds", "projectIds", "skillIds", "tagIds"],
+    listPath: "/content/case-studies",
+    run: ({ id, set, relations }) =>
+      patchCaseStudy({ id, set: set as Partial<CreateCaseStudyInput>, relations }),
+  });
+}
+
+export async function patchSkillAction(formData: FormData): Promise<void> {
+  await applyPatch(formData, {
+    schema: patchSkillSchema,
+    scalarKeys: ["slug", "name", "category", "summary", "status", "position"],
+    relationKeys: [],
+    listPath: "/content/skills",
+    run: ({ id, set }) => patchSkill({ id, set: set as Partial<CreateSkillInput> }),
+  });
+}
+
+export async function patchTagAction(formData: FormData): Promise<void> {
+  await applyPatch(formData, {
+    schema: patchTagSchema,
+    scalarKeys: ["slug", "name", "category", "status"],
+    relationKeys: [],
+    listPath: "/content/tags",
+    run: ({ id, set }) => patchTag({ id, set: set as Partial<CreateTagInput> }),
+  });
 }
 
 // ---------------------------------------------------------------------------

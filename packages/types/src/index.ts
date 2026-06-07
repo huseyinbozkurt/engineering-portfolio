@@ -2,6 +2,7 @@ import type { InferSelectModel } from "drizzle-orm";
 
 import type {
   caseStudies,
+  contactProfiles,
   decisionPatterns,
   experiences,
   lenses,
@@ -19,6 +20,7 @@ export type DecisionPattern = InferSelectModel<typeof decisionPatterns>;
 export type Experience = InferSelectModel<typeof experiences>;
 export type Project = InferSelectModel<typeof projects>;
 export type CaseStudy = InferSelectModel<typeof caseStudies>;
+export type ContactProfile = InferSelectModel<typeof contactProfiles>;
 export type Skill = InferSelectModel<typeof skills>;
 export type Tag = InferSelectModel<typeof tags>;
 

@@ -32,7 +32,7 @@ export default async function AboutPage() {
       <PageHeader
         eyebrow="About"
         title="A portfolio about how the work gets done."
-        description="This page becomes a concise career and operating overview as real experiences, principles, and case studies are added."
+        description=""
       />
       {content.experiences.length > 0 ? (
         <section className="mx-auto max-w-7xl px-5 pb-16 lg:px-8">

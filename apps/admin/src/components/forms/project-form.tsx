@@ -93,6 +93,46 @@ export function ProjectForm({
           defaultValue={defaults?.details}
           hint="Long-form, in-depth content shown on the project detail page."
         />
+        <fieldset className="grid gap-4 rounded-lg border border-line bg-white/[0.025] p-4">
+          <legend className="px-1 text-sm font-medium text-ink">Architecture</legend>
+          <RichTextField
+            label="Architecture overview"
+            name="architecture"
+            rows={8}
+            defaultValue={defaults?.architecture}
+            hint="Optional architecture narrative shown before the stack boxes."
+          />
+          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+            <RichTextField
+              label="Development Tech Stack"
+              name="developmentTechStack"
+              rows={8}
+              defaultValue={defaults?.developmentTechStack}
+              hint="Optional tools, frameworks, services, and implementation choices."
+            />
+            <RichTextField
+              label="Q&A Tech Stack"
+              name="qaTechStack"
+              rows={8}
+              defaultValue={defaults?.qaTechStack}
+              hint="Optional testing, validation, review, or quality tooling."
+            />
+            <RichTextField
+              label="AI Integration Tech Stack"
+              name="aiIntegrationTechStack"
+              rows={8}
+              defaultValue={defaults?.aiIntegrationTechStack}
+              hint="Optional AI services, model orchestration, prompts, and retrieval tooling."
+            />
+            <RichTextField
+              label="Deployment Tech Stack"
+              name="deploymentTechStack"
+              rows={8}
+              defaultValue={defaults?.deploymentTechStack}
+              hint="Optional hosting, CI/CD, runtime, observability, and infrastructure tooling."
+            />
+          </div>
+        </fieldset>
         <SelectField
           label="Related position"
           name="experienceId"

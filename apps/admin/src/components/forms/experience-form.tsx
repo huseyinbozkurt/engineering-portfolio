@@ -8,6 +8,7 @@ import {
   SeoFields,
   StatusSelect,
   SubmitButton,
+  TextArea,
 } from "@/components/form-controls";
 
 import { RichTextField } from "./rich-text-field";
@@ -89,6 +90,18 @@ export function ExperienceForm({
           defaultValue={defaults?.details}
           hint="Long-form, in-depth content shown lower on the experience detail page."
         />
+        <div className="grid gap-2">
+          <TextArea
+            label="Awards & Recognition"
+            name="awards"
+            rows={4}
+            defaultValue={defaults?.awards}
+            placeholder="One employer feedback note, award, or recognition per line"
+          />
+          <p className="text-xs text-muted">
+            Keep each item brief. The experience detail page displays up to 3.
+          </p>
+        </div>
         <CheckboxGroup
           label="Related lenses"
           name="lensIds"

@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
 import type {
@@ -12,6 +12,7 @@ import type {
   CreateProjectInput,
   CreateSkillInput,
   CreateTagInput,
+  ContactProfile,
   UpdateCaseStudyInput,
   UpdateDecisionPatternInput,
   UpdateExperienceInput,
@@ -32,6 +33,7 @@ import {
   caseStudyProjects,
   caseStudySkills,
   caseStudyTags,
+  contactProfiles,
   decisionPatternPrinciples,
   decisionPatterns,
   experienceLenses,
@@ -173,6 +175,7 @@ export async function createExperience(input: CreateExperienceInput): Promise<st
           isCurrent: input.isCurrent,
           summary: input.summary,
           details: input.details,
+          awards: input.awards,
           seoTitle: input.seoTitle,
           seoDescription: input.seoDescription,
           ogImage: input.ogImage,
@@ -234,6 +237,11 @@ export async function createProject(input: CreateProjectInput): Promise<string> 
           name: input.name,
           description: input.description,
           details: input.details,
+          architecture: input.architecture,
+          developmentTechStack: input.developmentTechStack,
+          qaTechStack: input.qaTechStack,
+          aiIntegrationTechStack: input.aiIntegrationTechStack,
+          deploymentTechStack: input.deploymentTechStack,
           url: input.url,
           githubUrl: input.githubUrl,
           experienceId: input.experienceId,
@@ -388,6 +396,33 @@ export async function createTag(input: CreateTagInput): Promise<string> {
       .insert(tags)
       .values({ ...input, ...workflowValues(input.status) })
       .returning({ id: tags.id }),
+  );
+
+  return record.id;
+}
+
+export async function upsertContactProfile(input: ContactProfile): Promise<string> {
+  const db = getDb();
+  const [existing] = await db
+    .select({ id: contactProfiles.id })
+    .from(contactProfiles)
+    .orderBy(desc(contactProfiles.updatedAt), desc(contactProfiles.createdAt))
+    .limit(1);
+
+  if (existing) {
+    await db
+      .update(contactProfiles)
+      .set({
+        ...input,
+        updatedAt: new Date(),
+      })
+      .where(eq(contactProfiles.id, existing.id));
+
+    return existing.id;
+  }
+
+  const record = inserted(
+    await db.insert(contactProfiles).values(input).returning({ id: contactProfiles.id }),
   );
 
   return record.id;
@@ -568,6 +603,7 @@ export async function updateExperience(input: UpdateExperienceInput): Promise<vo
         isCurrent: input.isCurrent,
         summary: input.summary,
         details: input.details,
+        awards: input.awards,
         seoTitle: input.seoTitle,
         seoDescription: input.seoDescription,
         ogImage: input.ogImage,
@@ -616,6 +652,11 @@ export async function updateProject(input: UpdateProjectInput): Promise<void> {
         name: input.name,
         description: input.description,
         details: input.details,
+        architecture: input.architecture,
+        developmentTechStack: input.developmentTechStack,
+        qaTechStack: input.qaTechStack,
+        aiIntegrationTechStack: input.aiIntegrationTechStack,
+        deploymentTechStack: input.deploymentTechStack,
         url: input.url,
         githubUrl: input.githubUrl,
         experienceId: input.experienceId,
@@ -720,6 +761,432 @@ export async function updateCaseStudy(input: UpdateCaseStudyInput): Promise<void
       await tx.insert(caseStudyTags).values(
         input.tagIds.map((tagId) => ({ caseStudyId: input.id, tagId })),
       );
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Patches. Partial updates that power per-section ("inline") editing in the
+// admin: only the scalar columns actually provided are written, and a relation
+// join table is re-written only when its id array is passed. This lets a single
+// section save (e.g. just a project's "Details") leave every other field and
+// relationship untouched, unlike the wholesale `update*` functions above.
+// ---------------------------------------------------------------------------
+
+/** Drop keys whose value is `undefined` so only provided columns are written. */
+function definedColumns<T extends Record<string, unknown>>(columns: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(columns).filter(([, value]) => value !== undefined),
+  ) as Partial<T>;
+}
+
+export async function patchLens(input: {
+  id: string;
+  set: Partial<CreateLensInput>;
+}): Promise<void> {
+  const { id, set } = input;
+  const { status } = set;
+  const columns = definedColumns({
+    slug: set.slug,
+    name: set.name,
+    summary: set.summary,
+    accentColor: set.accentColor,
+    seoTitle: set.seoTitle,
+    seoDescription: set.seoDescription,
+    ogImage: set.ogImage,
+    position: set.position,
+  });
+
+  if (Object.keys(columns).length === 0 && status === undefined) {
+    return;
+  }
+
+  await getDb()
+    .update(lenses)
+    .set(
+      status !== undefined
+        ? { ...columns, ...workflowUpdate(status, lenses.publishedAt, lenses.archivedAt) }
+        : { ...columns, updatedAt: new Date() },
+    )
+    .where(eq(lenses.id, id));
+}
+
+export async function patchPrinciple(input: {
+  id: string;
+  set: Partial<CreatePrincipleInput>;
+}): Promise<void> {
+  const { id, set } = input;
+  const { status } = set;
+  const columns = definedColumns({
+    slug: set.slug,
+    title: set.title,
+    summary: set.summary,
+    body: set.body,
+    seoTitle: set.seoTitle,
+    seoDescription: set.seoDescription,
+    ogImage: set.ogImage,
+    position: set.position,
+  });
+
+  if (Object.keys(columns).length === 0 && status === undefined) {
+    return;
+  }
+
+  await getDb()
+    .update(principles)
+    .set(
+      status !== undefined
+        ? { ...columns, ...workflowUpdate(status, principles.publishedAt, principles.archivedAt) }
+        : { ...columns, updatedAt: new Date() },
+    )
+    .where(eq(principles.id, id));
+}
+
+export async function patchSkill(input: {
+  id: string;
+  set: Partial<CreateSkillInput>;
+}): Promise<void> {
+  const { id, set } = input;
+  const { status } = set;
+  const columns = definedColumns({
+    slug: set.slug,
+    name: set.name,
+    category: set.category,
+    summary: set.summary,
+    position: set.position,
+  });
+
+  if (Object.keys(columns).length === 0 && status === undefined) {
+    return;
+  }
+
+  await getDb()
+    .update(skills)
+    .set(
+      status !== undefined
+        ? { ...columns, ...workflowUpdate(status, skills.publishedAt, skills.archivedAt) }
+        : { ...columns, updatedAt: new Date() },
+    )
+    .where(eq(skills.id, id));
+}
+
+export async function patchTag(input: {
+  id: string;
+  set: Partial<CreateTagInput>;
+}): Promise<void> {
+  const { id, set } = input;
+  const { status } = set;
+  const columns = definedColumns({
+    slug: set.slug,
+    name: set.name,
+    category: set.category,
+  });
+
+  if (Object.keys(columns).length === 0 && status === undefined) {
+    return;
+  }
+
+  await getDb()
+    .update(tags)
+    .set(
+      status !== undefined
+        ? { ...columns, ...workflowUpdate(status, tags.publishedAt, tags.archivedAt) }
+        : { ...columns, updatedAt: new Date() },
+    )
+    .where(eq(tags.id, id));
+}
+
+export async function patchDecisionPattern(input: {
+  id: string;
+  set: Partial<CreateDecisionPatternInput>;
+  relations?: { principleIds?: string[] };
+}): Promise<void> {
+  const { id, set, relations = {} } = input;
+  const { status } = set;
+  const columns = definedColumns({
+    slug: set.slug,
+    title: set.title,
+    summary: set.summary,
+    body: set.body,
+    seoTitle: set.seoTitle,
+    seoDescription: set.seoDescription,
+    ogImage: set.ogImage,
+    position: set.position,
+  });
+
+  await getDb().transaction(async (tx) => {
+    if (Object.keys(columns).length > 0 || status !== undefined) {
+      await tx
+        .update(decisionPatterns)
+        .set(
+          status !== undefined
+            ? {
+                ...columns,
+                ...workflowUpdate(status, decisionPatterns.publishedAt, decisionPatterns.archivedAt),
+              }
+            : { ...columns, updatedAt: new Date() },
+        )
+        .where(eq(decisionPatterns.id, id));
+    }
+
+    if (relations.principleIds) {
+      await tx
+        .delete(decisionPatternPrinciples)
+        .where(eq(decisionPatternPrinciples.decisionPatternId, id));
+      if (relations.principleIds.length > 0) {
+        await tx.insert(decisionPatternPrinciples).values(
+          relations.principleIds.map((principleId) => ({ decisionPatternId: id, principleId })),
+        );
+      }
+    }
+  });
+}
+
+export async function patchExperience(input: {
+  id: string;
+  set: Partial<CreateExperienceInput>;
+  relations?: { lensIds?: string[]; principleIds?: string[]; skillIds?: string[]; tagIds?: string[] };
+}): Promise<void> {
+  const { id, set, relations = {} } = input;
+  const { status } = set;
+  const columns = definedColumns({
+    slug: set.slug,
+    company: set.company,
+    role: set.role,
+    location: set.location,
+    startDate: set.startDate,
+    endDate: set.endDate,
+    isCurrent: set.isCurrent,
+    summary: set.summary,
+    details: set.details,
+    awards: set.awards,
+    seoTitle: set.seoTitle,
+    seoDescription: set.seoDescription,
+    ogImage: set.ogImage,
+    position: set.position,
+  });
+
+  await getDb().transaction(async (tx) => {
+    if (Object.keys(columns).length > 0 || status !== undefined) {
+      await tx
+        .update(experiences)
+        .set(
+          status !== undefined
+            ? { ...columns, ...workflowUpdate(status, experiences.publishedAt, experiences.archivedAt) }
+            : { ...columns, updatedAt: new Date() },
+        )
+        .where(eq(experiences.id, id));
+    }
+
+    if (relations.lensIds) {
+      await tx.delete(experienceLenses).where(eq(experienceLenses.experienceId, id));
+      if (relations.lensIds.length > 0) {
+        await tx.insert(experienceLenses).values(
+          relations.lensIds.map((lensId) => ({ experienceId: id, lensId })),
+        );
+      }
+    }
+
+    if (relations.principleIds) {
+      await tx.delete(experiencePrinciples).where(eq(experiencePrinciples.experienceId, id));
+      if (relations.principleIds.length > 0) {
+        await tx.insert(experiencePrinciples).values(
+          relations.principleIds.map((principleId) => ({ experienceId: id, principleId })),
+        );
+      }
+    }
+
+    if (relations.skillIds) {
+      await tx.delete(experienceSkills).where(eq(experienceSkills.experienceId, id));
+      if (relations.skillIds.length > 0) {
+        await tx.insert(experienceSkills).values(
+          relations.skillIds.map((skillId) => ({ experienceId: id, skillId })),
+        );
+      }
+    }
+
+    if (relations.tagIds) {
+      await tx.delete(experienceTags).where(eq(experienceTags.experienceId, id));
+      if (relations.tagIds.length > 0) {
+        await tx.insert(experienceTags).values(
+          relations.tagIds.map((tagId) => ({ experienceId: id, tagId })),
+        );
+      }
+    }
+  });
+}
+
+export async function patchProject(input: {
+  id: string;
+  set: Partial<CreateProjectInput>;
+  relations?: { lensIds?: string[]; principleIds?: string[]; skillIds?: string[]; tagIds?: string[] };
+}): Promise<void> {
+  const { id, set, relations = {} } = input;
+  const { status } = set;
+  const columns = definedColumns({
+    slug: set.slug,
+    name: set.name,
+    description: set.description,
+    details: set.details,
+    architecture: set.architecture,
+    developmentTechStack: set.developmentTechStack,
+    qaTechStack: set.qaTechStack,
+    aiIntegrationTechStack: set.aiIntegrationTechStack,
+    deploymentTechStack: set.deploymentTechStack,
+    url: set.url,
+    githubUrl: set.githubUrl,
+    experienceId: set.experienceId,
+    seoTitle: set.seoTitle,
+    seoDescription: set.seoDescription,
+    ogImage: set.ogImage,
+    position: set.position,
+  });
+
+  await getDb().transaction(async (tx) => {
+    if (Object.keys(columns).length > 0 || status !== undefined) {
+      await tx
+        .update(projects)
+        .set(
+          status !== undefined
+            ? { ...columns, ...workflowUpdate(status, projects.publishedAt, projects.archivedAt) }
+            : { ...columns, updatedAt: new Date() },
+        )
+        .where(eq(projects.id, id));
+    }
+
+    if (relations.lensIds) {
+      await tx.delete(projectLenses).where(eq(projectLenses.projectId, id));
+      if (relations.lensIds.length > 0) {
+        await tx.insert(projectLenses).values(
+          relations.lensIds.map((lensId) => ({ projectId: id, lensId })),
+        );
+      }
+    }
+
+    if (relations.principleIds) {
+      await tx.delete(projectPrinciples).where(eq(projectPrinciples.projectId, id));
+      if (relations.principleIds.length > 0) {
+        await tx.insert(projectPrinciples).values(
+          relations.principleIds.map((principleId) => ({ projectId: id, principleId })),
+        );
+      }
+    }
+
+    if (relations.skillIds) {
+      await tx.delete(projectSkills).where(eq(projectSkills.projectId, id));
+      if (relations.skillIds.length > 0) {
+        await tx.insert(projectSkills).values(
+          relations.skillIds.map((skillId) => ({ projectId: id, skillId })),
+        );
+      }
+    }
+
+    if (relations.tagIds) {
+      await tx.delete(projectTags).where(eq(projectTags.projectId, id));
+      if (relations.tagIds.length > 0) {
+        await tx.insert(projectTags).values(
+          relations.tagIds.map((tagId) => ({ projectId: id, tagId })),
+        );
+      }
+    }
+  });
+}
+
+export async function patchCaseStudy(input: {
+  id: string;
+  set: Partial<CreateCaseStudyInput>;
+  relations?: {
+    lensIds?: string[];
+    principleIds?: string[];
+    experienceIds?: string[];
+    projectIds?: string[];
+    skillIds?: string[];
+    tagIds?: string[];
+  };
+}): Promise<void> {
+  const { id, set, relations = {} } = input;
+  const { status } = set;
+  const columns = definedColumns({
+    slug: set.slug,
+    title: set.title,
+    excerpt: set.excerpt,
+    context: set.context,
+    problem: set.problem,
+    constraints: set.constraints,
+    action: set.action,
+    tradeoffs: set.tradeoffs,
+    outcome: set.outcome,
+    learning: set.learning,
+    seoTitle: set.seoTitle,
+    seoDescription: set.seoDescription,
+    ogImage: set.ogImage,
+    position: set.position,
+  });
+
+  await getDb().transaction(async (tx) => {
+    if (Object.keys(columns).length > 0 || status !== undefined) {
+      await tx
+        .update(caseStudies)
+        .set(
+          status !== undefined
+            ? { ...columns, ...workflowUpdate(status, caseStudies.publishedAt, caseStudies.archivedAt) }
+            : { ...columns, updatedAt: new Date() },
+        )
+        .where(eq(caseStudies.id, id));
+    }
+
+    if (relations.lensIds) {
+      await tx.delete(caseStudyLenses).where(eq(caseStudyLenses.caseStudyId, id));
+      if (relations.lensIds.length > 0) {
+        await tx.insert(caseStudyLenses).values(
+          relations.lensIds.map((lensId) => ({ caseStudyId: id, lensId })),
+        );
+      }
+    }
+
+    if (relations.principleIds) {
+      await tx.delete(caseStudyPrinciples).where(eq(caseStudyPrinciples.caseStudyId, id));
+      if (relations.principleIds.length > 0) {
+        await tx.insert(caseStudyPrinciples).values(
+          relations.principleIds.map((principleId) => ({ caseStudyId: id, principleId })),
+        );
+      }
+    }
+
+    if (relations.experienceIds) {
+      await tx.delete(caseStudyExperiences).where(eq(caseStudyExperiences.caseStudyId, id));
+      if (relations.experienceIds.length > 0) {
+        await tx.insert(caseStudyExperiences).values(
+          relations.experienceIds.map((experienceId) => ({ caseStudyId: id, experienceId })),
+        );
+      }
+    }
+
+    if (relations.projectIds) {
+      await tx.delete(caseStudyProjects).where(eq(caseStudyProjects.caseStudyId, id));
+      if (relations.projectIds.length > 0) {
+        await tx.insert(caseStudyProjects).values(
+          relations.projectIds.map((projectId) => ({ caseStudyId: id, projectId })),
+        );
+      }
+    }
+
+    if (relations.skillIds) {
+      await tx.delete(caseStudySkills).where(eq(caseStudySkills.caseStudyId, id));
+      if (relations.skillIds.length > 0) {
+        await tx.insert(caseStudySkills).values(
+          relations.skillIds.map((skillId) => ({ caseStudyId: id, skillId })),
+        );
+      }
+    }
+
+    if (relations.tagIds) {
+      await tx.delete(caseStudyTags).where(eq(caseStudyTags.caseStudyId, id));
+      if (relations.tagIds.length > 0) {
+        await tx.insert(caseStudyTags).values(
+          relations.tagIds.map((tagId) => ({ caseStudyId: id, tagId })),
+        );
+      }
     }
   });
 }

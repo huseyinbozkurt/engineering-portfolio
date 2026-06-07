@@ -10,6 +10,7 @@ import {
   caseStudySkills,
   caseStudyTags,
   contactSubmissions,
+  contactProfiles,
   decisionPatternPrinciples,
   decisionPatterns,
   experienceLenses,
@@ -37,6 +38,7 @@ export type CaseStudyRecord = InferSelectModel<typeof caseStudies>;
 export type SkillRecord = InferSelectModel<typeof skills>;
 export type TagRecord = InferSelectModel<typeof tags>;
 export type ContactSubmissionRecord = InferSelectModel<typeof contactSubmissions>;
+export type ContactProfileRecord = InferSelectModel<typeof contactProfiles>;
 
 // Admin "edit" records bundle a single entity with the ids of its current
 // relationships so an edit form can pre-select the related checkboxes.
@@ -334,6 +336,18 @@ export async function getContactSubmissions(): Promise<ContactSubmissionRecord[]
   return readArray((db) =>
     db.select().from(contactSubmissions).orderBy(desc(contactSubmissions.createdAt)),
   );
+}
+
+export async function getContactProfile(): Promise<ContactProfileRecord | null> {
+  return readOne(async (db) => {
+    const [profile] = await db
+      .select()
+      .from(contactProfiles)
+      .orderBy(desc(contactProfiles.updatedAt), desc(contactProfiles.createdAt))
+      .limit(1);
+
+    return profile;
+  });
 }
 
 export async function getCaseStudyBySlug(
@@ -890,4 +904,16 @@ export async function getCaseStudyById(id: string): Promise<CaseStudyEditRecord 
       tagIds: tagRows.map((row) => row.id),
     };
   });
+}
+
+export async function getDBAvailability() : Promise<{ isDbAvailable: boolean }> {
+    try {
+    const db = getDb();
+    await db.execute(sql`select 1`);
+    return {isDbAvailable : true};
+  } catch (error) {
+    console.error("[database-health-check]", error);
+
+    return {isDbAvailable : false};
+  }
 }

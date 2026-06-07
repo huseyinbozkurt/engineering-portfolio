@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 
 import { getProjectBySlug, getPublishedProjects } from "@portfolio/db/queries";
 
-import { ContentCard } from "@/components/content-card";
+import { CaseStoryCard } from "@/components/case-story-card";
 import { RichText } from "@/components/rich-text";
 import { SectionHeading } from "@/components/section-heading";
 import { StatusPill } from "@/components/status-pill";
@@ -69,6 +69,11 @@ interface MetaItem {
   href?: string;
 }
 
+interface ArchitectureStackBox {
+  title: string;
+  value: string;
+}
+
 function MetaGroup({ title, items }: { title: string; items: MetaItem[] }) {
   if (items.length === 0) {
     return null;
@@ -113,6 +118,14 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
   const { project } = detail;
   const hasDescription = project.description.trim().length > 0;
   const hasDetails = project.details.trim().length > 0;
+  const architectureStackBoxes: ArchitectureStackBox[] = [
+    { title: "Development Tech Stack", value: project.developmentTechStack },
+    { title: "Q&A Tech Stack", value: project.qaTechStack },
+    { title: "AI Integration Tech Stack", value: project.aiIntegrationTechStack },
+    { title: "Deployment Tech Stack", value: project.deploymentTechStack },
+  ].filter((box) => box.value.trim().length > 0);
+  const hasArchitecture =
+    project.architecture.trim().length > 0 || architectureStackBoxes.length > 0;
   const hasMeta =
     Boolean(detail.experience) ||
     detail.lenses.length > 0 ||
@@ -171,7 +184,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
           ) : null}
         </header>
 
-        {hasDescription || hasDetails || hasMeta ? (
+        {hasDescription || hasDetails || hasArchitecture || hasMeta ? (
           <div
             className={
               hasMeta ? "mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]" : "mt-10"
@@ -188,6 +201,23 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
                 <section className="glass-panel rounded-lg p-6 lg:p-8">
                   <h2 className="mb-5 text-2xl font-semibold text-ink">Details</h2>
                   <RichText value={project.details} />
+                </section>
+              ) : null}
+              {hasArchitecture ? (
+                <section className="grid gap-4">
+                  <h2 className="text-2xl font-semibold text-ink">Architecture</h2>
+                  {project.architecture.trim().length > 0 ? (
+                    <div className="glass-panel rounded-lg p-6 lg:p-8">
+                      <RichText value={project.architecture} />
+                    </div>
+                  ) : null}
+                  {architectureStackBoxes.length > 0 ? (
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      {architectureStackBoxes.map((box) => (
+                        <ArchitectureStackCard key={box.title} box={box} />
+                      ))}
+                    </div>
+                  ) : null}
                 </section>
               ) : null}
             </div>
@@ -240,21 +270,31 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
       {detail.caseStudies.length > 0 ? (
         <section className="border-y border-line bg-white/[0.025]">
           <div className="mx-auto max-w-7xl px-5 py-14 lg:px-8">
-            <SectionHeading title="Related Case Studies" />
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <SectionHeading
+              title="Case Story Highlights"
+              description="Short problem-to-outcome summaries from related case studies. Open a case story for the full context, constraints, and trade-offs."
+            />
+            <div className="grid gap-4 lg:grid-cols-2">
               {detail.caseStudies.map((caseStudy) => (
-                <ContentCard
-                  key={caseStudy.id}
-                  href={`/case-studies/${caseStudy.slug}`}
-                  title={caseStudy.title}
-                  description={caseStudy.excerpt}
-                  meta="Case study"
-                />
+                <CaseStoryCard key={caseStudy.id} caseStudy={caseStudy} />
               ))}
             </div>
           </div>
         </section>
       ) : null}
     </>
+  );
+}
+
+function ArchitectureStackCard({ box }: { box: ArchitectureStackBox }) {
+  return (
+    <section className="glass-panel rounded-lg p-5">
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-amber-200">
+        {box.title}
+      </h3>
+      <div className="mt-4 [&_.rich-text]:gap-2 [&_.rich-text]:text-sm [&_.rich-text]:leading-6">
+        <RichText value={box.value} />
+      </div>
+    </section>
   );
 }

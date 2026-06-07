@@ -7,10 +7,12 @@
   "exports": {
     ".": "./src/index.ts",
     "./admin": "./src/mutations.ts",
+    "./ai-stories": "./src/ai-stories.ts",
     "./contact": "./src/contact.ts",
     "./llm-tasks": "./src/llm-tasks.ts",
     "./queries": "./src/queries.ts",
-    "./schema": "./src/schema.ts"
+    "./schema": "./src/schema.ts",
+    "./cached-queries": "./src/cached-queries.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

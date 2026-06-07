@@ -1,14 +1,15 @@
-import Link from "next/link";
+import { Pencil } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { getTagById } from "@portfolio/db/queries";
 
-import { deleteTagAction, updateTagAction } from "@/app/actions";
+import { deleteTagAction, patchTagAction } from "@/app/actions";
 import { DeleteForm } from "@/components/delete-form";
-import { TagForm } from "@/components/forms/tag-form";
+import { DetailHeader } from "@/components/detail/detail-header";
+import { SectionEditForm } from "@/components/detail/section-edit-form";
+import { SettingsModal } from "@/components/detail/settings-modal";
+import { Field } from "@/components/form-controls";
 import { ModalPanel } from "@/components/modal-panel";
-import { PageTitle } from "@/components/page-title";
-import { RecordOverview } from "@/components/record-overview";
 
 export const dynamic = "force-dynamic";
 
@@ -24,39 +25,70 @@ export default async function EditTagPage({ params }: EditPageProps) {
     notFound();
   }
 
+  const settings = (
+    <SettingsModal
+      id={tag.id}
+      action={patchTagAction}
+      size="sm"
+      description="Slug and category. Tags have no SEO fields."
+      fields={["slug", "category"]}
+    >
+      <Field label="Slug" name="slug" required defaultValue={tag.slug} />
+      <Field
+        label="Category"
+        name="category"
+        placeholder="Domain"
+        defaultValue={tag.category ?? undefined}
+      />
+    </SettingsModal>
+  );
+
+  const headerEdit = (
+    <ModalPanel
+      title="Edit name"
+      triggerLabel="Edit name"
+      size="sm"
+      triggerClassName="inline-flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-xs font-medium text-muted transition hover:border-teal-300/50 hover:text-ink"
+      triggerContent={
+        <>
+          <Pencil className="size-3.5" /> Edit
+        </>
+      }
+    >
+      <SectionEditForm action={patchTagAction} id={tag.id} fields="name">
+        <Field label="Name" name="name" required defaultValue={tag.name} />
+      </SectionEditForm>
+    </ModalPanel>
+  );
+
   return (
-    <main className="mx-auto max-w-2xl px-5 py-8 lg:px-8">
-      <Link href="/content/tags" className="text-sm text-muted transition hover:text-ink">
-        ← Back to tags
-      </Link>
-      <div className="mt-4">
-        <PageTitle title="Edit tag" description="Update this tag." />
-      </div>
-      <RecordOverview
+    <main className="mx-auto max-w-3xl px-5 py-8 lg:px-8">
+      <DetailHeader
+        backHref="/content/tags"
+        backLabel="All tags"
+        eyebrow="Tag"
         title={tag.name}
-        description={tag.slug}
-        details={[
-          { label: "Status", value: tag.status },
-          { label: "Slug", value: tag.slug },
-          { label: "Category", value: tag.category },
-        ]}
-        action={
-          <ModalPanel
-            triggerLabel="Edit tag"
-            title="Edit tag"
-            description="Make changes in the form, then confirm before saving."
-            size="sm"
-          >
-            <TagForm
-              action={updateTagAction}
-              title={tag.name}
-              submitLabel="Save changes"
-              defaults={tag}
-            />
-          </ModalPanel>
+        id={tag.id}
+        status={tag.status}
+        statusAction={patchTagAction}
+        settings={settings}
+        headerEdit={headerEdit}
+        subtitle={
+          tag.category ? (
+            <span className="rounded-full border border-line bg-white/5 px-2.5 py-0.5 text-xs text-muted">
+              {tag.category}
+            </span>
+          ) : null
         }
       />
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-white/[0.02] p-4">
+
+      <div className="mt-8 rounded-lg border border-line bg-white/[0.02] p-5 text-sm leading-6 text-muted">
+        Tags are labels applied to projects, experience, and case studies. Choose where this tag
+        appears from each of those records (in their Settings), or edit its name, category, slug,
+        and publish state here.
+      </div>
+
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-400/20 bg-rose-500/[0.04] p-4">
         <p className="text-sm text-muted">Permanently remove this tag and its relationships.</p>
         <DeleteForm action={deleteTagAction} id={tag.id} label="Delete tag" />
       </div>

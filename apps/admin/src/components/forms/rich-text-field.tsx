@@ -7,9 +7,9 @@ interface RichTextFieldProps {
   label: string;
   name: string;
   defaultValue?: string | undefined;
-  placeholder?: string;
-  rows?: number;
-  hint?: string;
+  placeholder?: string | undefined;
+  rows?: number | undefined;
+  hint?: string | undefined;
 }
 
 type Mode = "write" | "preview";

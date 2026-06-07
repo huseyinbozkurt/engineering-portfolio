@@ -34,7 +34,7 @@ export default async function HowIWorkPage() {
       <PageHeader
         eyebrow="How I Work"
         title="Principles first. Decisions in context."
-        description="This page shows how problems are approached, which trade-offs matter, and how operating principles connect to real work."
+        description=""
       />
       {principles.length > 0 ? (
         <section className="mx-auto max-w-7xl px-5 pb-14 lg:px-8">

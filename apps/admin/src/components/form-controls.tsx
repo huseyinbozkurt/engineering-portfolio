@@ -3,7 +3,7 @@ interface FieldProps {
   name: string;
   required?: boolean;
   placeholder?: string;
-  type?: "text" | "number" | "url" | "date";
+  type?: "text" | "number" | "url" | "date" | "email";
   defaultValue?: string | undefined;
 }
 

@@ -12,11 +12,22 @@ function text(formData: FormData, key: string): string {
 }
 
 function valuesFromFormData(formData: FormData): ContactFormValues {
+  const message = text(formData, "message");
+  const problem = text(formData, "problem") || message;
+
   return {
+    intent: (text(formData, "intent") || "hiring") as ContactFormValues["intent"],
     name: text(formData, "name"),
     email: text(formData, "email"),
-    message: text(formData, "message"),
-    wantsResponse: formData.get("wantsResponse") === "on",
+    company: text(formData, "company"),
+    roleTitle: text(formData, "roleTitle"),
+    techStack: text(formData, "techStack"),
+    problem,
+    desiredOutcome: text(formData, "desiredOutcome"),
+    timeline: text(formData, "timeline"),
+    message,
+    wantsResponse:
+      formData.get("wantsResponse") === "on" || text(formData, "wantsResponse") === "true",
   };
 }
 
@@ -55,10 +66,17 @@ export async function submitContactForm(
       status: "success",
       message: "Thanks. Your message has been sent.",
       values: {
+        intent: "hiring",
         name: "",
         email: "",
+        company: "",
+        roleTitle: "",
+        techStack: "",
+        problem: "",
+        desiredOutcome: "",
+        timeline: "",
         message: "",
-        wantsResponse: false,
+        wantsResponse: true,
       },
       fieldErrors: {},
       version,

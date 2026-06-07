@@ -37,6 +37,14 @@ export const llmTaskStatusEnum = pgEnum("llm_task_status", [
 
 export type LlmTaskStatus = (typeof llmTaskStatusEnum.enumValues)[number];
 
+export const aiGeneratedStoryStatusEnum = pgEnum("ai_generated_story_status", [
+  "draft",
+  "applied",
+  "failed",
+]);
+
+export type AiGeneratedStoryStatus = (typeof aiGeneratedStoryStatusEnum.enumValues)[number];
+
 /**
  * Forward-looking shape for AI-generated content review suggestions. Stored as
  * jsonb so the structure can evolve without a migration. No LLM writes these
@@ -150,6 +158,9 @@ export const experiences = pgTable(
     summary: text("summary").notNull().default(""),
     // Long-form rich text (markdown) shown on the experience detail page.
     details: text("details").notNull().default(""),
+    // Short "Awards & Recognition" briefs (employer feedback or rewards), one
+    // per line. Only the first 3 are displayed, top-right on the detail page.
+    awards: text("awards").notNull().default(""),
     ...workflow,
     ...seo,
     ...aiMetadata,
@@ -173,6 +184,12 @@ export const projects = pgTable(
     description: text("description").notNull().default(""),
     // Long-form rich text (markdown) shown on the project detail page.
     details: text("details").notNull().default(""),
+    // Optional architecture content shown as a dedicated detail section.
+    architecture: text("architecture").notNull().default(""),
+    developmentTechStack: text("development_tech_stack").notNull().default(""),
+    qaTechStack: text("qa_tech_stack").notNull().default(""),
+    aiIntegrationTechStack: text("ai_integration_tech_stack").notNull().default(""),
+    deploymentTechStack: text("deployment_tech_stack").notNull().default(""),
     url: text("url"),
     githubUrl: text("github_url"),
     // Optional "position" a project was built during. Nullable: a project need
@@ -280,15 +297,47 @@ export const contactSubmissions = pgTable(
   "contact_submissions",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    mode: varchar("mode", { length: 40 }).notNull().default("technical"),
+    intent: varchar("intent", { length: 80 }).notNull().default("collaboration"),
     name: varchar("name", { length: 160 }).notNull(),
     email: varchar("email", { length: 320 }),
     wantsResponse: boolean("wants_response").notNull().default(false),
+    company: varchar("company", { length: 180 }),
+    roleTitle: varchar("role_title", { length: 180 }),
+    techStack: text("tech_stack"),
+    problem: text("problem").notNull().default(""),
+    desiredOutcome: text("desired_outcome"),
+    timeline: varchar("timeline", { length: 180 }),
     message: text("message").notNull(),
     ...timestamps,
   },
   (table) => ({
     createdAtIdx: index("contact_submissions_created_at_idx").on(table.createdAt),
     wantsResponseIdx: index("contact_submissions_wants_response_idx").on(table.wantsResponse),
+  }),
+);
+
+export const contactProfiles = pgTable(
+  "contact_profiles",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    locationLabel: varchar("location_label", { length: 180 }),
+    availabilityLabel: text("availability_label"),
+    timezoneLabel: varchar("timezone_label", { length: 120 }),
+    responseTimeLabel: varchar("response_time_label", { length: 180 }),
+    linkedinUrl: text("linkedin_url"),
+    githubUrl: text("github_url"),
+    emailAddress: varchar("email_address", { length: 320 }),
+    resumeUrl: text("resume_url"),
+    shortContactIntro: text("short_contact_intro"),
+    openToItems: jsonb("open_to_items")
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    ...timestamps,
+  },
+  (table) => ({
+    updatedAtIdx: index("contact_profiles_updated_at_idx").on(table.updatedAt),
   }),
 );
 
@@ -322,6 +371,64 @@ export const llmTasks = pgTable(
       .where(
         sql`${table.taskType} = 'ai_insights' and ${table.status} in ('pending', 'running')`,
       ),
+  }),
+);
+
+export interface AiGeneratedStoryPart {
+  id: string;
+  kind:
+    | "lens"
+    | "principle"
+    | "decisionPattern"
+    | "experience"
+    | "project"
+    | "caseStudy"
+    | "skill"
+    | "tag";
+  title: string;
+  summary: string;
+  fields: Record<string, unknown>;
+  relations?: Record<string, string[] | string | null>;
+  deletedAt?: string | null;
+  appliedRecordId?: string | null;
+}
+
+export interface AiGeneratedLensRenameSuggestion {
+  lensId: string;
+  currentName: string;
+  suggestedName: string;
+  reason: string;
+}
+
+export interface AiGeneratedStoryPayload {
+  version: 1;
+  title: string;
+  summary: string;
+  lensRenameSuggestions?: AiGeneratedLensRenameSuggestion[];
+  parts: AiGeneratedStoryPart[];
+}
+
+export const aiGeneratedStories = pgTable(
+  "ai_generated_stories",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    title: varchar("title", { length: 220 }).notNull(),
+    sourcePrompt: text("source_prompt").notNull(),
+    status: aiGeneratedStoryStatusEnum("status").notNull().default("draft"),
+    providerName: varchar("provider_name", { length: 180 }),
+    providerModel: varchar("provider_model", { length: 220 }),
+    generatedContent: jsonb("generated_content").$type<AiGeneratedStoryPayload>().notNull(),
+    rawResponse: text("raw_response"),
+    finishReason: varchar("finish_reason", { length: 120 }),
+    errorMessage: text("error_message"),
+    targetType: varchar("target_type", { length: 60 }),
+    targetId: uuid("target_id"),
+    appliedAt: timestamp("applied_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => ({
+    createdAtIdx: index("ai_generated_stories_created_at_idx").on(table.createdAt),
+    statusIdx: index("ai_generated_stories_status_idx").on(table.status),
   }),
 );
 

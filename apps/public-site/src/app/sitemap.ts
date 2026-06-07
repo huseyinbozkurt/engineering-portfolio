@@ -3,11 +3,12 @@ import type { MetadataRoute } from "next";
 import { experienceHref, projectHref } from "@/lib/paths";
 import { getPublicSiteAvailability } from "@/lib/site-availability";
 import { siteConfig } from "@/lib/site";
+import { getCachedHomeContent } from "@portfolio/db/cached-queries";
 
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const { content, shouldShowComingSoon } = await getPublicSiteAvailability();
+  const { shouldShowComingSoon } = await getPublicSiteAvailability();
 
   if (shouldShowComingSoon) {
     return [
@@ -17,6 +18,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       },
     ];
   }
+  const content = await getCachedHomeContent();
 
   const staticRoutes = [
     "",
