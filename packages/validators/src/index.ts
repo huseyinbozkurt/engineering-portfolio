@@ -255,7 +255,6 @@ export type CreateCaseStudyInput = z.infer<typeof createCaseStudySchema>;
 export type CreateSkillInput = z.infer<typeof createSkillSchema>;
 export type CreateTagInput = z.infer<typeof createTagSchema>;
 export type CreateContactSubmissionInput = z.infer<typeof createContactSubmissionSchema>;
-export type ContactMode = CreateContactSubmissionInput["mode"];
 export type ContactIntent = CreateContactSubmissionInput["intent"];
 export type ContactSubmission = CreateContactSubmissionInput;
 export type ContactProfile = z.infer<typeof contactProfileSchema>;
