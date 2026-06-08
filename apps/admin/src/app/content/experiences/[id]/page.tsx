@@ -10,7 +10,7 @@ import { MetaSidebar } from "@/components/detail/meta-sidebar";
 import { SectionCard } from "@/components/detail/section-card";
 import { SectionEditForm } from "@/components/detail/section-edit-form";
 import { SettingsModal } from "@/components/detail/settings-modal";
-import { Checkbox, CheckboxGroup, Field, SeoFields } from "@/components/form-controls";
+import { Checkbox, CheckboxGroup, Field, SeoFields, TextArea } from "@/components/form-controls";
 import { RichTextField } from "@/components/forms/rich-text-field";
 import { ModalPanel } from "@/components/modal-panel";
 import { publicHrefs } from "@/lib/public-site";
@@ -142,7 +142,7 @@ export default async function EditExperiencePage({ params }: EditPageProps) {
       description="Role, company, dates, and location shown at the top of the page."
       triggerLabel="Edit role details"
       size="md"
-      triggerClassName="inline-flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-xs font-medium text-muted transition hover:border-teal-300/50 hover:text-ink"
+      triggerClassName="ui-btn-ghost"
       triggerContent={
         <>
           <Pencil className="size-3.5" /> Edit
@@ -244,13 +244,70 @@ export default async function EditExperiencePage({ params }: EditPageProps) {
           />
         </div>
 
-        <MetaSidebar groups={metaGroups} />
+        <aside className="grid h-fit content-start gap-6">
+          <SectionCard
+            title="Awards & Recognition"
+            id={experience.id}
+            action={patchExperienceAction}
+            fields="awards"
+            value={experience.awards}
+            addLabel="Add awards or recognition"
+            eyebrow="Shown at the top-right of the public experience detail page."
+            modalDescription="Add up to 3 short employer feedback notes, engineering awards, or recognition items. Use one item per line."
+            submitLabel="Save awards"
+            formFields={
+              <div className="grid gap-2">
+                <TextArea
+                  label="Awards & Recognition"
+                  name="awards"
+                  rows={5}
+                  defaultValue={experience.awards}
+                  placeholder="One employer feedback note, award, or recognition per line"
+                />
+                <p className="text-xs text-muted">
+                  Keep each item brief. The public experience detail page displays the first 3.
+                </p>
+              </div>
+            }
+            preview={
+              <AwardsRecognitionPreview items={getAwardsRecognitionItems(experience.awards)} />
+            }
+          />
+          <MetaSidebar groups={metaGroups} />
+        </aside>
       </div>
 
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-400/20 bg-rose-500/[0.04] p-4">
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-400/20 bg-rose-500/[0.04] p-5">
         <p className="text-sm text-muted">Permanently remove this experience record.</p>
         <DeleteForm action={deleteExperienceAction} id={experience.id} label="Delete experience" />
       </div>
     </main>
   );
+}
+
+function AwardsRecognitionPreview({ items }: { items: string[] }) {
+  if (items.length === 0) {
+    return <p className="text-sm leading-6 text-muted">No awards or recognition added yet.</p>;
+  }
+
+  return (
+    <ol className="grid gap-3">
+      {items.map((item, index) => (
+        <li key={`${index}-${item}`} className="flex gap-3">
+          <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border border-line bg-white/[0.04] text-xs font-semibold text-teal-200">
+            {index + 1}
+          </span>
+          <p className="text-sm leading-6 text-muted">{item}</p>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function getAwardsRecognitionItems(value: string): string[] {
+  return value
+    .split(/\r?\n/)
+    .map((item) => item.trim().replace(/^(?:[-*]|\d+[.)])\s+/, ""))
+    .filter((item) => item.length > 0)
+    .slice(0, 3);
 }

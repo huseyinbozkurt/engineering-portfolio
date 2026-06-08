@@ -25,8 +25,10 @@ export function MetaSidebar({ groups, emptyHint }: MetaSidebarProps) {
   const populated = groups.filter((group) => group.items.length > 0);
 
   return (
-    <aside className="grid h-fit content-start gap-5 rounded-lg border border-line bg-white/[0.02] p-5">
-      <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">Relationships</p>
+    <aside className="ui-card grid h-fit content-start gap-5 p-5 shadow-card lg:sticky lg:top-6">
+      <p className="text-xs font-semibold uppercase tracking-wider text-amber-200/90">
+        Relationships
+      </p>
 
       {populated.length === 0 ? (
         <p className="text-sm text-muted">
@@ -40,10 +42,7 @@ export function MetaSidebar({ groups, emptyHint }: MetaSidebarProps) {
             </p>
             <div className="flex flex-wrap gap-2">
               {group.items.map((item) => (
-                <span
-                  key={item.id}
-                  className="rounded-lg border border-line bg-white/5 px-3 py-1 text-xs text-muted"
-                >
+                <span key={item.id} className="ui-chip">
                   {item.label}
                 </span>
               ))}

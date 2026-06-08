@@ -238,6 +238,33 @@ export const contactProfileSchema = z.object({
     .default([]),
 });
 
+export const homepageMetricSchema = z.object({
+  value: z.string().trim().min(1).max(80),
+  label: z.string().trim().min(1).max(120),
+  detail: z.string().trim().max(180).optional(),
+});
+
+export const homepageSettingsSchema = z.object({
+  roleLabel: nullableTextSchema,
+  headline: nullableTextSchema,
+  headlineHighlight: nullableTextSchema,
+  summary: nullableTextSchema,
+  primaryCtaLabel: nullableTextSchema,
+  primaryCtaHref: nullableTextSchema,
+  secondaryCtaLabel: nullableTextSchema,
+  secondaryCtaHref: nullableTextSchema,
+  codeRoleLabel: nullableTextSchema,
+  codeMindsetLabel: nullableTextSchema,
+  codeLocationLabel: nullableTextSchema,
+  codeExperienceLabel: nullableTextSchema,
+  codeFocusItems: z.array(z.string().trim().min(1).max(180)).max(8).default([]),
+  metricCards: z.array(homepageMetricSchema).max(6).default([]),
+  featuredSkillIds: relationIdsSchema,
+  featuredPrincipleIds: relationIdsSchema,
+  featuredCaseStudyIds: relationIdsSchema,
+  featuredRecognitionExperienceId: nullableUuidSchema,
+});
+
 export const bulkSkillsSchema = z.object({
   items: z.array(createSkillSchema).min(1, "Add at least one skill."),
 });
@@ -258,6 +285,8 @@ export type CreateContactSubmissionInput = z.infer<typeof createContactSubmissio
 export type ContactIntent = CreateContactSubmissionInput["intent"];
 export type ContactSubmission = CreateContactSubmissionInput;
 export type ContactProfile = z.infer<typeof contactProfileSchema>;
+export type HomepageSettings = z.infer<typeof homepageSettingsSchema>;
+export type HomepageMetric = z.infer<typeof homepageMetricSchema>;
 export type BulkSkillsInput = z.infer<typeof bulkSkillsSchema>;
 export type BulkTagsInput = z.infer<typeof bulkTagsSchema>;
 

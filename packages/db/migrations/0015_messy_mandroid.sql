@@ -1,0 +1,1 @@
+ALTER TABLE "homepage_settings" ADD COLUMN "headline_highlight" varchar(180);

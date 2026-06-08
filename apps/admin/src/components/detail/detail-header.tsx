@@ -43,16 +43,19 @@ export function DetailHeader({
     <header className="border-b border-line pb-6">
       <Link
         href={backHref}
-        className="inline-flex items-center gap-2 text-sm text-muted transition hover:text-ink"
+        className="inline-flex items-center gap-1.5 text-sm text-muted transition hover:text-ink"
       >
-        <ArrowLeft className="size-4" aria-hidden /> {backLabel}
+        <ArrowLeft className="size-4 transition group-hover:-translate-x-0.5" aria-hidden />{" "}
+        {backLabel}
       </Link>
 
       <div className="mt-5 flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-teal-200">{eyebrow}</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-teal-200/90">
+            {eyebrow}
+          </p>
           <div className="mt-2 flex flex-wrap items-center gap-3">
-            <h1 className="text-3xl font-semibold text-ink">{title}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{title}</h1>
             {headerEdit}
           </div>
           {subtitle ? <div className="mt-2 text-sm text-muted">{subtitle}</div> : null}
@@ -65,7 +68,7 @@ export function DetailHeader({
               href={publicHref}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-ink transition hover:border-teal-300/50 hover:bg-white/[0.06]"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-white/[0.02] px-3 py-2 text-sm font-medium text-ink transition hover:border-line-strong hover:bg-white/[0.06]"
             >
               View on site <ExternalLink className="size-3.5" aria-hidden />
             </a>

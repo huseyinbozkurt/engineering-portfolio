@@ -16,13 +16,13 @@ export function AdminNav() {
   const pathname = usePathname() ?? "/";
 
   return (
-    <nav className="mt-7 grid gap-5">
+    <nav className="mt-7 grid gap-6">
       {adminNavGroups.map((group) => {
         const items = adminNavItems.filter((item) => item.group === group);
 
         return (
-          <div key={group} className="grid gap-1">
-            <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted/60">
+          <div key={group} className="grid gap-0.5">
+            <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted/50">
               {group}
             </p>
             {items.map((item) => {
@@ -36,11 +36,20 @@ export function AdminNav() {
                   aria-current={active ? "page" : undefined}
                   className={
                     active
-                      ? "flex items-center gap-2.5 rounded-lg border border-teal-300/30 bg-teal-300/10 px-3 py-2 text-sm font-medium text-ink"
-                      : "flex items-center gap-2.5 rounded-lg border border-transparent px-3 py-2 text-sm text-muted transition hover:bg-white/7 hover:text-ink"
+                      ? "group relative flex items-center gap-2.5 rounded-xl bg-teal-300/[0.12] px-3 py-2 text-sm font-medium text-ink"
+                      : "group relative flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-muted transition hover:bg-white/[0.05] hover:text-ink"
                   }
                 >
-                  <Icon className={active ? "size-4 text-teal-200" : "size-4 text-muted"} />
+                  {active ? (
+                    <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-teal-300" />
+                  ) : null}
+                  <Icon
+                    className={
+                      active
+                        ? "size-4 text-teal-200"
+                        : "size-4 text-muted transition group-hover:text-ink"
+                    }
+                  />
                   {item.label}
                 </Link>
               );

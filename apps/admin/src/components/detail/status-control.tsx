@@ -25,19 +25,19 @@ export function StatusControl({ action, id, status }: StatusControlProps) {
   const formRef = useRef<HTMLFormElement>(null);
 
   return (
-    <form ref={formRef} action={action} className="inline-flex items-center gap-2">
+    <form ref={formRef} action={action} className="relative inline-flex items-center">
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="__fields" value="status" />
       <span
         aria-hidden
-        className={`size-2 rounded-full ${statusDot[status] ?? statusDot.draft}`}
+        className={`pointer-events-none absolute left-3 top-1/2 z-10 size-2 -translate-y-1/2 rounded-full ${statusDot[status] ?? statusDot.draft}`}
       />
       <select
         name="status"
         defaultValue={status}
         aria-label="Publish status"
         onChange={() => formRef.current?.requestSubmit()}
-        className="rounded-lg border border-line bg-white/[0.04] px-3 py-1.5 text-sm font-medium text-ink outline-none transition focus:border-teal-300/60"
+        className="ui-select w-auto py-2 pl-7 font-medium"
       >
         <option value="draft">Draft</option>
         <option value="published">Published</option>

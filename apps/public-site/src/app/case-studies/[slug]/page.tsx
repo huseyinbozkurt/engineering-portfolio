@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
 
-import { getCaseStudyBySlug, getPublishedCaseStudies } from "@portfolio/db/queries";
+import { getCaseStudyBySlug } from "@portfolio/db/queries";
 
 import { RichText } from "@/components/rich-text";
+import { SectionHeader } from "@/components/portfolio-ui";
 import { StatusPill } from "@/components/status-pill";
 import { getComingSoonFallback } from "@/lib/coming-soon-gate";
+import { experienceHref, projectHref } from "@/lib/paths";
 import { siteConfig } from "@/lib/site";
 
 interface CaseStudyPageProps {
@@ -14,12 +18,8 @@ interface CaseStudyPageProps {
   }>;
 }
 
-export const revalidate = 3600;
-
-export async function generateStaticParams(): Promise<Array<{ slug: string }>> {
-  const caseStudies = await getPublishedCaseStudies();
-  return caseStudies.map((caseStudy) => ({ slug: caseStudy.slug }));
-}
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function generateMetadata({ params }: CaseStudyPageProps): Promise<Metadata> {
   const { slug } = await params;
@@ -70,76 +70,100 @@ export default async function CaseStudyPage({ params }: CaseStudyPageProps) {
   }
 
   const sections: CaseStudySection[] = [
-    { title: "Context", value: detail.caseStudy.context, accent: "text-teal-200" },
+    { title: "Context", value: detail.caseStudy.context, accent: "text-sky-200" },
     { title: "Problem", value: detail.caseStudy.problem, accent: "text-rose-200" },
     { title: "Constraints", value: detail.caseStudy.constraints, accent: "text-amber-200" },
-    { title: "What I Did", value: detail.caseStudy.action, accent: "text-teal-200" },
+    { title: "What I Did", value: detail.caseStudy.action, accent: "text-violet-200" },
     { title: "Trade-offs", value: detail.caseStudy.tradeoffs, accent: "text-amber-200" },
-    { title: "Outcome", value: detail.caseStudy.outcome, accent: "text-teal-100" },
+    { title: "Outcome", value: detail.caseStudy.outcome, accent: "text-emerald-200" },
     { title: "What I Learned", value: detail.caseStudy.learning, accent: "text-sky-200" },
   ].filter((section) => section.value.trim().length > 0);
+  const hasSidebar =
+    detail.lenses.length > 0 ||
+    detail.principles.length > 0 ||
+    detail.experiences.length > 0 ||
+    detail.projects.length > 0 ||
+    detail.skills.length > 0 ||
+    detail.tags.length > 0;
 
   return (
-    <article className="mx-auto flex min-h-screen max-w-7xl flex-col px-5 py-5 lg:h-[calc(100vh-4.5rem)] lg:min-h-[calc(100vh-4.5rem)] lg:px-8">
-      <header className="grid shrink-0 gap-3 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="glass-panel rounded-lg p-4">
-          <p className="text-sm font-medium text-teal-200">Case study</p>
-          <h1 className="mt-2 max-w-4xl text-3xl font-semibold text-ink md:text-4xl">
+    <>
+      <section className="quiet-grid border-b border-line">
+        <div className="mx-auto max-w-7xl px-5 py-14 lg:px-8 lg:py-20">
+          <Link
+            href="/case-studies"
+            className="inline-flex items-center gap-2 text-sm text-muted transition hover:text-ink"
+          >
+            <span aria-hidden>←</span> All case studies
+          </Link>
+          <p className="mt-8 text-xs font-semibold uppercase tracking-[0.22em] text-violet-300">
+            Case Study
+          </p>
+          <h1 className="mt-4 max-w-5xl text-4xl font-semibold leading-tight text-ink md:text-6xl">
             {detail.caseStudy.title}
           </h1>
           {detail.caseStudy.excerpt ? (
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">
+            <p className="mt-6 max-w-3xl text-lg leading-8 text-muted">
               {detail.caseStudy.excerpt}
             </p>
           ) : null}
-          <div className="mt-4 flex flex-wrap gap-2">
-            {detail.lenses.map((lens) => (
-              <StatusPill key={lens.id} label={lens.name} />
-            ))}
-            {detail.principles.map((principle) => (
-              <StatusPill key={principle.id} label={principle.title} />
-            ))}
-          </div>
+          {detail.lenses.length > 0 || detail.principles.length > 0 ? (
+            <div className="mt-7 flex flex-wrap gap-2">
+              {detail.lenses.map((lens) => (
+                <StatusPill key={lens.id} label={lens.name} />
+              ))}
+              {detail.principles.map((principle) => (
+                <StatusPill key={principle.id} label={principle.title} />
+              ))}
+            </div>
+          ) : null}
         </div>
+      </section>
 
-        <aside className="glass-panel rounded-lg p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-amber-200">Case map</p>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <Metric label="Sections" value={sections.length} />
-            <Metric label="Signals" value={detail.lenses.length + detail.principles.length} />
-            <Metric label="Skills" value={detail.skills.length} />
-            <Metric label="Projects" value={detail.projects.length} />
-          </div>
-        </aside>
-      </header>
+      {sections.length > 0 || hasSidebar ? (
+        <section className="mx-auto grid max-w-7xl gap-8 px-5 py-14 lg:grid-cols-[minmax(0,1fr)_20rem] lg:px-8 lg:py-16">
+          {sections.length > 0 ? (
+            <div>
+              <SectionHeader title="Story Flow" />
+              <div className="grid gap-4 md:grid-cols-2">
+                {sections.map((section, index) => (
+                  <CaseStudySectionCard key={section.title} section={section} index={index} />
+                ))}
+              </div>
+            </div>
+          ) : null}
 
-      <div className="mt-3 grid min-h-0 flex-1 gap-3 lg:grid-cols-[16rem_minmax(0,1fr)]">
-        <aside className="glass-panel min-h-0 rounded-lg p-3 lg:overflow-y-auto">
-          <h2 className="text-sm font-semibold text-ink">Story flow</h2>
-          <ol className="mt-3 grid gap-1">
-            {sections.map((section, index) => (
-              <li key={section.title} className="flex items-center gap-2 rounded-lg bg-white/[0.035] p-1.5">
-                <span className={`flex size-6 shrink-0 items-center justify-center rounded-full border border-line bg-white/[0.04] text-xs font-semibold ${section.accent}`}>
-                  {index + 1}
-                </span>
-                <span className="text-xs text-muted">{section.title}</span>
-              </li>
-            ))}
-          </ol>
-        </aside>
-
-        <div className="grid min-h-0 gap-3 lg:grid-cols-3 lg:grid-rows-[repeat(3,minmax(0,1fr))] lg:overflow-hidden xl:grid-cols-4 xl:grid-rows-[repeat(2,minmax(0,1fr))]">
-          {sections.map((section, index) => (
-            <CaseStudySectionCard
-              key={section.title}
-              section={section}
-              index={index}
-              highlight={section.title === "Problem" || section.title === "Outcome"}
-            />
-          ))}
-        </div>
-      </div>
-    </article>
+          {hasSidebar ? (
+            <aside className="grid content-start gap-5">
+              <MetaPanel title="Related Experience">
+                {detail.experiences.map((experience) => (
+                  <MetaLink
+                    key={experience.id}
+                    href={experienceHref(experience)}
+                    label={`${experience.role} at ${experience.company}`}
+                  />
+                ))}
+              </MetaPanel>
+              <MetaPanel title="Related Projects">
+                {detail.projects.map((project) => (
+                  <MetaLink key={project.id} href={projectHref(project)} label={project.name} />
+                ))}
+              </MetaPanel>
+              <MetaPanel title="Skills">
+                {detail.skills.map((skill) => (
+                  <StatusPill key={skill.id} label={skill.name} />
+                ))}
+              </MetaPanel>
+              <MetaPanel title="Focus Areas">
+                {detail.tags.map((tag) => (
+                  <StatusPill key={tag.id} label={tag.name} />
+                ))}
+              </MetaPanel>
+            </aside>
+          ) : null}
+        </section>
+      ) : null}
+    </>
   );
 }
 
@@ -149,41 +173,52 @@ interface CaseStudySection {
   accent: string;
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-lg border border-line bg-white/[0.035] p-2.5">
-      <p className="text-xl font-semibold text-ink">{value}</p>
-      <p className="text-xs text-muted">{label}</p>
-    </div>
-  );
-}
-
 function CaseStudySectionCard({
   section,
   index,
-  highlight,
 }: {
   section: CaseStudySection;
   index: number;
-  highlight: boolean;
 }) {
   return (
-    <section
-      className={
-        highlight
-          ? "glass-panel flex min-h-44 flex-col rounded-lg border-teal-300/30 p-3 lg:min-h-0"
-          : "glass-panel flex min-h-44 flex-col rounded-lg p-3 lg:min-h-0"
-      }
-    >
+    <article className="glass-panel rounded-lg p-5">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-ink">{section.title}</h2>
-        <span className={`text-xs font-semibold ${section.accent}`}>
+        <h2 className="text-xl font-semibold text-ink">{section.title}</h2>
+        <span className={`text-sm font-semibold ${section.accent}`}>
           {String(index + 1).padStart(2, "0")}
         </span>
       </div>
-      <div className="mt-3 min-h-0 flex-1 overflow-y-auto pr-1 [&_.rich-text]:gap-2 [&_.rich-text]:text-sm [&_.rich-text]:leading-6">
+      <div className="mt-4 [&_.rich-text]:text-sm [&_.rich-text]:leading-7">
         <RichText value={section.value} />
       </div>
+    </article>
+  );
+}
+
+function MetaPanel({ title, children }: { title: string; children: ReactNode }) {
+  const hasChildren = Array.isArray(children) ? children.length > 0 : Boolean(children);
+
+  if (!hasChildren) {
+    return null;
+  }
+
+  return (
+    <section className="glass-panel rounded-lg p-4">
+      <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-300">
+        {title}
+      </h2>
+      <div className="mt-4 flex flex-wrap gap-2">{children}</div>
     </section>
+  );
+}
+
+function MetaLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="rounded-lg border border-white/10 bg-white/[0.045] px-3 py-1.5 text-xs text-muted transition hover:border-violet-300/50 hover:text-ink"
+    >
+      {label}
+    </Link>
   );
 }

@@ -21,7 +21,7 @@ export function ContactProfileForm({ action, defaults }: ContactProfileFormProps
         confirmLabel: "Save contact profile",
       }}
     >
-      <section className="grid gap-4 rounded-lg border border-line bg-white/[0.025] p-4">
+      <section className="grid gap-4 rounded-2xl border border-line bg-white/[0.02] p-4">
         <h2 className="text-lg font-semibold text-ink">Profile metadata</h2>
         <div className="grid gap-4 md:grid-cols-2">
           <Field
@@ -65,7 +65,7 @@ export function ContactProfileForm({ action, defaults }: ContactProfileFormProps
         />
       </section>
 
-      <section className="grid gap-4 rounded-lg border border-line bg-white/[0.025] p-4">
+      <section className="grid gap-4 rounded-2xl border border-line bg-white/[0.02] p-4">
         <h2 className="text-lg font-semibold text-ink">Direct links</h2>
         <div className="grid gap-4 md:grid-cols-2">
           <Field

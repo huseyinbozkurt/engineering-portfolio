@@ -6,6 +6,7 @@ import {
   FileText,
   FolderKanban,
   GitBranch,
+  Home,
   LayoutDashboard,
   ListChecks,
   Mail,
@@ -33,6 +34,7 @@ export const adminNavItems: AdminNavItem[] = [
   { href: "/ai-insights", label: "AI Insights", group: "Workspace", icon: Sparkles },
   { href: "/ai-stories", label: "AI Stories", group: "Workspace", icon: BookOpen },
   { href: "/tasks", label: "LLM Tasks", group: "Workspace", icon: ListChecks },
+  { href: "/content/homepage", label: "Homepage", group: "Content", icon: Home },
   { href: "/content/lenses", label: "Lenses", group: "Content", icon: Aperture },
   { href: "/content/principles", label: "Principles", group: "Content", icon: Compass },
   {

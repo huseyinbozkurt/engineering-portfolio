@@ -4,7 +4,7 @@ import { getPublishedDecisionPatterns, getPublishedPrinciples } from "@portfolio
 
 import { ContentCard } from "@/components/content-card";
 import { PageHeader } from "@/components/page-header";
-import { SectionHeading } from "@/components/section-heading";
+import { PrincipleCard, SectionHeader } from "@/components/portfolio-ui";
 import { getComingSoonFallback } from "@/lib/coming-soon-gate";
 
 export const metadata: Metadata = {
@@ -15,7 +15,8 @@ export const metadata: Metadata = {
   },
 };
 
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function HowIWorkPage() {
   const comingSoon = await getComingSoonFallback();
@@ -37,15 +38,11 @@ export default async function HowIWorkPage() {
         description=""
       />
       {principles.length > 0 ? (
-        <section className="mx-auto max-w-7xl px-5 pb-14 lg:px-8">
-          <SectionHeading title="Operating Principles" />
+        <section className="mx-auto max-w-7xl px-5 py-14 lg:px-8 lg:py-16">
+          <SectionHeader title="Operating Principles" />
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {principles.map((principle) => (
-              <ContentCard
-                key={principle.id}
-                title={principle.title}
-                description={principle.summary}
-              />
+            {principles.map((principle, index) => (
+              <PrincipleCard key={principle.id} principle={principle} index={index} />
             ))}
           </div>
         </section>
@@ -53,7 +50,7 @@ export default async function HowIWorkPage() {
       {decisionPatterns.length > 0 ? (
         <section className="border-y border-line bg-white/[0.025]">
           <div className="mx-auto max-w-7xl px-5 py-14 lg:px-8">
-            <SectionHeading title="Decision Patterns" />
+            <SectionHeader title="Decision Patterns" />
             <div className="grid gap-4 md:grid-cols-2">
               {decisionPatterns.map((pattern) => (
                 <ContentCard

@@ -2,16 +2,20 @@ export const siteConfig = {
   name: "Huseyin Bozkurt",
   title: "Huseyin Bozkurt | Engineering Portfolio",
   description:
-    "A professional engineering portfolio organized around lenses, operating principles, decisions, projects, experience, and case studies.",
+    "",
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
 };
 
 export const navItems = [
-  { href: "/", label: "Home" },
-  { href: "/about", label: "About" },
   { href: "/experience", label: "Experience" },
-  { href: "/projects", label: "Projects" },
-  { href: "/how-i-work", label: "How I Work" },
   { href: "/case-studies", label: "Case Studies" },
+  { href: "/projects", label: "Projects" },
+  { href: "/ai-insights", label: "AI Insights" },
+  { href: "/about", label: "About" },
+  { href: "/recognition", label: "Recognition" },
   { href: "/contact", label: "Contact" },
+] as const;
+
+export const secondaryNavItems = [
+  { href: "/how-i-work", label: "Operating Principles" },
 ] as const;

@@ -68,10 +68,10 @@ export function SectionCard({
         description={modalDescription}
         triggerLabel={`Add ${title}`}
         size={modalSize}
-        triggerClassName="flex w-full flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-line bg-white/[0.015] px-4 py-9 text-center text-sm font-medium text-muted transition hover:border-teal-300/50 hover:bg-white/[0.03] hover:text-ink"
+        triggerClassName="flex w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-line bg-white/[0.015] px-4 py-10 text-center text-sm font-medium text-muted transition hover:border-teal-300/50 hover:bg-white/[0.03] hover:text-ink"
         triggerContent={
           <>
-            <span className="flex size-8 items-center justify-center rounded-full border border-line text-muted">
+            <span className="flex size-9 items-center justify-center rounded-full border border-line bg-white/[0.03] text-muted transition group-hover:text-ink">
               <Plus className="size-4" />
             </span>
             {addLabel ?? `Add ${title.toLowerCase()}`}
@@ -84,10 +84,10 @@ export function SectionCard({
   }
 
   return (
-    <section className="rounded-lg border border-line bg-white/[0.025] p-6 lg:p-8">
+    <section className="ui-card p-6 shadow-card lg:p-8">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold text-ink">{title}</h2>
+          <h2 className="text-lg font-semibold text-ink">{title}</h2>
           {eyebrow ? <p className="mt-1 text-xs text-muted">{eyebrow}</p> : null}
         </div>
         <ModalPanel
@@ -95,7 +95,7 @@ export function SectionCard({
           description={modalDescription}
           triggerLabel={`Edit ${title}`}
           size={modalSize}
-          triggerClassName="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-xs font-medium text-muted transition hover:border-teal-300/50 hover:text-ink"
+          triggerClassName="ui-btn-ghost shrink-0"
           triggerContent={
             <>
               <Pencil className="size-3.5" /> Edit

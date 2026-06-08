@@ -9,7 +9,12 @@ import type { NextConfig } from "next";
 // and renders the "Coming Soon" empty state. `next dev`/`next build` run with cwd
 // set to this app package (apps/public-site), so the root is two levels up.
 // loadEnvConfig does not overwrite variables already present in the environment.
-loadEnvConfig(join(process.cwd(), "..", ".."), process.env.NODE_ENV !== "production");
+//
+// `forceReload` (4th arg) is required as of Next.js 16: Next now initializes
+// @next/env for this app directory (which has no env files) before evaluating
+// this config, and @next/env caches that first result — so a plain call here is
+// a no-op and the root .env.local is never read. forceReload bypasses the cache.
+loadEnvConfig(join(process.cwd(), "..", ".."), process.env.NODE_ENV !== "production", console, true);
 
 const nextConfig: NextConfig = {
   output: "standalone",

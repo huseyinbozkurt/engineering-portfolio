@@ -55,6 +55,12 @@ export interface AiSuggestion {
   suggestion: string;
 }
 
+export interface HomepageMetric {
+  value: string;
+  label: string;
+  detail?: string | undefined;
+}
+
 /**
  * Editorial workflow columns shared by every content-like entity. `status`
  * drives public visibility (only "published" is shown publicly); the two
@@ -338,6 +344,56 @@ export const contactProfiles = pgTable(
   },
   (table) => ({
     updatedAtIdx: index("contact_profiles_updated_at_idx").on(table.updatedAt),
+  }),
+);
+
+export const homepageSettings = pgTable(
+  "homepage_settings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    roleLabel: varchar("role_label", { length: 180 }),
+    headline: text("headline"),
+    headlineHighlight: varchar("headline_highlight", { length: 180 }),
+    summary: text("summary"),
+    primaryCtaLabel: varchar("primary_cta_label", { length: 120 }),
+    primaryCtaHref: varchar("primary_cta_href", { length: 240 }),
+    secondaryCtaLabel: varchar("secondary_cta_label", { length: 120 }),
+    secondaryCtaHref: varchar("secondary_cta_href", { length: 240 }),
+    codeRoleLabel: varchar("code_role_label", { length: 180 }),
+    codeMindsetLabel: varchar("code_mindset_label", { length: 220 }),
+    codeLocationLabel: varchar("code_location_label", { length: 180 }),
+    codeExperienceLabel: varchar("code_experience_label", { length: 120 }),
+    codeFocusItems: jsonb("code_focus_items")
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    metricCards: jsonb("metric_cards")
+      .$type<HomepageMetric[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    featuredSkillIds: jsonb("featured_skill_ids")
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    featuredPrincipleIds: jsonb("featured_principle_ids")
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    featuredCaseStudyIds: jsonb("featured_case_study_ids")
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    featuredRecognitionExperienceId: uuid("featured_recognition_experience_id").references(
+      () => experiences.id,
+      { onDelete: "set null" },
+    ),
+    ...timestamps,
+  },
+  (table) => ({
+    updatedAtIdx: index("homepage_settings_updated_at_idx").on(table.updatedAt),
+    recognitionExperienceIdx: index("homepage_settings_recognition_experience_idx").on(
+      table.featuredRecognitionExperienceId,
+    ),
   }),
 );
 

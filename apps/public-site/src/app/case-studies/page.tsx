@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 
 import { getPublishedCaseStudies } from "@portfolio/db/queries";
 
-import { ContentCard } from "@/components/content-card";
 import { PageHeader } from "@/components/page-header";
+import { CaseStudyCard } from "@/components/portfolio-ui";
 import { getComingSoonFallback } from "@/lib/coming-soon-gate";
 
 export const metadata: Metadata = {
@@ -14,7 +14,8 @@ export const metadata: Metadata = {
   },
 };
 
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function CaseStudiesPage() {
   const comingSoon = await getComingSoonFallback();
@@ -33,16 +34,10 @@ export default async function CaseStudiesPage() {
         description="Each case study is structured around context, problem, constraints, action, trade-offs, outcome, and learning."
       />
       {caseStudies.length > 0 ? (
-        <section className="mx-auto max-w-7xl px-5 pb-16 lg:px-8">
+        <section className="mx-auto max-w-7xl px-5 py-14 lg:px-8 lg:py-16">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {caseStudies.map((caseStudy) => (
-              <ContentCard
-                key={caseStudy.id}
-                href={`/case-studies/${caseStudy.slug}`}
-                title={caseStudy.title}
-                description={caseStudy.excerpt}
-                meta="Case study"
-              />
+              <CaseStudyCard key={caseStudy.id} caseStudy={caseStudy} />
             ))}
           </div>
         </section>

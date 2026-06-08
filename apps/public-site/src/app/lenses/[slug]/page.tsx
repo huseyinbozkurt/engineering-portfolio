@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { getLensBySlug, getPublishedLenses } from "@portfolio/db/queries";
+import { getLensBySlug } from "@portfolio/db/queries";
 
 import { ContentCard } from "@/components/content-card";
 import { SectionHeading } from "@/components/section-heading";
@@ -13,12 +13,8 @@ interface LensPageProps {
   }>;
 }
 
-export const revalidate = 3600;
-
-export async function generateStaticParams(): Promise<Array<{ slug: string }>> {
-  const lenses = await getPublishedLenses();
-  return lenses.map((lens) => ({ slug: lens.slug }));
-}
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function generateMetadata({ params }: LensPageProps): Promise<Metadata> {
   const { slug } = await params;
@@ -65,7 +61,9 @@ export default async function LensPage({ params }: LensPageProps) {
   return (
     <>
       <section className="mx-auto max-w-7xl px-5 py-16 lg:px-8 lg:py-24">
-        <p className="mb-5 text-sm font-medium text-teal-200">Lens</p>
+        <p className="mb-5 text-xs font-semibold uppercase tracking-[0.22em] text-violet-300">
+          Lens
+        </p>
         <h1 className="max-w-4xl text-4xl font-semibold text-ink md:text-6xl">
           {detail.lens.name}
         </h1>

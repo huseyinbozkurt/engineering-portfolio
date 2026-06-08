@@ -3,6 +3,9 @@ import Link from "next/link";
 import { EmptyState } from "@/components/empty-state";
 import { getComingSoonFallback } from "@/lib/coming-soon-gate";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function NotFound() {
   const comingSoon = await getComingSoonFallback();
 
@@ -18,7 +21,7 @@ export default async function NotFound() {
       />
       <Link
         href="/"
-        className="mt-6 inline-flex rounded-lg bg-teal-200 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-teal-100"
+        className="mt-6 inline-flex rounded-lg bg-gradient-to-r from-violet-500 to-sky-400 px-5 py-3 text-sm font-semibold text-white transition hover:brightness-110"
       >
         Return Home
       </Link>

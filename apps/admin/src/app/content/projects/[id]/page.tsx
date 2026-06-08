@@ -158,7 +158,7 @@ export default async function EditProjectPage({ params }: EditPageProps) {
       description="Name and links shown at the top of the project page."
       triggerLabel="Edit header"
       size="md"
-      triggerClassName="inline-flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-xs font-medium text-muted transition hover:border-teal-300/50 hover:text-ink"
+      triggerClassName="ui-btn-ghost"
       triggerContent={
         <>
           <Pencil className="size-3.5" /> Edit
@@ -209,12 +209,7 @@ export default async function EditProjectPage({ params }: EditPageProps) {
         {project.url || project.githubUrl ? (
           <div className="flex flex-wrap gap-3">
             {project.url ? (
-              <a
-                href={project.url}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-lg bg-teal-200 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-teal-100"
-              >
+              <a href={project.url} target="_blank" rel="noreferrer" className="ui-btn-primary">
                 Visit project ↗
               </a>
             ) : null}
@@ -223,7 +218,7 @@ export default async function EditProjectPage({ params }: EditPageProps) {
                 href={project.githubUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink transition hover:border-teal-300/50 hover:bg-white/[0.06]"
+                className="ui-btn-secondary"
               >
                 View source ↗
               </a>
@@ -350,7 +345,7 @@ export default async function EditProjectPage({ params }: EditPageProps) {
         <MetaSidebar groups={metaGroups} />
       </div>
 
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-400/20 bg-rose-500/[0.04] p-4">
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-400/20 bg-rose-500/[0.04] p-5">
         <p className="text-sm text-muted">Permanently remove this project and its relationships.</p>
         <DeleteForm action={deleteProjectAction} id={project.id} label="Delete project" />
       </div>

@@ -93,7 +93,7 @@ export function ProjectForm({
           defaultValue={defaults?.details}
           hint="Long-form, in-depth content shown on the project detail page."
         />
-        <fieldset className="grid gap-4 rounded-lg border border-line bg-white/[0.025] p-4">
+        <fieldset className="grid gap-4 rounded-2xl border border-line bg-white/[0.02] p-4">
           <legend className="px-1 text-sm font-medium text-ink">Architecture</legend>
           <RichTextField
             label="Architecture overview"

@@ -1,4 +1,4 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { desc, eq, inArray, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
 import type {
@@ -13,6 +13,7 @@ import type {
   CreateSkillInput,
   CreateTagInput,
   ContactProfile,
+  HomepageSettings,
   UpdateCaseStudyInput,
   UpdateDecisionPatternInput,
   UpdateExperienceInput,
@@ -41,6 +42,7 @@ import {
   experienceSkills,
   experienceTags,
   experiences,
+  homepageSettings,
   lenses,
   principles,
   projectLenses,
@@ -423,6 +425,32 @@ export async function upsertContactProfile(input: ContactProfile): Promise<strin
 
   const record = inserted(
     await db.insert(contactProfiles).values(input).returning({ id: contactProfiles.id }),
+  );
+
+  return record.id;
+}
+
+export async function upsertHomepageSettings(input: HomepageSettings): Promise<string> {
+  const db = getDb();
+  const [existing] = await db
+    .select({ id: homepageSettings.id })
+    .from(homepageSettings)
+    .orderBy(desc(homepageSettings.updatedAt), desc(homepageSettings.createdAt))
+    .limit(1);
+
+  const values = {
+    ...input,
+    updatedAt: new Date(),
+  };
+
+  if (existing) {
+    await db.update(homepageSettings).set(values).where(eq(homepageSettings.id, existing.id));
+
+    return existing.id;
+  }
+
+  const record = inserted(
+    await db.insert(homepageSettings).values(input).returning({ id: homepageSettings.id }),
   );
 
   return record.id;
@@ -1221,6 +1249,14 @@ export async function deleteCaseStudy(id: string): Promise<void> {
 
 export async function deleteSkill(id: string): Promise<void> {
   await getDb().delete(skills).where(eq(skills.id, id));
+}
+
+export async function deleteSkills(ids: string[]): Promise<void> {
+  if (ids.length === 0) {
+    return;
+  }
+
+  await getDb().delete(skills).where(inArray(skills.id, ids));
 }
 
 export async function deleteTag(id: string): Promise<void> {

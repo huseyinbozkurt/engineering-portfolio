@@ -40,10 +40,10 @@ export function Field({
   defaultValue,
 }: FieldProps) {
   return (
-    <label className="grid gap-2">
-      <span className="text-sm font-medium text-ink">{label}</span>
+    <label className="grid min-w-0 gap-2">
+      <span className="ui-label">{label}</span>
       <input
-        className="rounded-lg border border-line bg-white/[0.04] px-3 py-2 text-sm outline-none transition placeholder:text-muted/70 focus:border-teal-300/60"
+        className="ui-input"
         name={name}
         placeholder={placeholder}
         required={required}
@@ -63,10 +63,10 @@ export function TextArea({
   defaultValue,
 }: TextAreaProps) {
   return (
-    <label className="grid gap-2">
-      <span className="text-sm font-medium text-ink">{label}</span>
+    <label className="grid min-w-0 gap-2">
+      <span className="ui-label">{label}</span>
       <textarea
-        className="rounded-lg border border-line bg-white/[0.04] px-3 py-2 text-sm leading-6 outline-none transition placeholder:text-muted/70 focus:border-teal-300/60"
+        className="ui-input leading-6"
         name={name}
         placeholder={placeholder}
         required={required}
@@ -79,13 +79,9 @@ export function TextArea({
 
 export function SelectField({ label, name, options, defaultValue }: SelectProps) {
   return (
-    <label className="grid gap-2">
-      <span className="text-sm font-medium text-ink">{label}</span>
-      <select
-        className="rounded-lg border border-line bg-white/[0.04] px-3 py-2 text-sm outline-none transition focus:border-teal-300/60"
-        name={name}
-        defaultValue={defaultValue}
-      >
+    <label className="grid min-w-0 gap-2">
+      <span className="ui-label">{label}</span>
+      <select className="ui-select" name={name} defaultValue={defaultValue}>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
@@ -106,14 +102,14 @@ export function Checkbox({
   defaultChecked?: boolean;
 }) {
   return (
-    <label className="flex items-center gap-2 text-sm text-muted">
+    <label className="flex min-w-0 items-center gap-2 text-sm text-muted">
       <input
-        className="size-4 rounded border-line bg-white/[0.05]"
+        className="size-4 shrink-0 rounded border-line bg-white/[0.05] accent-teal-300"
         name={name}
         type="checkbox"
         defaultChecked={defaultChecked}
       />
-      <span>{label}</span>
+      <span className="min-w-0 break-words">{label}</span>
     </label>
   );
 }
@@ -130,31 +126,34 @@ export function CheckboxGroup({
   const groupedOptions = hasCategories ? groupOptionsByCategory(options) : [];
 
   return (
-    <fieldset className="rounded-lg border border-line bg-white/[0.025] p-4">
+    <fieldset className="ui-card min-w-0 p-4">
       <legend className="px-1 text-sm font-medium text-ink">{label}</legend>
       {options.length === 0 ? (
         <p className="mt-2 text-sm text-muted">{emptyLabel}</p>
       ) : hasCategories ? (
         <div className="mt-3 grid gap-4">
           {groupedOptions.map((group) => (
-            <div key={group.name} className="grid gap-2">
-              <div className="flex items-center justify-between gap-3 border-b border-line/70 pb-1">
-                <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">
+            <div key={group.name} className="grid min-w-0 gap-2">
+              <div className="flex items-center justify-between gap-3 border-b border-line pb-1.5">
+                <p className="min-w-0 break-words text-xs font-semibold uppercase tracking-wide text-amber-200/90">
                   {group.name}
                 </p>
                 <span className="text-xs text-muted">{group.options.length}</span>
               </div>
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid min-w-0 gap-2 sm:grid-cols-2">
                 {group.options.map((option) => (
-                  <label key={option.id} className="flex items-center gap-2 text-sm text-muted">
+                  <label
+                    key={option.id}
+                    className="flex min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-muted transition hover:bg-white/[0.03]"
+                  >
                     <input
-                      className="size-4 rounded border-line bg-white/[0.05]"
+                      className="size-4 shrink-0 rounded border-line bg-white/[0.05] accent-teal-300"
                       name={name}
                       type="checkbox"
                       value={option.id}
                       defaultChecked={selected.has(option.id)}
                     />
-                    <span>{option.label}</span>
+                    <span className="min-w-0 break-words">{option.label}</span>
                   </label>
                 ))}
               </div>
@@ -162,17 +161,20 @@ export function CheckboxGroup({
           ))}
         </div>
       ) : (
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <div className="mt-3 grid min-w-0 gap-2 sm:grid-cols-2">
           {options.map((option) => (
-            <label key={option.id} className="flex items-center gap-2 text-sm text-muted">
+            <label
+              key={option.id}
+              className="flex min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-muted transition hover:bg-white/[0.03]"
+            >
               <input
-                className="size-4 rounded border-line bg-white/[0.05]"
+                className="size-4 shrink-0 rounded border-line bg-white/[0.05] accent-teal-300"
                 name={name}
                 type="checkbox"
                 value={option.id}
                 defaultChecked={selected.has(option.id)}
               />
-              <span>{option.label}</span>
+              <span className="min-w-0 break-words">{option.label}</span>
             </label>
           ))}
         </div>
@@ -207,16 +209,10 @@ function groupOptionsByCategory(
   });
 }
 
-export function SubmitButton({ label }: { label: string }) {
-  return (
-    <button
-      className="rounded-lg bg-teal-200 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-teal-100"
-      type="submit"
-    >
-      {label}
-    </button>
-  );
-}
+// Re-exported so existing `import { SubmitButton } from "@/components/form-controls"`
+// keeps working. The button itself lives in a client module because it reads the
+// form-validity context to disable itself until the form is complete.
+export { SubmitButton } from "@/components/submit-button";
 
 export const statusOptions: Array<{ label: string; value: string }> = [
   { label: "Draft", value: "draft" },
@@ -242,7 +238,7 @@ export interface SeoDefaults {
  */
 export function SeoFields({ defaults }: { defaults?: SeoDefaults | undefined }) {
   return (
-    <fieldset className="grid gap-4 rounded-lg border border-line bg-white/[0.025] p-4">
+    <fieldset className="ui-card grid gap-4 p-4">
       <legend className="px-1 text-sm font-medium text-ink">SEO &amp; social</legend>
       <Field
         label="SEO title"

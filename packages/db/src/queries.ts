@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, or, sql, type InferSelectModel } from "drizzle-orm";
 
-import { getDb, hasDatabaseUrl, type PortfolioDb } from "./client";
+import { getDb, hasDatabaseUrl, verifyInitialDbConnection, type PortfolioDb } from "./client";
 import {
   caseStudies,
   caseStudyExperiences,
@@ -18,6 +18,7 @@ import {
   experiences,
   experienceSkills,
   experienceTags,
+  homepageSettings,
   lenses,
   principles,
   projectLenses,
@@ -39,6 +40,7 @@ export type SkillRecord = InferSelectModel<typeof skills>;
 export type TagRecord = InferSelectModel<typeof tags>;
 export type ContactSubmissionRecord = InferSelectModel<typeof contactSubmissions>;
 export type ContactProfileRecord = InferSelectModel<typeof contactProfiles>;
+export type HomepageSettingsRecord = InferSelectModel<typeof homepageSettings>;
 
 // Admin "edit" records bundle a single entity with the ids of its current
 // relationships so an edit form can pre-select the related checkboxes.
@@ -76,6 +78,8 @@ export interface HomeContentRecord {
   experiences: ExperienceRecord[];
   projects: ProjectRecord[];
   caseStudies: CaseStudyRecord[];
+  skills: SkillRecord[];
+  homepageSettings: HomepageSettingsRecord | null;
 }
 
 export interface CaseStudyDetailRecord {
@@ -116,7 +120,7 @@ export interface ProjectDetailRecord {
   caseStudies: CaseStudyRecord[];
 }
 
-export interface AdminContentIndexRecord extends HomeContentRecord {
+export interface AdminContentIndexRecord extends Omit<HomeContentRecord, "homepageSettings"> {
   skills: SkillRecord[];
   tags: TagRecord[];
 }
@@ -245,6 +249,16 @@ export async function getPublishedCaseStudies(): Promise<CaseStudyRecord[]> {
   );
 }
 
+export async function getPublishedSkills(): Promise<SkillRecord[]> {
+  return readArray((db) =>
+    db
+      .select()
+      .from(skills)
+      .where(eq(skills.status, "published"))
+      .orderBy(sql`${skills.category} asc nulls last`, asc(skills.position), asc(skills.name)),
+  );
+}
+
 export async function getHomeContent(): Promise<HomeContentRecord> {
   const [
     lensRows,
@@ -253,6 +267,8 @@ export async function getHomeContent(): Promise<HomeContentRecord> {
     experienceRows,
     projectRows,
     caseStudyRows,
+    skillRows,
+    homepageSettingsRow,
   ] = await Promise.all([
     getPublishedLenses(),
     getPublishedPrinciples(),
@@ -260,6 +276,8 @@ export async function getHomeContent(): Promise<HomeContentRecord> {
     getPublishedExperiences(),
     getPublishedProjects(),
     getPublishedCaseStudies(),
+    getPublishedSkills(),
+    getHomepageSettings(),
   ]);
 
   return {
@@ -269,6 +287,8 @@ export async function getHomeContent(): Promise<HomeContentRecord> {
     experiences: experienceRows,
     projects: projectRows,
     caseStudies: caseStudyRows,
+    skills: skillRows,
+    homepageSettings: homepageSettingsRow,
   };
 }
 
@@ -347,6 +367,18 @@ export async function getContactProfile(): Promise<ContactProfileRecord | null> 
       .limit(1);
 
     return profile;
+  });
+}
+
+export async function getHomepageSettings(): Promise<HomepageSettingsRecord | null> {
+  return readOne(async (db) => {
+    const [settings] = await db
+      .select()
+      .from(homepageSettings)
+      .orderBy(desc(homepageSettings.updatedAt), desc(homepageSettings.createdAt))
+      .limit(1);
+
+    return settings;
   });
 }
 
@@ -906,14 +938,18 @@ export async function getCaseStudyById(id: string): Promise<CaseStudyEditRecord 
   });
 }
 
-export async function getDBAvailability() : Promise<{ isDbAvailable: boolean }> {
-    try {
-    const db = getDb();
-    await db.execute(sql`select 1`);
-    return {isDbAvailable : true};
-  } catch (error) {
-    console.error("[database-health-check]", error);
+export async function getDBAvailability(
+  options: { force?: boolean; source?: string } = {},
+): Promise<{ isDbAvailable: boolean }> {
+  const checkOptions: { force?: boolean; source: string } = {
+    source: options.source ?? "database-health-check",
+  };
 
-    return {isDbAvailable : false};
+  if (options.force !== undefined) {
+    checkOptions.force = options.force;
   }
+
+  const result = await verifyInitialDbConnection(checkOptions);
+
+  return { isDbAvailable: result.ok };
 }

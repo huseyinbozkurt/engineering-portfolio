@@ -41,7 +41,7 @@ export function SettingsModal({
       }
       triggerLabel="Open settings"
       size={size}
-      triggerClassName="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-ink transition hover:border-teal-300/50 hover:bg-white/[0.06]"
+      triggerClassName="inline-flex items-center gap-1.5 rounded-xl border border-line bg-white/[0.02] px-3 py-2 text-sm font-medium text-ink transition hover:border-line-strong hover:bg-white/[0.06]"
       triggerContent={
         <>
           <Settings className="size-4" /> Settings

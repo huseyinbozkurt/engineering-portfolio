@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 import { getAdminContentIndex, getContactSubmissions, hasDatabaseUrl } from "@portfolio/db";
@@ -47,10 +48,7 @@ export default async function AdminHomePage() {
               canCreate={onlineLlmCount > 0}
               disabledReason={createWithAiDisabledReason}
             />
-            <Link
-              className="rounded-lg border border-line px-3 py-2 text-sm font-medium text-ink transition hover:border-teal-300/50 hover:bg-white/[0.06]"
-              href="/ai-stories"
-            >
+            <Link className="ui-btn-secondary" href="/ai-stories">
               Review AI stories
             </Link>
           </>
@@ -64,27 +62,35 @@ export default async function AdminHomePage() {
           />
         </div>
       ) : null}
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {metrics.map((metric) => (
-          <div key={metric.label} className="rounded-lg border border-line bg-white/[0.03] p-5">
-            <p className="text-3xl font-semibold text-ink">{metric.value}</p>
-            <p className="mt-2 text-sm text-muted">{metric.label}</p>
+          <div
+            key={metric.label}
+            className="ui-card p-5 shadow-card transition hover:border-line-strong hover:bg-white/[0.035]"
+          >
+            <p className="text-3xl font-semibold tracking-tight text-ink tabular-nums">
+              {metric.value}
+            </p>
+            <p className="mt-1.5 text-sm text-muted">{metric.label}</p>
           </div>
         ))}
       </section>
       <section className="mt-10">
-        <h2 className="mb-4 text-lg font-semibold text-ink">Content Areas</h2>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <h2 className="mb-4 text-base font-semibold text-ink">Content Areas</h2>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {adminNavItems.slice(1).map((item) => {
             const Icon = item.icon;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center gap-3 rounded-lg border border-line bg-white/[0.03] p-4 text-sm font-medium text-ink transition hover:border-teal-300/50 hover:bg-white/[0.06]"
+                className="group flex items-center gap-3 rounded-2xl border border-line bg-white/[0.02] p-4 text-sm font-medium text-ink transition hover:border-teal-300/40 hover:bg-white/[0.05]"
               >
-                <Icon className="size-4 text-teal-200" />
-                {item.label}
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-line bg-teal-300/10 text-teal-200">
+                  <Icon className="size-4" />
+                </span>
+                <span className="flex-1">{item.label}</span>
+                <ChevronRight className="size-4 text-muted/40 transition group-hover:translate-x-0.5 group-hover:text-ink" />
               </Link>
             );
           })}

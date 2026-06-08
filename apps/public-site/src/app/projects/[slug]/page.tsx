@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { getProjectBySlug, getPublishedProjects } from "@portfolio/db/queries";
+import { getProjectBySlug } from "@portfolio/db/queries";
 
 import { CaseStoryCard } from "@/components/case-story-card";
 import { RichText } from "@/components/rich-text";
@@ -18,12 +18,8 @@ interface ProjectDetailPageProps {
   }>;
 }
 
-export const revalidate = 3600;
-
-export async function generateStaticParams(): Promise<Array<{ slug: string }>> {
-  const projects = await getPublishedProjects();
-  return projects.map((project) => ({ slug: project.slug }));
-}
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function generateMetadata({
   params,
@@ -81,14 +77,16 @@ function MetaGroup({ title, items }: { title: string; items: MetaItem[] }) {
 
   return (
     <div>
-      <p className="mb-3 text-xs font-medium uppercase tracking-wide text-amber-200">{title}</p>
+      <p className="mb-3 text-xs font-medium uppercase tracking-[0.18em] text-violet-300">
+        {title}
+      </p>
       <div className="flex flex-wrap gap-2">
         {items.map((item) =>
           item.href ? (
             <Link
               key={item.id}
               href={item.href}
-              className="rounded-lg border border-line bg-white/5 px-3 py-1 text-xs text-muted transition hover:border-teal-300/50 hover:text-ink"
+              className="rounded-lg border border-line bg-white/5 px-3 py-1 text-xs text-muted transition hover:border-violet-300/50 hover:text-ink"
             >
               {item.label}
             </Link>
@@ -145,14 +143,16 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
         </Link>
 
         <header className="mt-8">
-          <p className="text-sm font-medium text-teal-200">Project</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-violet-300">
+            Project
+          </p>
           <h1 className="mt-4 text-4xl font-semibold text-ink md:text-6xl">{project.name}</h1>
           {detail.experience ? (
             <p className="mt-3 text-sm text-muted">
               Built during{" "}
               <Link
                 href={experienceHref(detail.experience)}
-                className="text-amber-200 underline-offset-4 transition hover:underline"
+                className="text-violet-200 underline-offset-4 transition hover:underline"
               >
                 {detail.experience.role} at {detail.experience.company}
               </Link>
@@ -165,7 +165,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
                   href={project.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-lg bg-teal-200 px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-teal-100"
+                  className="rounded-lg bg-gradient-to-r from-violet-500 to-sky-400 px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
                 >
                   Visit project ↗
                 </a>
@@ -175,7 +175,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
                   href={project.githubUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-lg border border-line px-5 py-2.5 text-sm font-semibold text-ink transition hover:border-teal-300/50 hover:bg-white/[0.06]"
+                  className="rounded-lg border border-violet-400/70 px-5 py-2.5 text-sm font-semibold text-ink transition hover:border-violet-300 hover:bg-violet-400/10"
                 >
                   View source ↗
                 </a>
@@ -289,7 +289,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
 function ArchitectureStackCard({ box }: { box: ArchitectureStackBox }) {
   return (
     <section className="glass-panel rounded-lg p-5">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-amber-200">
+      <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-violet-300">
         {box.title}
       </h3>
       <div className="mt-4 [&_.rich-text]:gap-2 [&_.rich-text]:text-sm [&_.rich-text]:leading-6">

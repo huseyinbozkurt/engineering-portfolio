@@ -21,6 +21,7 @@ import {
   deletePrinciple,
   deleteProject,
   deleteSkill,
+  deleteSkills,
   deleteTag,
   patchCaseStudy,
   patchDecisionPattern,
@@ -39,6 +40,7 @@ import {
   updateSkill,
   updateTag,
   upsertContactProfile,
+  upsertHomepageSettings,
 } from "@portfolio/db/admin";
 import type {
   CreateCaseStudyInput,
@@ -62,6 +64,7 @@ import {
   createProjectSchema,
   createSkillSchema,
   createTagSchema,
+  homepageSettingsSchema,
   idInputSchema,
   patchCaseStudySchema,
   patchDecisionPatternSchema,
@@ -128,6 +131,20 @@ function bulkLines(value: string): string[] {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line.length > 0 && !line.startsWith("#"));
+}
+
+function parseHomepageMetricRows(value: string) {
+  return bulkLines(value).map((line) => {
+    const [valuePart = "", label = "", detail = ""] = line
+      .split("|")
+      .map((part) => part.trim());
+
+    return {
+      value: valuePart,
+      label,
+      detail: detail || undefined,
+    };
+  });
 }
 
 function parseBulkSkillRows(value: string) {
@@ -395,6 +412,35 @@ export async function upsertContactProfileAction(formData: FormData): Promise<vo
   revalidatePath("/contact");
   refresh("/content/contact-profile");
   redirect("/content/contact-profile");
+}
+
+export async function upsertHomepageSettingsAction(formData: FormData): Promise<void> {
+  await upsertHomepageSettings(
+    homepageSettingsSchema.parse({
+      roleLabel: text(formData, "roleLabel"),
+      headline: text(formData, "headline"),
+      headlineHighlight: text(formData, "headlineHighlight"),
+      summary: text(formData, "summary"),
+      primaryCtaLabel: text(formData, "primaryCtaLabel"),
+      primaryCtaHref: text(formData, "primaryCtaHref"),
+      secondaryCtaLabel: text(formData, "secondaryCtaLabel"),
+      secondaryCtaHref: text(formData, "secondaryCtaHref"),
+      codeRoleLabel: text(formData, "codeRoleLabel"),
+      codeMindsetLabel: text(formData, "codeMindsetLabel"),
+      codeLocationLabel: text(formData, "codeLocationLabel"),
+      codeExperienceLabel: text(formData, "codeExperienceLabel"),
+      codeFocusItems: bulkLines(text(formData, "codeFocusItems")),
+      metricCards: parseHomepageMetricRows(text(formData, "metricCards")),
+      featuredSkillIds: ids(formData, "featuredSkillIds"),
+      featuredPrincipleIds: ids(formData, "featuredPrincipleIds"),
+      featuredCaseStudyIds: ids(formData, "featuredCaseStudyIds"),
+      featuredRecognitionExperienceId: text(formData, "featuredRecognitionExperienceId"),
+    }),
+  );
+
+  revalidatePath("/");
+  refresh("/content/homepage");
+  redirect("/content/homepage");
 }
 
 // ---------------------------------------------------------------------------
@@ -855,6 +901,16 @@ export async function deleteSkillAction(formData: FormData): Promise<void> {
   await deleteSkill(id);
   refresh("/content/skills");
   redirect("/content/skills");
+}
+
+/**
+ * Deletes every skill in a category group at once. Submitted from the skills
+ * list (one hidden `ids` input per skill), so it refreshes in place rather than
+ * redirecting.
+ */
+export async function deleteSkillsAction(formData: FormData): Promise<void> {
+  await deleteSkills(ids(formData, "ids"));
+  refresh("/content/skills");
 }
 
 export async function deleteTagAction(formData: FormData): Promise<void> {

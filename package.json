@@ -16,15 +16,15 @@
   },
   "overrides": {
     "next": {
-      ".": "15.5.19",
+      ".": "16.2.7",
       "postcss": "8.5.15"
     },
     "postcss": "8.5.15"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
     "autoprefixer": "^10.4.21",
     "postcss": "8.5.15",
     "tailwindcss": "^3.4.17",

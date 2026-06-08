@@ -50,7 +50,7 @@ export default async function EditPrinciplePage({ params }: EditPageProps) {
       title="Edit title"
       triggerLabel="Edit title"
       size="md"
-      triggerClassName="inline-flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-xs font-medium text-muted transition hover:border-teal-300/50 hover:text-ink"
+      triggerClassName="ui-btn-ghost"
       triggerContent={
         <>
           <Pencil className="size-3.5" /> Edit
@@ -114,7 +114,7 @@ export default async function EditPrinciplePage({ params }: EditPageProps) {
         />
       </div>
 
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-400/20 bg-rose-500/[0.04] p-4">
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-400/20 bg-rose-500/[0.04] p-5">
         <p className="text-sm text-muted">Permanently remove this principle.</p>
         <DeleteForm action={deletePrincipleAction} id={principle.id} label="Delete principle" />
       </div>

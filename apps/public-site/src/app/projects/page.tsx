@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 
 import { getPublishedProjects } from "@portfolio/db/queries";
 
-import { ContentCard } from "@/components/content-card";
 import { PageHeader } from "@/components/page-header";
+import { ProjectCard } from "@/components/portfolio-ui";
 import { getComingSoonFallback } from "@/lib/coming-soon-gate";
-import { projectHref } from "@/lib/paths";
+import { getProjectMeta } from "@/lib/portfolio-content";
 
 export const metadata: Metadata = {
   title: "Projects",
@@ -15,7 +15,8 @@ export const metadata: Metadata = {
   },
 };
 
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function ProjectsPage() {
   const comingSoon = await getComingSoonFallback();
@@ -34,16 +35,10 @@ export default async function ProjectsPage() {
         description=""
       />
       {projects.length > 0 ? (
-        <section className="mx-auto max-w-7xl px-5 pb-16 lg:px-8">
+        <section className="mx-auto max-w-7xl px-5 py-14 lg:px-8 lg:py-16">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {projects.map((project) => (
-              <ContentCard
-                key={project.id}
-                title={project.name}
-                description={project.description}
-                href={projectHref(project)}
-                meta="Project"
-              />
+              <ProjectCard key={project.id} project={project} meta={getProjectMeta(project)} />
             ))}
           </div>
         </section>

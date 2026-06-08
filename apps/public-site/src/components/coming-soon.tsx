@@ -5,9 +5,9 @@ import { siteConfig } from "@/lib/site";
 export function ComingSoon() {
   return (
     <section className="quiet-grid flex min-h-screen items-center justify-center px-5 py-24 lg:px-8">
-      <div className="glass-panel w-full max-w-2xl rounded-2xl p-8 text-center shadow-glow sm:p-12">
-        <div className="mx-auto mb-6 h-1.5 w-20 rounded-full bg-gradient-to-r from-teal-300 via-amber-200 to-rose-300" />
-        <p className="text-sm font-medium uppercase tracking-wide text-teal-200">
+      <div className="glass-panel w-full max-w-2xl rounded-lg p-8 text-center shadow-glow sm:p-12">
+        <div className="mx-auto mb-6 h-1.5 w-20 rounded-full bg-gradient-to-r from-violet-400 via-sky-300 to-emerald-300" />
+        <p className="text-sm font-medium uppercase tracking-[0.22em] text-violet-200">
           {siteConfig.name}
         </p>
         <h1 className="mt-4 text-4xl font-semibold text-ink md:text-6xl">Coming soon</h1>

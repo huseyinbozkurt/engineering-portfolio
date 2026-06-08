@@ -7,7 +7,7 @@ import type { ContactFormValues } from "./contact-form-state";
 import { initialContactFormState } from "./contact-form-state";
 
 const inputClasses =
-  "w-full rounded-lg border border-white/12 bg-[#070a0f] px-3 py-2 text-sm text-ink outline-none transition placeholder:text-muted/70 focus:border-teal-300/60 focus:ring-2 focus:ring-teal-300/20";
+  "w-full rounded-lg border border-white/12 bg-[#060b14] px-3 py-2 text-sm text-ink outline-none transition placeholder:text-muted/70 focus:border-violet-300/60 focus:ring-2 focus:ring-violet-300/20";
 const labelClasses = "grid gap-2 text-sm font-medium text-ink";
 
 type DynamicFieldName =
@@ -265,7 +265,7 @@ export function ContactForm() {
         <p
           className={
             state.status === "success"
-              ? "rounded-lg border border-teal-300/30 bg-teal-300/10 px-3 py-2 text-sm text-teal-100"
+              ? "rounded-lg border border-emerald-300/30 bg-emerald-300/10 px-3 py-2 text-sm text-emerald-100"
               : "rounded-lg border border-amber-200/30 bg-amber-200/10 px-3 py-2 text-sm text-amber-100"
           }
           role="status"
@@ -331,7 +331,7 @@ export function ContactForm() {
       />
 
       <button
-        className="rounded-lg bg-teal-200 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-teal-100 disabled:cursor-not-allowed disabled:opacity-60"
+        className="rounded-lg bg-gradient-to-r from-violet-500 to-sky-400 px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
         disabled={isPending}
         type="submit"
       >
@@ -351,10 +351,10 @@ function IntentPicker({
   onChange: (intent: ContactFormValues["intent"]) => void;
 }) {
   return (
-    <section className="rounded-lg border border-teal-300/20 bg-[#05070a] p-4">
+    <section className="rounded-lg border border-violet-300/20 bg-[#050914] p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="font-mono text-xs text-teal-200">contact.intent</p>
+          <p className="font-mono text-xs text-violet-200">contact.intent</p>
           <h2 className="mt-2 text-lg font-semibold text-ink">{activeIntent.label}</h2>
         </div>
       </div>
@@ -368,8 +368,8 @@ function IntentPicker({
               aria-pressed={isActive}
               className={
                 isActive
-                  ? "rounded-lg border border-teal-300/50 bg-teal-300/15 p-3 text-left text-ink shadow-[0_0_24px_rgba(45,212,191,0.12)]"
-                  : "rounded-lg border border-line bg-white/[0.035] p-3 text-left text-muted transition hover:border-teal-300/40 hover:bg-white/[0.055] hover:text-ink"
+                  ? "rounded-lg border border-violet-300/50 bg-violet-300/15 p-3 text-left text-ink shadow-[0_0_24px_rgba(139,92,246,0.14)]"
+                  : "rounded-lg border border-line bg-white/[0.035] p-3 text-left text-muted transition hover:border-violet-300/40 hover:bg-white/[0.055] hover:text-ink"
               }
               key={intent.value}
               onClick={() => onChange(intent.value)}
@@ -446,7 +446,7 @@ function ContactPreview({
     .filter(([, value]) => value.trim().length > 0);
 
   return (
-    <section className="rounded-lg border border-line bg-[#070a0f] p-4">
+    <section className="rounded-lg border border-line bg-[#060b14] p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-ink">Message preview</h3>
         <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-muted">

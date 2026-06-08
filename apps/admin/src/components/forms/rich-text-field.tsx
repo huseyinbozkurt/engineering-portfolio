@@ -88,8 +88,8 @@ export function RichTextField({
   return (
     <div className="grid gap-2">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-sm font-medium text-ink">{label}</span>
-        <div className="flex overflow-hidden rounded-md border border-line text-xs">
+        <span className="ui-label">{label}</span>
+        <div className="flex gap-0.5 rounded-lg border border-line bg-white/[0.03] p-0.5 text-xs">
           {(["write", "preview"] as const).map((option) => (
             <button
               key={option}
@@ -97,8 +97,8 @@ export function RichTextField({
               onClick={() => setMode(option)}
               className={
                 mode === option
-                  ? "bg-white/10 px-3 py-1 font-medium capitalize text-ink"
-                  : "px-3 py-1 capitalize text-muted transition hover:text-ink"
+                  ? "rounded-md bg-white/10 px-3 py-1 font-medium capitalize text-ink"
+                  : "rounded-md px-3 py-1 capitalize text-muted transition hover:text-ink"
               }
             >
               {option}
@@ -107,17 +107,17 @@ export function RichTextField({
         </div>
       </div>
 
-      <div className="rounded-lg border border-line bg-white/[0.04]">
+      <div className="overflow-hidden rounded-xl border border-line bg-white/[0.03] transition focus-within:border-teal-300/50 focus-within:ring-2 focus-within:ring-teal-300/15">
         {mode === "write" ? (
           <>
-            <div className="flex flex-wrap gap-1 border-b border-line p-1.5">
+            <div className="flex flex-wrap gap-1 border-b border-line bg-white/[0.02] p-1.5">
               {tools.map((tool) => (
                 <button
                   key={tool.title}
                   type="button"
                   title={tool.title}
                   onClick={tool.run}
-                  className="rounded px-2 py-1 text-xs font-semibold text-muted transition hover:bg-white/10 hover:text-ink"
+                  className="rounded-md px-2 py-1 text-xs font-semibold text-muted transition hover:bg-white/10 hover:text-ink"
                 >
                   {tool.label}
                 </button>

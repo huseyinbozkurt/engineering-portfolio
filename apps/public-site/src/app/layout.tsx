@@ -9,7 +9,8 @@ import { siteConfig } from "@/lib/site";
 
 import "./globals.css";
 
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
@@ -36,7 +37,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#050607",
+  themeColor: "#050914",
   colorScheme: "dark",
 };
 
@@ -48,7 +49,7 @@ export default async function RootLayout({
   const { shouldShowComingSoon } = await getPublicSiteAvailability();
 
   return (
-    <html lang="en">
+    <html lang="en" data-scroll-behavior="smooth">
       <body>
         {shouldShowComingSoon ? (
           <main>

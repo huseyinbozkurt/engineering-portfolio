@@ -2,15 +2,51 @@ import { getSkills } from "@portfolio/db/queries";
 
 import { bulkUpsertSkillsAction, createSkillAction } from "@/app/actions";
 import { ContentList } from "@/components/content-list";
-import { BulkTaxonomyForm } from "@/components/forms/bulk-taxonomy-form";
+import { BulkSkillsForm } from "@/components/forms/bulk-skills-form";
+import {
+  SkillCategoryEditor,
+  type SkillCategoryEditorData,
+} from "@/components/forms/skill-category-editor";
 import { SkillForm } from "@/components/forms/skill-form";
 import { ModalPanel } from "@/components/modal-panel";
 import { PageTitle } from "@/components/page-title";
 
 export const dynamic = "force-dynamic";
 
+type Skill = Awaited<ReturnType<typeof getSkills>>[number];
+
+function toRow(skill: Skill) {
+  return {
+    key: skill.id,
+    name: skill.name,
+    slug: skill.slug,
+    category: skill.category ?? "",
+    status: skill.status,
+    summary: skill.summary,
+    position: String(skill.position),
+  };
+}
+
 export default async function SkillsPage() {
   const skills = await getSkills();
+
+  // Group skills by the same key ContentList uses ("Uncategorized" for blanks),
+  // then build the per-category editor payload for each group header. Each pen
+  // icon opens the bulk editor scoped to one category: existing skills are
+  // editable and "Add skill" creates a new sub-skill under that category.
+  const groups = new Map<string, Skill[]>();
+  for (const skill of skills) {
+    const name = skill.category?.trim() || "Uncategorized";
+    groups.set(name, [...(groups.get(name) ?? []), skill]);
+  }
+
+  const groupActionData: Record<string, SkillCategoryEditorData> = {};
+  for (const [groupName, groupSkills] of groups) {
+    groupActionData[groupName] = {
+      rows: groupSkills.map(toRow),
+      defaultCategory: groupName === "Uncategorized" ? "" : groupName,
+    };
+  }
 
   return (
     <main className="px-5 py-8 lg:px-8">
@@ -30,17 +66,14 @@ export default async function SkillsPage() {
             <ModalPanel
               triggerLabel="Bulk edit"
               title="Bulk create or edit skills"
-              description="Paste skill rows, then confirm before saving all changes."
-              size="lg"
+              description="Edit every skill in one place, then confirm before saving all changes."
+              size="xl"
               triggerVariant="secondary"
             >
-              <BulkTaxonomyForm
+              <BulkSkillsForm
                 action={bulkUpsertSkillsAction}
-                title="Bulk create or edit skills"
-                fieldGuide="One row per skill. Use: name | slug | category | status | summary | position. Existing slugs are updated; new slugs are created."
-                defaultValue={serializeSkills(skills)}
-                placeholder="TypeScript | typescript | Languages | published | Strongly typed JavaScript | 0"
                 submitLabel="Save Skills In Bulk"
+                initialRows={skills.map(toRow)}
               />
             </ModalPanel>
           </>
@@ -50,6 +83,8 @@ export default async function SkillsPage() {
         title="Existing skills"
         emptyTitle="No skills yet"
         emptyDescription="Skills will appear here after real records are created."
+        groupActionComponent={SkillCategoryEditor}
+        groupActionData={groupActionData}
         items={skills.map((skill) => ({
           id: skill.id,
           title: skill.name,
@@ -67,23 +102,4 @@ export default async function SkillsPage() {
       />
     </main>
   );
-}
-
-function serializeSkills(skills: Awaited<ReturnType<typeof getSkills>>): string {
-  return skills
-    .map((skill) =>
-      [
-        skill.name,
-        skill.slug,
-        skill.category ?? "",
-        skill.status,
-        sanitizeBulkField(skill.summary),
-        String(skill.position),
-      ].join(" | "),
-    )
-    .join("\n");
-}
-
-function sanitizeBulkField(value: string): string {
-  return value.replace(/\r?\n/g, " ").replace(/\|/g, "/").trim();
 }

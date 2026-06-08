@@ -1,8 +1,23 @@
 "use client";
 
-import { useId, useRef, useState, type ComponentPropsWithoutRef, type ReactNode } from "react";
+import {
+  createContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ComponentPropsWithoutRef,
+  type ReactNode,
+} from "react";
 
 import type { FormAction } from "@/components/forms/types";
+
+/**
+ * Whether the enclosing {@link ConfirmedForm} currently passes validation.
+ * {@link SubmitButton} reads this to disable itself until the form is complete,
+ * so every confirmed form gets validation-based save enablement for free.
+ */
+export const FormValidityContext = createContext(true);
 
 type ConfirmTone = "default" | "danger";
 
@@ -19,6 +34,13 @@ interface ConfirmedFormProps
   action: FormAction;
   children: ReactNode;
   confirmation?: Partial<ConfirmationCopy>;
+  /**
+   * Extra validity signal beyond native HTML constraints — for dynamic forms
+   * with no `required` inputs (e.g. the bulk skills editor needs at least one
+   * row). The submit button stays disabled unless this is true AND the form's
+   * native constraints pass. Defaults to `true`.
+   */
+  valid?: boolean;
 }
 
 const defaultConfirmation: ConfirmationCopy = {
@@ -34,15 +56,39 @@ export function ConfirmedForm({
   children,
   confirmation,
   className,
+  valid = true,
   ...props
 }: ConfirmedFormProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const allowSubmitRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [nativeValid, setNativeValid] = useState(true);
   const titleId = useId();
   const descriptionId = useId();
   const copy = { ...defaultConfirmation, ...confirmation };
+
+  // Track native HTML constraint validity (required fields, url/email types, …)
+  // so the submit button can disable itself until the form is complete. Listens
+  // on the form so dynamically added inputs are covered via event bubbling.
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) {
+      return;
+    }
+
+    const update = () => setNativeValid(form.checkValidity());
+    update();
+    form.addEventListener("input", update);
+    form.addEventListener("change", update);
+
+    return () => {
+      form.removeEventListener("input", update);
+      form.removeEventListener("change", update);
+    };
+  }, []);
+
+  const canSubmit = valid && nativeValid;
 
   function closeDialog() {
     dialogRef.current?.close();
@@ -56,7 +102,7 @@ export function ConfirmedForm({
   }
 
   return (
-    <>
+    <FormValidityContext.Provider value={canSubmit}>
       <form
         {...props}
         ref={formRef}
@@ -84,30 +130,26 @@ export function ConfirmedForm({
         ref={dialogRef}
         aria-describedby={descriptionId}
         aria-labelledby={titleId}
-        className="w-[min(calc(100vw-2rem),28rem)] rounded-lg border border-line bg-[#090b0f] p-0 text-ink shadow-2xl outline-none backdrop:bg-black/75"
+        className="w-[min(calc(100vw-2rem),28rem)] rounded-2xl border border-line-strong bg-surface p-0 text-ink shadow-pop outline-none backdrop:bg-black/70 backdrop:backdrop-blur-sm"
         onCancel={() => setIsSubmitting(false)}
       >
-        <div className="p-5">
-          <h2 id={titleId} className="text-lg font-semibold text-ink">
+        <div className="p-6">
+          <h2 id={titleId} className="text-base font-semibold text-ink">
             {copy.title}
           </h2>
           <p id={descriptionId} className="mt-2 text-sm leading-6 text-muted">
             {copy.description}
           </p>
-          <div className="mt-5 flex flex-wrap justify-end gap-3">
-            <button
-              type="button"
-              className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink transition hover:border-teal-300/50 hover:bg-white/[0.06]"
-              onClick={closeDialog}
-            >
+          <div className="mt-6 flex flex-wrap justify-end gap-2.5">
+            <button type="button" className="ui-btn-secondary" onClick={closeDialog}>
               {copy.cancelLabel}
             </button>
             <button
               type="button"
               className={
                 copy.tone === "danger"
-                  ? "rounded-lg border border-rose-300/50 bg-rose-500/15 px-4 py-2 text-sm font-semibold text-rose-100 transition hover:bg-rose-500/25"
-                  : "rounded-lg bg-teal-200 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-teal-100"
+                  ? "inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-300/50 bg-rose-500/15 px-4 py-2.5 text-sm font-semibold text-rose-100 transition hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+                  : "ui-btn-primary"
               }
               disabled={isSubmitting}
               onClick={confirmSubmit}
@@ -117,6 +159,6 @@ export function ConfirmedForm({
           </div>
         </div>
       </dialog>
-    </>
+    </FormValidityContext.Provider>
   );
 }

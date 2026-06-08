@@ -14,11 +14,13 @@ export function CaseStoryCard({ caseStudy }: { caseStudy: CaseStudyRecord }) {
 
   return (
     <article className="glass-panel h-full rounded-lg p-5">
-      <p className="text-xs font-medium uppercase tracking-wide text-amber-200">Case story</p>
+      <p className="text-xs font-medium uppercase tracking-[0.18em] text-violet-300">
+        Case story
+      </p>
       <h3 className="mt-3 text-xl font-semibold text-ink">
         <Link
           href={`/case-studies/${caseStudy.slug}`}
-          className="underline-offset-4 transition hover:text-teal-200 hover:underline"
+          className="underline-offset-4 transition hover:text-violet-200 hover:underline"
         >
           {caseStudy.title}
         </Link>
@@ -31,10 +33,10 @@ export function CaseStoryCard({ caseStudy }: { caseStudy: CaseStudyRecord }) {
           {parts.map((part, index) => (
             <li key={part.label} className="border-l border-line pl-4">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-teal-200">
+                <span className="text-xs font-semibold text-violet-200">
                   {String(index + 1).padStart(2, "0")}
                 </span>
-                <p className="text-xs font-semibold uppercase tracking-wide text-ink">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink">
                   {part.label}
                 </p>
               </div>
@@ -47,7 +49,7 @@ export function CaseStoryCard({ caseStudy }: { caseStudy: CaseStudyRecord }) {
       ) : null}
       <Link
         href={`/case-studies/${caseStudy.slug}`}
-        className="mt-5 inline-flex text-sm font-semibold text-teal-200 underline-offset-4 transition hover:underline"
+        className="mt-5 inline-flex text-sm font-semibold text-violet-200 underline-offset-4 transition hover:underline"
       >
         View full case story ↗
       </Link>

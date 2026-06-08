@@ -1,5 +1,6 @@
 "use client";
 
+import { X } from "lucide-react";
 import { useId, useRef, type ReactNode } from "react";
 
 type ModalSize = "sm" | "md" | "lg" | "xl";
@@ -26,10 +27,8 @@ const sizeClasses: Record<ModalSize, string> = {
 };
 
 const triggerClasses: Record<TriggerVariant, string> = {
-  primary:
-    "rounded-lg bg-teal-200 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-teal-100",
-  secondary:
-    "rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink transition hover:border-teal-300/50 hover:bg-white/[0.06]",
+  primary: "ui-btn-primary",
+  secondary: "ui-btn-secondary",
 };
 
 export function ModalPanel({
@@ -63,12 +62,12 @@ export function ModalPanel({
         ref={dialogRef}
         aria-describedby={description ? descriptionId : undefined}
         aria-labelledby={titleId}
-        className={`${sizeClasses[size]} max-h-[calc(100vh-2rem)] overflow-hidden rounded-lg border border-line bg-[#090b0f] p-0 text-ink shadow-2xl outline-none backdrop:bg-black/75`}
+        className={`${sizeClasses[size]} max-h-[calc(100vh-2rem)] overflow-hidden rounded-2xl border border-line-strong bg-surface p-0 text-ink shadow-pop outline-none backdrop:bg-black/70 backdrop:backdrop-blur-sm`}
       >
         <div className="flex max-h-[calc(100vh-2rem)] flex-col">
-          <div className="flex items-start justify-between gap-4 border-b border-line bg-[#090b0f] px-5 py-4">
-            <div>
-              <h2 id={titleId} className="text-lg font-semibold text-ink">
+          <div className="flex items-start justify-between gap-4 border-b border-line bg-white/[0.02] px-6 py-4">
+            <div className="min-w-0">
+              <h2 id={titleId} className="text-base font-semibold text-ink">
                 {title}
               </h2>
               {description ? (
@@ -79,14 +78,14 @@ export function ModalPanel({
             </div>
             <button
               type="button"
-              className="rounded-md border border-line px-2.5 py-1 text-xs font-semibold text-muted transition hover:border-teal-300/50 hover:text-ink"
+              className="-mr-1.5 -mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-white/[0.06] hover:text-ink"
               aria-label={`Close ${title}`}
               onClick={() => dialogRef.current?.close()}
             >
-              Close
+              <X className="size-4" aria-hidden />
             </button>
           </div>
-          <div className="overflow-y-auto px-5 py-5">{children}</div>
+          <div className="overflow-y-auto px-6 py-5">{children}</div>
         </div>
       </dialog>
     </>

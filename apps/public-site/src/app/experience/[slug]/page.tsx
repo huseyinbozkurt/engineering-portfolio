@@ -2,10 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import {
-  getExperienceBySlug,
-  getPublishedExperiences,
-} from "@portfolio/db/queries";
+import { getExperienceBySlug } from "@portfolio/db/queries";
 
 import { CaseStoryCard } from "@/components/case-story-card";
 import { ContentCard } from "@/components/content-card";
@@ -23,12 +20,8 @@ interface ExperienceDetailPageProps {
   }>;
 }
 
-export const revalidate = 3600;
-
-export async function generateStaticParams(): Promise<Array<{ slug: string }>> {
-  const experiences = await getPublishedExperiences();
-  return experiences.map((experience) => ({ slug: experience.slug || experience.id }));
-}
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function generateMetadata({
   params,
@@ -81,14 +74,16 @@ function MetaGroup({ title, items }: { title: string; items: MetaItem[] }) {
 
   return (
     <div>
-      <p className="mb-3 text-xs font-medium uppercase tracking-wide text-amber-200">{title}</p>
+      <p className="mb-3 text-xs font-medium uppercase tracking-[0.18em] text-violet-300">
+        {title}
+      </p>
       <div className="flex flex-wrap gap-2">
         {items.map((item) =>
           item.href ? (
             <Link
               key={item.id}
               href={item.href}
-              className="rounded-lg border border-line bg-white/5 px-3 py-1 text-xs text-muted transition hover:border-teal-300/50 hover:text-ink"
+              className="rounded-lg border border-line bg-white/5 px-3 py-1 text-xs text-muted transition hover:border-violet-300/50 hover:text-ink"
             >
               {item.label}
             </Link>
@@ -143,12 +138,14 @@ export default async function ExperienceDetailPage({ params }: ExperienceDetailP
         </Link>
 
         <header className="mt-8">
-          <p className="text-sm font-medium text-teal-200">Experience</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-violet-300">
+            Experience
+          </p>
           <h1 className="mt-4 text-4xl font-semibold text-ink md:text-6xl">{experience.role}</h1>
           <p className="mt-3 text-xl text-muted">{experience.company}</p>
           {dateRange || experience.location ? (
             <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-              {dateRange ? <span className="text-amber-200">{dateRange}</span> : null}
+              {dateRange ? <span className="text-violet-200">{dateRange}</span> : null}
               {dateRange && experience.location ? (
                 <span className="text-muted/50" aria-hidden>
                   •
@@ -257,13 +254,13 @@ function AwardsRecognition({ items }: { items: string[] }) {
 
   return (
     <section className="glass-panel rounded-lg p-4">
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-amber-200">
+      <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-200">
         Awards &amp; Recognition
       </h2>
       <ol className="mt-4 grid gap-3">
         {items.map((item, index) => (
           <li key={`${index}-${item}`} className="flex gap-3">
-            <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border border-line bg-white/[0.04] text-xs font-semibold text-teal-200">
+            <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border border-line bg-white/[0.04] text-xs font-semibold text-violet-200">
               {index + 1}
             </span>
             <p className="text-sm leading-6 text-muted">{item}</p>

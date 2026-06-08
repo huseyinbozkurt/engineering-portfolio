@@ -4,7 +4,7 @@
 
 :root {
   color-scheme: dark;
-  --background: #050607;
+  --background: #06070a;
   --foreground: #f6f7f9;
 }
 
@@ -19,13 +19,20 @@ body {
 
 body {
   margin: 0;
+  min-height: 100vh;
   background:
-    linear-gradient(135deg, rgba(45, 212, 191, 0.08), transparent 32%),
-    linear-gradient(180deg, #050607 0%, #090b0f 100%);
+    radial-gradient(60rem 38rem at 100% -8%, rgba(45, 212, 191, 0.07), transparent 60%),
+    radial-gradient(48rem 30rem at -8% 2%, rgba(56, 189, 248, 0.05), transparent 58%),
+    linear-gradient(180deg, #06070a 0%, #090b0f 55%, #0a0c11 100%);
+  background-attachment: fixed;
   color: var(--foreground);
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 a {
@@ -37,4 +44,76 @@ input,
 textarea,
 select {
   color-scheme: dark;
+}
+
+::selection {
+  background: rgba(45, 212, 191, 0.28);
+  color: #f6f7f9;
+}
+
+/* Slim, unobtrusive scrollbars to match the lighter chrome. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.14);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.24);
+}
+
+@layer components {
+  /* Form field label. */
+  .ui-label {
+    @apply text-sm font-medium text-ink;
+  }
+
+  /* Text inputs / textareas. */
+  .ui-input {
+    @apply w-full min-w-0 rounded-xl border border-line bg-white/[0.03] px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-muted/60 focus:border-teal-300/50 focus:bg-white/[0.05] focus:ring-2 focus:ring-teal-300/15;
+  }
+
+  /* Native select styled to match inputs, with a custom chevron. */
+  .ui-select {
+    @apply ui-input cursor-pointer appearance-none bg-no-repeat pr-10;
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='24'%20height='24'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%239aa4b2'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='m6%209%206%206%206-6'/%3E%3C/svg%3E");
+    background-position: right 0.75rem center;
+    background-size: 1rem;
+  }
+
+  /* Primary action button (teal). */
+  .ui-btn-primary {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl bg-teal-300 px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-sm shadow-teal-300/20 transition hover:bg-teal-200 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  /* Secondary / outline button. */
+  .ui-btn-secondary {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl border border-line bg-white/[0.02] px-4 py-2.5 text-sm font-semibold text-ink transition hover:border-line-strong hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  /* Small ghost button used for inline "Edit" affordances. */
+  .ui-btn-ghost {
+    @apply inline-flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-muted transition hover:border-teal-300/40 hover:bg-white/[0.05] hover:text-ink;
+  }
+
+  /* Elevated surface used for cards, panels, and modals. */
+  .ui-card {
+    @apply rounded-2xl border border-line bg-white/[0.02];
+  }
+
+  /* Relationship / metadata chip. */
+  .ui-chip {
+    @apply inline-flex items-center rounded-full border border-line bg-white/[0.04] px-3 py-1 text-xs text-muted;
+  }
 }
