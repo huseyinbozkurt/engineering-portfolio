@@ -1,7 +1,7 @@
 import { Pencil } from "lucide-react";
 import { notFound } from "next/navigation";
 
-import { getSkillById } from "@portfolio/db/queries";
+import { getSkillById, getSkills } from "@portfolio/db/queries";
 
 import { deleteSkillAction, patchSkillAction } from "@/app/actions";
 import { DeleteForm } from "@/components/delete-form";
@@ -12,6 +12,7 @@ import { SettingsModal } from "@/components/detail/settings-modal";
 import { Field } from "@/components/form-controls";
 import { RichTextField } from "@/components/forms/rich-text-field";
 import { ModalPanel } from "@/components/modal-panel";
+import { siblingLinks } from "@/lib/detail-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -21,11 +22,16 @@ interface EditPageProps {
 
 export default async function EditSkillPage({ params }: EditPageProps) {
   const { id } = await params;
-  const skill = await getSkillById(id);
+  const [skill, skills] = await Promise.all([getSkillById(id), getSkills()]);
 
   if (!skill) {
     notFound();
   }
+
+  const siblings = siblingLinks(skills, skill.id, (item) => ({
+    href: `/content/skills/${item.id}`,
+    label: item.name,
+  }));
 
   const settings = (
     <SettingsModal
@@ -76,6 +82,8 @@ export default async function EditSkillPage({ params }: EditPageProps) {
         backLabel="All skills"
         eyebrow="Skill"
         title={skill.name}
+        prev={siblings.prev}
+        next={siblings.next}
         id={skill.id}
         status={skill.status}
         statusAction={patchSkillAction}
@@ -111,7 +119,7 @@ export default async function EditSkillPage({ params }: EditPageProps) {
         />
       </div>
 
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-400/20 bg-rose-500/[0.04] p-5">
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-danger-400/20 bg-danger-500/[0.04] p-5">
         <p className="text-sm text-muted">Permanently remove this skill and its relationships.</p>
         <DeleteForm action={deleteSkillAction} id={skill.id} label="Delete skill" />
       </div>

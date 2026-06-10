@@ -40,7 +40,7 @@ export function CreateWithAiModal({ canCreate, disabledReason }: CreateWithAiMod
     <>
       <button
         type="button"
-        className="inline-flex items-center gap-2 rounded-lg bg-teal-200 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-teal-100 disabled:cursor-not-allowed disabled:opacity-50"
+        className="ui-btn-primary"
         disabled={!canCreate}
         title={!canCreate && disabledReason ? disabledReason : undefined}
         onClick={() => dialogRef.current?.showModal()}
@@ -53,10 +53,10 @@ export function CreateWithAiModal({ canCreate, disabledReason }: CreateWithAiMod
         ref={dialogRef}
         aria-describedby={descriptionId}
         aria-labelledby={titleId}
-        className="w-[min(calc(100vw-2rem),42rem)] max-h-[calc(100vh-2rem)] overflow-hidden rounded-lg border border-line bg-[#090b0f] p-0 text-ink shadow-2xl outline-none backdrop:bg-black/75"
+        className="w-[min(calc(100vw-2rem),42rem)] max-h-[calc(100vh-2rem)] overflow-hidden rounded-2xl border border-line-strong bg-surface p-0 text-ink shadow-pop outline-none backdrop:bg-black/70 backdrop:backdrop-blur-sm"
       >
         <div className="flex max-h-[calc(100vh-2rem)] flex-col">
-          <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
+          <div className="flex items-start justify-between gap-4 border-b border-line bg-white/[0.02] px-5 py-4">
             <div>
               <h2 id={titleId} className="text-lg font-semibold text-ink">
                 Create with AI
@@ -67,7 +67,7 @@ export function CreateWithAiModal({ canCreate, disabledReason }: CreateWithAiMod
             </div>
             <button
               type="button"
-              className="rounded-md border border-line px-2.5 py-1 text-xs font-semibold text-muted transition hover:border-teal-300/50 hover:text-ink"
+              className="rounded-md border border-line px-2.5 py-1 text-xs font-semibold text-muted transition hover:border-accent-400/50 hover:text-ink"
               onClick={() => dialogRef.current?.close()}
             >
               Close
@@ -78,7 +78,7 @@ export function CreateWithAiModal({ canCreate, disabledReason }: CreateWithAiMod
             <label className="grid gap-2">
               <span className="text-sm font-medium text-ink">Story brief</span>
               <textarea
-                className="min-h-56 rounded-lg border border-line bg-white/[0.04] px-3 py-2 text-sm leading-6 outline-none transition placeholder:text-muted/70 focus:border-teal-300/60"
+                className="min-h-56 rounded-lg border border-line bg-white/[0.04] px-3 py-2 text-sm leading-6 outline-none transition placeholder:text-muted/70 focus:border-accent-400/60"
                 name="sourceStory"
                 placeholder="I built..., because..., the hard parts were..., I decided..., the result was..."
                 required
@@ -89,8 +89,8 @@ export function CreateWithAiModal({ canCreate, disabledReason }: CreateWithAiMod
               <p
                 className={
                   state.status === "error"
-                    ? "rounded-lg border border-rose-300/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-100"
-                    : "rounded-lg border border-teal-300/30 bg-teal-300/10 px-3 py-2 text-sm text-teal-100"
+                    ? "rounded-lg border border-danger-300/30 bg-danger-500/10 px-3 py-2 text-sm text-danger-100"
+                    : "rounded-lg border border-success-400/30 bg-success-400/10 px-3 py-2 text-sm text-success-100"
                 }
                 role="status"
               >
@@ -101,16 +101,12 @@ export function CreateWithAiModal({ canCreate, disabledReason }: CreateWithAiMod
             <div className="flex flex-wrap justify-end gap-3">
               <button
                 type="button"
-                className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-ink transition hover:border-teal-300/50 hover:bg-white/[0.06]"
+                className="ui-btn-secondary"
                 onClick={() => dialogRef.current?.close()}
               >
                 Cancel
               </button>
-              <button
-                type="submit"
-                className="inline-flex items-center gap-2 rounded-lg bg-teal-200 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-teal-100 disabled:cursor-wait disabled:opacity-60"
-                disabled={isPending}
-              >
+              <button type="submit" className="ui-btn-primary disabled:cursor-wait" disabled={isPending}>
                 <Sparkles className="size-4" aria-hidden="true" />
                 {isPending ? "Generating..." : "Generate story"}
               </button>
@@ -120,7 +116,7 @@ export function CreateWithAiModal({ canCreate, disabledReason }: CreateWithAiMod
       </dialog>
 
       {!canCreate && disabledReason ? (
-        <p className="basis-full text-xs text-amber-200">{disabledReason}</p>
+        <p className="basis-full text-xs text-warning-200">{disabledReason}</p>
       ) : null}
     </>
   );

@@ -81,14 +81,14 @@ export function ContactSubmissionsList({ submissions }: ContactSubmissionsListPr
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Filter by name, email, message…"
             aria-label="Filter submissions"
-            className="w-full rounded-lg border border-line bg-white/[0.04] py-2 pl-9 pr-3 text-sm outline-none transition placeholder:text-muted/70 focus:border-teal-300/60"
+            className="ui-input pl-10"
           />
         </div>
         <select
           aria-label="Response requested"
           value={responseFilter}
           onChange={(event) => setResponseFilter(event.target.value as ResponseFilter)}
-          className="rounded-lg border border-line bg-white/[0.04] px-3 py-2 text-sm text-ink outline-none transition focus:border-teal-300/60"
+          className="ui-select w-auto"
         >
           <option value="all">All submissions</option>
           <option value="wants">Response requested</option>
@@ -100,34 +100,27 @@ export function ContactSubmissionsList({ submissions }: ContactSubmissionsListPr
       </div>
 
       {filtered.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-line bg-white/[0.02] p-6 text-center text-sm text-muted">
+        <div className="rounded-2xl border border-dashed border-line bg-white/[0.02] p-6 text-center text-sm text-muted">
           No submissions match the current filters.
         </div>
       ) : (
         <div className="grid gap-4">
           {filtered.map((submission) => (
-            <article
-              key={submission.id}
-              className="rounded-lg border border-line bg-white/[0.025] p-5"
-            >
+            <article key={submission.id} className="ui-card p-5 shadow-card">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="text-lg font-semibold text-ink">{submission.name}</h2>
-                    <span className="rounded-full border border-line bg-white/[0.04] px-2 py-0.5 text-xs font-medium capitalize text-muted">
+                    <span className="ui-badge ui-badge-neutral capitalize">
                       {formatMode(submission.mode)}
                     </span>
-                    <span className="rounded-full border border-amber-200/25 bg-amber-200/10 px-2 py-0.5 text-xs font-medium text-amber-100">
+                    <span className="ui-badge ui-badge-warning">
                       {formatIntent(submission.intent)}
                     </span>
                     {submission.wantsResponse ? (
-                      <span className="rounded-full border border-teal-300/30 bg-teal-300/10 px-2 py-0.5 text-xs font-medium text-teal-100">
-                        Contact back requested
-                      </span>
+                      <span className="ui-badge ui-badge-success">Contact back requested</span>
                     ) : (
-                      <span className="rounded-full border border-line bg-white/[0.04] px-2 py-0.5 text-xs font-medium text-muted">
-                        No response requested
-                      </span>
+                      <span className="ui-badge ui-badge-neutral">No response requested</span>
                     )}
                   </div>
                   <p className="mt-1 text-xs text-muted">
@@ -135,15 +128,12 @@ export function ContactSubmissionsList({ submissions }: ContactSubmissionsListPr
                   </p>
                 </div>
                 {submission.email ? (
-                  <a
-                    className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-ink transition hover:border-teal-300/50 hover:bg-white/[0.06]"
-                    href={`mailto:${submission.email}`}
-                  >
+                  <a className="ui-btn-outline" href={`mailto:${submission.email}`}>
                     {submission.email}
                   </a>
                 ) : null}
               </div>
-              <dl className="mt-4 grid gap-3 rounded-lg border border-line bg-white/[0.02] p-4 text-sm md:grid-cols-2">
+              <dl className="mt-4 grid gap-3 rounded-xl border border-line bg-white/[0.02] p-4 text-sm md:grid-cols-2">
                 <SubmissionMeta label="Company" value={submission.company} />
                 <SubmissionMeta label="Role/title" value={submission.roleTitle} />
                 <SubmissionMeta label="Timeline" value={submission.timeline} />
@@ -177,7 +167,7 @@ function SubmissionMeta({
 
   return (
     <div className={wide ? "md:col-span-2" : undefined}>
-      <dt className="text-xs font-medium uppercase tracking-wide text-amber-200">{label}</dt>
+      <dt className="text-xs font-medium uppercase tracking-wide text-warning-200">{label}</dt>
       <dd className="mt-1 whitespace-pre-wrap leading-6 text-muted">{value}</dd>
     </div>
   );

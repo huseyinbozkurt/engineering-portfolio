@@ -1,7 +1,7 @@
 import { Pencil } from "lucide-react";
 import { notFound } from "next/navigation";
 
-import { getPrincipleById } from "@portfolio/db/queries";
+import { getPrincipleById, getPrinciples } from "@portfolio/db/queries";
 
 import { deletePrincipleAction, patchPrincipleAction } from "@/app/actions";
 import { DeleteForm } from "@/components/delete-form";
@@ -12,6 +12,7 @@ import { SettingsModal } from "@/components/detail/settings-modal";
 import { Field, SeoFields } from "@/components/form-controls";
 import { RichTextField } from "@/components/forms/rich-text-field";
 import { ModalPanel } from "@/components/modal-panel";
+import { siblingLinks } from "@/lib/detail-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -21,11 +22,16 @@ interface EditPageProps {
 
 export default async function EditPrinciplePage({ params }: EditPageProps) {
   const { id } = await params;
-  const principle = await getPrincipleById(id);
+  const [principle, principles] = await Promise.all([getPrincipleById(id), getPrinciples()]);
 
   if (!principle) {
     notFound();
   }
+
+  const siblings = siblingLinks(principles, principle.id, (item) => ({
+    href: `/content/principles/${item.id}`,
+    label: item.title,
+  }));
 
   const settings = (
     <SettingsModal
@@ -70,6 +76,8 @@ export default async function EditPrinciplePage({ params }: EditPageProps) {
         backLabel="All principles"
         eyebrow="Operating principle"
         title={principle.title}
+        prev={siblings.prev}
+        next={siblings.next}
         id={principle.id}
         status={principle.status}
         statusAction={patchPrincipleAction}
@@ -114,7 +122,7 @@ export default async function EditPrinciplePage({ params }: EditPageProps) {
         />
       </div>
 
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-400/20 bg-rose-500/[0.04] p-5">
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-danger-400/20 bg-danger-500/[0.04] p-5">
         <p className="text-sm text-muted">Permanently remove this principle.</p>
         <DeleteForm action={deletePrincipleAction} id={principle.id} label="Delete principle" />
       </div>

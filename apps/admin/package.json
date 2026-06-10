@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@portfolio/db": "workspace:*",
+    "@portfolio/llm": "workspace:*",
     "@portfolio/types": "workspace:*",
     "@portfolio/validators": "workspace:*",
     "lucide-react": "^1.17.0",

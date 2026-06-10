@@ -1,11 +1,15 @@
 import Link from "next/link";
 
+import {
+  getCaseStudyBySlug,
+  type CaseStudyDetailRecord,
+  type CaseStudyRecord,
+} from "@portfolio/db/queries";
+
 import { ComingSoon } from "@/components/coming-soon";
 import {
   CaseStudyCard,
   CTAButton,
-  MetricCard,
-  PrincipleCard,
   RecognitionCard,
   SectionHeader,
   Timeline,
@@ -13,8 +17,6 @@ import {
 import {
   getHeroHeadline,
   getHeroSummary,
-  getImpactMetrics,
-  getOperatingPrinciples,
   getRecognitionItems,
   getRoleLabel,
   getSkillCategoryChips,
@@ -46,20 +48,10 @@ export default async function HomePage() {
     selectedIds: settings?.featuredSkillIds ?? [],
     content,
   });
-  const metrics =
-    settings?.metricCards.length
-      ? settings.metricCards.map((metric) => ({
-          value: metric.value,
-          label: metric.label,
-          detail: metric.detail,
-        }))
-      : getImpactMetrics(content);
-  const principles = selectByIds(content.principles, settings?.featuredPrincipleIds ?? []);
-  const visiblePrinciples =
-    principles.length > 0 ? principles : getOperatingPrinciples(content.principles);
   const caseStudies = selectByIds(content.caseStudies, settings?.featuredCaseStudyIds ?? []);
   const visibleCaseStudies =
     caseStudies.length > 0 ? caseStudies : content.caseStudies.slice(0, 3);
+  const impactStoryLabels = await getImpactStoryLabels(visibleCaseStudies);
   const recognitionExperience = settings?.featuredRecognitionExperienceId
     ? content.experiences.filter(
         (experience) => experience.id === settings.featuredRecognitionExperienceId,
@@ -76,8 +68,7 @@ export default async function HomePage() {
   const codeRole = settings?.codeRoleLabel?.trim() || role;
   const codeMindset = settings?.codeMindsetLabel?.trim() || "";
   const codeExperience =
-    settings?.codeExperienceLabel?.trim() ||
-    metrics.find((metric) => metric.label === "Professional experience")?.value;
+    settings?.codeExperienceLabel?.trim() || getExperienceSpanLabel(content.experiences);
   const primaryCta = getConfiguredCta(settings?.primaryCtaLabel, settings?.primaryCtaHref);
   const secondaryCta = getConfiguredCta(settings?.secondaryCtaLabel, settings?.secondaryCtaHref);
 
@@ -134,37 +125,13 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {metrics.length > 0 ? (
-        <section className="mx-auto max-w-7xl px-5 py-8 lg:px-8">
-          <div className="glass-panel grid overflow-hidden rounded-lg md:grid-cols-2 lg:grid-cols-5">
-            {metrics.map((metric) => (
-              <MetricCard key={metric.label} metric={metric} />
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {visiblePrinciples.length > 0 ? (
-        <section className="mx-auto max-w-7xl px-5 py-10 lg:px-8">
+      {content.experiences.length > 0 || content.projects.length > 0 ? (
+        <section className="mx-auto max-w-7xl px-5 py-12 lg:px-8 lg:py-16">
           <SectionHeader
-            title="How I Approach Engineering"
-            action={{ href: "/how-i-work", label: "See all principles" }}
+            title="Career & Projects Journey"
+            description="A single timeline of professional chapters and shipped projects."
           />
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {visiblePrinciples.map((principle, index) => (
-              <PrincipleCard key={principle.id} principle={principle} index={index} />
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {content.experiences.length > 0 ? (
-        <section className="mx-auto max-w-7xl px-5 py-10 lg:px-8">
-          <SectionHeader
-            title="Career Journey"
-            action={{ href: "/experience", label: "View full timeline" }}
-          />
-          <Timeline experiences={content.experiences} />
+          <Timeline experiences={content.experiences} projects={content.projects} />
         </section>
       ) : null}
 
@@ -172,11 +139,16 @@ export default async function HomePage() {
         <section className="mx-auto max-w-7xl px-5 py-10 lg:px-8">
           <SectionHeader
             title="Selected Impact Stories"
+            description="Real problems, practical decisions, and measurable outcomes."
             action={{ href: "/case-studies", label: "View all case studies" }}
           />
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {visibleCaseStudies.map((caseStudy) => (
-              <CaseStudyCard key={caseStudy.id} caseStudy={caseStudy} />
+              <CaseStudyCard
+                key={caseStudy.id}
+                caseStudy={caseStudy}
+                label={impactStoryLabels.get(caseStudy.id)}
+              />
             ))}
           </div>
         </section>
@@ -282,6 +254,37 @@ function CodeProfile({
   );
 }
 
+function getExperienceSpanLabel(
+  experiences: Awaited<ReturnType<typeof getPublicSiteAvailability>>["content"]["experiences"],
+): string | undefined {
+  const ranges = experiences
+    .map((experience) => ({
+      start: parseTimelineDate(experience.startDate),
+      end: experience.isCurrent ? new Date() : parseTimelineDate(experience.endDate),
+    }))
+    .filter((range): range is { start: Date; end: Date } => Boolean(range.start && range.end));
+
+  if (ranges.length === 0) {
+    return undefined;
+  }
+
+  const earliest = new Date(Math.min(...ranges.map((range) => range.start.getTime())));
+  const latest = new Date(Math.max(...ranges.map((range) => range.end.getTime())));
+  const years = Math.max(1, latest.getUTCFullYear() - earliest.getUTCFullYear());
+
+  return `${years}+ years`;
+}
+
+function parseTimelineDate(value: string | null): Date | null {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(`${value}T00:00:00Z`);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function getHomepageChips({
   selectedIds,
   content,
@@ -299,6 +302,31 @@ function getHomepageChips({
     skills: content.skills,
     lenses: content.lenses,
   });
+}
+
+async function getImpactStoryLabels(caseStudies: CaseStudyRecord[]): Promise<Map<string, string>> {
+  const entries = await Promise.all(
+    caseStudies.map(async (caseStudy) => {
+      const detail = await getCaseStudyBySlug(caseStudy.slug);
+      const label = getImpactStoryLabel(detail);
+
+      return label ? ([caseStudy.id, label] as const) : null;
+    }),
+  );
+
+  return new Map(
+    entries.filter((entry): entry is readonly [string, string] => Boolean(entry)),
+  );
+}
+
+function getImpactStoryLabel(detail: CaseStudyDetailRecord | null): string | undefined {
+  const experience = detail?.experiences.find((item) => item.company.trim().length > 0);
+
+  if (experience) {
+    return experience.company;
+  }
+
+  return detail?.projects.find((item) => item.name.trim().length > 0)?.name;
 }
 
 function selectByIds<T extends { id: string }>(items: T[], ids: string[]): T[] {

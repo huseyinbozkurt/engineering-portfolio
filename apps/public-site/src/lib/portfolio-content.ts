@@ -18,12 +18,6 @@ export interface RecognitionItem {
   href: string;
 }
 
-export interface DerivedMetric {
-  label: string;
-  value: string;
-  detail?: string | undefined;
-}
-
 export function getRoleLabel(experiences: ExperienceRecord[]): string {
   const experience = experiences.find((item) => item.isCurrent) ?? experiences[0];
 
@@ -84,55 +78,6 @@ export function getOperatingPrinciples(principles: PrincipleRecord[]): Principle
   return principles.slice(0, 4);
 }
 
-export function getImpactMetrics(content: HomeContentRecord): DerivedMetric[] {
-  const metrics: DerivedMetric[] = [];
-  const totalYears = getTotalExperienceYears(content.experiences);
-  const activeYears = getActiveExperienceYears(content.experiences);
-  const awards = getRecognitionItems(content.experiences);
-
-  if (content.caseStudies.length > 0) {
-    metrics.push({
-      label: "Impact stories",
-      value: `${content.caseStudies.length}`,
-      detail: "Published case studies",
-    });
-  }
-
-  if (content.projects.length > 0) {
-    metrics.push({
-      label: "Projects delivered",
-      value: `${content.projects.length}`,
-      detail: "Published projects",
-    });
-  }
-
-  if (content.skills.length > 0) {
-    metrics.push({
-      label: "Skill areas",
-      value: `${getSkillCategoryChips({ skills: content.skills, lenses: content.lenses }).length}`,
-      detail: "Published categories",
-    });
-  }
-
-  if (totalYears > 0) {
-    metrics.push({
-      label: "Professional experience",
-      value: `${totalYears}+`,
-      detail: activeYears,
-    });
-  }
-
-  if (awards.length > 0) {
-    metrics.push({
-      label: "Recognition",
-      value: `${awards.length}`,
-      detail: "Published awards",
-    });
-  }
-
-  return metrics.slice(0, 5);
-}
-
 export function getRecognitionItems(experiences: ExperienceRecord[]): RecognitionItem[] {
   return experiences.flatMap((experience) => {
     const date = formatDateRange(experience.startDate, experience.endDate, experience.isCurrent);
@@ -166,49 +111,6 @@ export function getProjectMeta(project: ProjectRecord): string {
   }
 
   return project.url || project.githubUrl ? "Linked project" : "Published project";
-}
-
-function getTotalExperienceYears(experiences: ExperienceRecord[]): number {
-  if (experiences.length === 0) {
-    return 0;
-  }
-
-  const ranges = experiences
-    .map((experience) => ({
-      start: parseDate(experience.startDate),
-      end: experience.isCurrent ? new Date() : parseDate(experience.endDate),
-    }))
-    .filter((range): range is { start: Date; end: Date } => Boolean(range.start && range.end));
-
-  if (ranges.length === 0) {
-    return 0;
-  }
-
-  const earliest = new Date(Math.min(...ranges.map((range) => range.start.getTime())));
-  const latest = new Date(Math.max(...ranges.map((range) => range.end.getTime())));
-  const years = latest.getUTCFullYear() - earliest.getUTCFullYear();
-
-  return Math.max(1, years);
-}
-
-function getActiveExperienceYears(experiences: ExperienceRecord[]): string | undefined {
-  const current = experiences.find((experience) => experience.isCurrent);
-
-  if (!current) {
-    return undefined;
-  }
-
-  const dateRange = formatDateRange(current.startDate, current.endDate, current.isCurrent);
-
-  return dateRange ? `Current role: ${dateRange}` : undefined;
-}
-
-function parseDate(value: string | null): Date | null {
-  if (!value) {
-    return null;
-  }
-
-  return new Date(`${value}T00:00:00Z`);
 }
 
 function parseAwards(value: string): string[] {

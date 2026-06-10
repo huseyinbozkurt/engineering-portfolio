@@ -1,7 +1,7 @@
 import { Pencil } from "lucide-react";
 import { notFound } from "next/navigation";
 
-import { getLensById } from "@portfolio/db/queries";
+import { getLensById, getLenses } from "@portfolio/db/queries";
 
 import { deleteLensAction, patchLensAction } from "@/app/actions";
 import { DeleteForm } from "@/components/delete-form";
@@ -12,6 +12,7 @@ import { SettingsModal } from "@/components/detail/settings-modal";
 import { Field, SeoFields } from "@/components/form-controls";
 import { RichTextField } from "@/components/forms/rich-text-field";
 import { ModalPanel } from "@/components/modal-panel";
+import { siblingLinks } from "@/lib/detail-nav";
 import { publicHrefs } from "@/lib/public-site";
 
 export const dynamic = "force-dynamic";
@@ -22,11 +23,16 @@ interface EditPageProps {
 
 export default async function EditLensPage({ params }: EditPageProps) {
   const { id } = await params;
-  const lens = await getLensById(id);
+  const [lens, lenses] = await Promise.all([getLensById(id), getLenses()]);
 
   if (!lens) {
     notFound();
   }
+
+  const siblings = siblingLinks(lenses, lens.id, (item) => ({
+    href: `/content/lenses/${item.id}`,
+    label: item.name,
+  }));
 
   const settings = (
     <SettingsModal
@@ -77,6 +83,8 @@ export default async function EditLensPage({ params }: EditPageProps) {
         backLabel="All lenses"
         eyebrow="Lens"
         title={lens.name}
+        prev={siblings.prev}
+        next={siblings.next}
         id={lens.id}
         status={lens.status}
         statusAction={patchLensAction}
@@ -115,7 +123,7 @@ export default async function EditLensPage({ params }: EditPageProps) {
         />
       </div>
 
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-400/20 bg-rose-500/[0.04] p-5">
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-danger-400/20 bg-danger-500/[0.04] p-5">
         <p className="text-sm text-muted">Permanently remove this lens.</p>
         <DeleteForm action={deleteLensAction} id={lens.id} label="Delete lens" />
       </div>

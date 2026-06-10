@@ -14,6 +14,7 @@ import { SettingsModal } from "@/components/detail/settings-modal";
 import { CheckboxGroup, Field, SelectField, SeoFields } from "@/components/form-controls";
 import { RichTextField } from "@/components/forms/rich-text-field";
 import { ModalPanel } from "@/components/modal-panel";
+import { siblingLinks } from "@/lib/detail-nav";
 import { publicHrefs } from "@/lib/public-site";
 
 export const dynamic = "force-dynamic";
@@ -47,6 +48,11 @@ export default async function EditProjectPage({ params }: EditPageProps) {
   const principleOptions = content.principles.map((p) => ({ id: p.id, label: p.title }));
   const skillOptions = content.skills.map((s) => ({ id: s.id, label: s.name, category: s.category }));
   const tagOptions = content.tags.map((t) => ({ id: t.id, label: t.name, category: t.category }));
+
+  const siblings = siblingLinks(content.projects, project.id, (item) => ({
+    href: `/content/projects/${item.id}`,
+    label: item.name,
+  }));
 
   const stackBoxes = [
     { title: "Development Tech Stack", value: project.developmentTechStack },
@@ -187,6 +193,8 @@ export default async function EditProjectPage({ params }: EditPageProps) {
       <DetailHeader
         backHref="/content/projects"
         backLabel="All projects"
+        prev={siblings.prev}
+        next={siblings.next}
         eyebrow="Project"
         title={project.name}
         id={project.id}
@@ -199,7 +207,7 @@ export default async function EditProjectPage({ params }: EditPageProps) {
           experience ? (
             <span>
               Built during{" "}
-              <span className="text-amber-200">
+              <span className="text-warning-200">
                 {experience.role} at {experience.company}
               </span>
             </span>
@@ -279,7 +287,7 @@ export default async function EditProjectPage({ params }: EditPageProps) {
             preview={
               <div className="grid gap-4">
                 {project.architecture.trim().length > 0 ? (
-                  <div className="rounded-lg border border-line bg-white/[0.02] p-5">
+                  <div className="rounded-xl border border-line bg-white/[0.02] p-5">
                     <RichTextView value={project.architecture} />
                   </div>
                 ) : null}
@@ -288,11 +296,9 @@ export default async function EditProjectPage({ params }: EditPageProps) {
                     {stackBoxes.map((box) => (
                       <div
                         key={box.title}
-                        className="rounded-lg border border-line bg-white/[0.02] p-5"
+                        className="rounded-xl border border-line bg-white/[0.02] p-5"
                       >
-                        <h3 className="text-sm font-semibold uppercase tracking-wide text-amber-200">
-                          {box.title}
-                        </h3>
+                        <h3 className="ui-eyebrow">{box.title}</h3>
                         <div className="mt-3">
                           <RichTextView value={box.value} dense />
                         </div>
@@ -345,7 +351,7 @@ export default async function EditProjectPage({ params }: EditPageProps) {
         <MetaSidebar groups={metaGroups} />
       </div>
 
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-400/20 bg-rose-500/[0.04] p-5">
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-danger-400/20 bg-danger-500/[0.04] p-5">
         <p className="text-sm text-muted">Permanently remove this project and its relationships.</p>
         <DeleteForm action={deleteProjectAction} id={project.id} label="Delete project" />
       </div>

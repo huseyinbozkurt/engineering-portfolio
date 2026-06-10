@@ -51,7 +51,7 @@ const providerDefaults: Record<
 const configuredStatusTimeoutMs = Number(process.env.LLM_STATUS_TIMEOUT_MS);
 const statusTimeoutMs = Number.isFinite(configuredStatusTimeoutMs)
   ? configuredStatusTimeoutMs
-  : 3000;
+  : 900000;
 
 export async function getLlmConnectionStatuses(): Promise<LlmConnectionStatus[]> {
   const configs = getLlmConnectionConfigs();

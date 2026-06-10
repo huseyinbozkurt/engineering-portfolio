@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { ReactNode, SVGProps } from "react";
 
 import type {
   CaseStudyRecord,
@@ -8,7 +8,11 @@ import type {
   ProjectRecord,
 } from "@portfolio/db/queries";
 
-import { type DerivedMetric, type RecognitionItem } from "@/lib/portfolio-content";
+import {
+  InteractiveTimeline,
+  type InteractiveTimelineItem,
+} from "@/components/interactive-timeline";
+import { type RecognitionItem } from "@/lib/portfolio-content";
 import { formatDateRange } from "@/lib/format";
 import { experienceHref, projectHref } from "@/lib/paths";
 
@@ -86,21 +90,6 @@ export function SectionHeader({ eyebrow, title, description, action }: SectionHe
   );
 }
 
-export function MetricCard({ metric }: { metric: DerivedMetric }) {
-  return (
-    <article className="group relative flex min-h-32 flex-col justify-center border-line px-5 py-5 text-center md:border-l first:md:border-l-0">
-      <div className="mx-auto mb-3 flex size-10 items-end justify-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] p-2 transition group-hover:border-violet-300/50">
-        <span className="h-3 w-1.5 rounded-t bg-emerald-300" />
-        <span className="h-5 w-1.5 rounded-t bg-sky-300" />
-        <span className="h-7 w-1.5 rounded-t bg-violet-300" />
-      </div>
-      <p className="text-3xl font-semibold text-ink">{metric.value}</p>
-      <p className="mt-2 text-sm leading-5 text-ink/85">{metric.label}</p>
-      {metric.detail ? <p className="mt-1 text-xs leading-5 text-muted">{metric.detail}</p> : null}
-    </article>
-  );
-}
-
 export function PrincipleCard({ principle, index }: { principle: PrincipleRecord; index: number }) {
   return (
     <article className="glass-panel group h-full rounded-lg p-5 transition hover:border-violet-300/45 hover:bg-white/[0.07]">
@@ -115,81 +104,220 @@ export function PrincipleCard({ principle, index }: { principle: PrincipleRecord
   );
 }
 
-export function Timeline({ experiences }: { experiences: ExperienceRecord[] }) {
-  if (experiences.length === 0) {
+export function Timeline({
+  experiences,
+  projects = [],
+}: {
+  experiences: ExperienceRecord[];
+  projects?: ProjectRecord[];
+}) {
+  const items = getTimelineItems(experiences, projects);
+
+  if (items.length === 0) {
     return null;
   }
 
-  const chronological = [...experiences].reverse();
-
-  return (
-    <ol className="relative grid gap-3 pt-2 md:grid-cols-3 md:gap-5 md:pt-6 lg:grid-cols-6">
-      <li
-        className="absolute bottom-5 left-5 top-5 w-px bg-line md:left-0 md:right-0 md:top-8 md:h-px md:w-auto"
-        aria-hidden
-      />
-      {chronological.map((experience, index) => {
-        const dateRange = formatDateRange(
-          experience.startDate,
-          experience.endDate,
-          experience.isCurrent,
-        );
-
-        return (
-          <li key={experience.id} className="relative">
-            <Link
-              href={experienceHref(experience)}
-              className="group grid grid-cols-[auto_1fr] gap-4 rounded-lg p-3 transition hover:bg-white/[0.04] md:block"
-            >
-              <span className="relative z-10 mt-1 block size-4 rounded-full border border-slate-950 bg-gradient-to-br from-emerald-300 via-sky-400 to-violet-500 shadow-[0_0_0_4px_rgba(255,255,255,0.08)] md:mt-0" />
-              <span className="block min-w-0">
-                {dateRange ? (
-                  <span className="block text-sm font-semibold text-violet-200 md:mt-5">
-                    {dateRange}
-                  </span>
-                ) : null}
-                <span className="mt-2 block text-sm font-semibold text-ink md:mt-3">
-                  {experience.company}
-                </span>
-                <span className="mt-1 block text-sm leading-5 text-muted">{experience.role}</span>
-                {index === chronological.length - 1 && experience.isCurrent ? (
-                  <span className="mt-3 inline-flex rounded-full border border-emerald-300/30 bg-emerald-300/10 px-2.5 py-1 text-xs font-medium text-emerald-200">
-                    Current
-                  </span>
-                ) : null}
-              </span>
-            </Link>
-          </li>
-        );
-      })}
-    </ol>
-  );
+  return <InteractiveTimeline items={items} />;
 }
 
-export function CaseStudyCard({ caseStudy }: { caseStudy: CaseStudyRecord }) {
-  const bars = getCaseStudySignalBars(caseStudy);
+function getTimelineItems(
+  experiences: ExperienceRecord[],
+  projects: ProjectRecord[],
+): InteractiveTimelineItem[] {
+  const experiencesById = new Map(experiences.map((experience) => [experience.id, experience]));
+  const experienceItems = experiences.map((experience) => {
+    const dateRange = formatDateRange(
+      experience.startDate,
+      experience.endDate,
+      experience.isCurrent,
+    );
+
+    return {
+      id: `experience-${experience.id}`,
+      kind: "experience" as const,
+      name: experience.company,
+      role: experience.role,
+      dateRange,
+      summary: compactText(experience.summary),
+      tags: [],
+      href: experienceHref(experience),
+      sortTime: getDateTime(experience.startDate) ?? getDateTime(experience.endDate),
+      sortPosition: experience.position,
+      sortPriority: 0,
+    };
+  });
+  const projectItems = projects.map((project) => {
+    const linkedExperience = project.experienceId
+      ? experiencesById.get(project.experienceId)
+      : undefined;
+    const linkedDateRange = linkedExperience
+      ? formatDateRange(
+          linkedExperience.startDate,
+          linkedExperience.endDate,
+          linkedExperience.isCurrent,
+        )
+      : "";
+    const publishedDate = formatTimestamp(project.publishedAt ?? project.createdAt);
+
+    return {
+      id: `project-${project.id}`,
+      kind: "project" as const,
+      name: project.name,
+      role: "Owner / Lead Developer",
+      dateRange: linkedDateRange || publishedDate,
+      summary: compactText(project.description),
+      tags: getProjectTags(project),
+      href: projectHref(project),
+      sortTime:
+        getDateTime(linkedExperience?.startDate ?? null) ??
+        getDateTime(project.publishedAt) ??
+        getDateTime(project.createdAt),
+      sortPosition: project.position,
+      sortPriority: 1,
+    };
+  });
+
+  return [...experienceItems, ...projectItems]
+    .sort((first, second) => {
+      const firstTime = first.sortTime ?? Number.POSITIVE_INFINITY;
+      const secondTime = second.sortTime ?? Number.POSITIVE_INFINITY;
+
+      if (firstTime !== secondTime) {
+        return firstTime - secondTime;
+      }
+
+      if (first.sortPosition !== second.sortPosition) {
+        return first.sortPosition - second.sortPosition;
+      }
+
+      if (first.sortPriority !== second.sortPriority) {
+        return first.sortPriority - second.sortPriority;
+      }
+
+      return first.name.localeCompare(second.name);
+    })
+    .map(({ sortTime: _sortTime, sortPosition: _sortPosition, sortPriority: _sortPriority, ...item }) => item);
+}
+
+function getProjectTags(project: ProjectRecord): string[] {
+  return uniqueStrings(
+    [
+      project.developmentTechStack,
+      project.qaTechStack,
+      project.aiIntegrationTechStack,
+      project.deploymentTechStack,
+    ].flatMap(splitStackItems),
+  ).slice(0, 5);
+}
+
+function splitStackItems(value: string): string[] {
+  return value
+    .split(/\r?\n|[,;|]/)
+    .map((item) => item.trim().replace(/^(?:[-*]|\d+[.)])\s+/, ""))
+    .filter((item) => item.length > 0 && item.length <= 40);
+}
+
+function compactText(value: string, maxLength = 180): string {
+  const normalized = value
+    .replace(/[`*_>#\[\]()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, Math.max(0, maxLength - 3)).trim()}...`;
+}
+
+function formatTimestamp(value: Date | string | null): string {
+  if (!value) {
+    return "";
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+}
+
+function getDateTime(value: Date | string | null): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(`${value}T00:00:00Z`);
+  const time = date.getTime();
+
+  return Number.isNaN(time) ? null : time;
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return Array.from(new Set(values));
+}
+
+interface CaseStudyCardProps {
+  caseStudy: CaseStudyRecord;
+  label?: string | undefined;
+}
+
+export function CaseStudyCard({ caseStudy, label }: CaseStudyCardProps) {
+  const problem = getCaseStudyPart([
+    ["Problem", caseStudy.problem],
+    ["Context", caseStudy.context],
+  ]);
+  const impact = getCaseStudyPart([["Impact", caseStudy.outcome]]);
+  const impactSignal = getImpactSignal(caseStudy.outcome);
 
   return (
-    <Link href={`/case-studies/${caseStudy.slug}`} className="group block h-full">
-      <article className="glass-panel flex h-full min-h-64 flex-col rounded-lg p-5 transition hover:border-violet-300/45 hover:bg-white/[0.07]">
-        <div className="mb-5 flex h-28 items-end overflow-hidden rounded-md border border-white/10 bg-[linear-gradient(135deg,rgba(16,185,129,0.18),rgba(124,58,237,0.22)_52%,rgba(14,165,233,0.12))] p-3">
-          <div className="grid w-full grid-cols-7 items-end gap-1">
-            {bars.map((height, index) => (
-              <span
-                key={`${caseStudy.id}-${index}`}
-                className="rounded-t bg-gradient-to-t from-emerald-400 to-violet-300"
-                style={{ height: `${height}%` }}
-              />
-            ))}
+    <Link
+      href={`/case-studies/${caseStudy.slug}`}
+      className="group block h-full rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-300"
+    >
+      <article className="glass-panel relative isolate flex h-full min-h-72 flex-col overflow-hidden rounded-lg p-5 transition hover:border-violet-300/45 hover:bg-white/[0.07]">
+        <span
+          className="pointer-events-none absolute inset-x-8 top-0 -z-10 h-px bg-gradient-to-r from-transparent via-violet-300/55 to-transparent opacity-0 transition group-hover:opacity-100"
+          aria-hidden
+        />
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-violet-300/35 bg-violet-400/10 text-violet-200 shadow-[0_16px_40px_rgba(124,58,237,0.16)]">
+              <ImpactStoryIcon className="size-5" aria-hidden />
+            </span>
+            <div className="min-w-0">
+              {label ? (
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-300">
+                  {label}
+                </p>
+              ) : null}
+              <h3 className="mt-2 text-lg font-semibold leading-7 text-ink transition group-hover:text-violet-100">
+                {caseStudy.title}
+              </h3>
+            </div>
           </div>
+          {impactSignal ? (
+            <span className="shrink-0 rounded-md border border-emerald-300/35 bg-emerald-300/10 px-2.5 py-1 text-xs font-semibold text-emerald-200">
+              {impactSignal}
+            </span>
+          ) : null}
         </div>
 
-        <h3 className="mt-3 text-lg font-semibold text-ink transition group-hover:text-violet-100">
-          {caseStudy.title}
-        </h3>
-        {caseStudy.excerpt ? (
-          <p className="mt-3 flex-1 text-sm leading-6 text-muted">{caseStudy.excerpt}</p>
-        ) : null}
+        {(problem || impact) ? (
+          <div className="mt-5 grid flex-1 gap-4">
+            {problem ? <CaseStudyPart part={problem} icon="problem" /> : null}
+            {impact ? <CaseStudyPart part={impact} icon="impact" /> : null}
+          </div>
+        ) : (
+          <div className="flex-1" />
+        )}
+
         <span className="mt-5 inline-flex text-sm font-semibold text-violet-300">
           Read case study
           <span className="ml-2" aria-hidden>
@@ -201,19 +329,92 @@ export function CaseStudyCard({ caseStudy }: { caseStudy: CaseStudyRecord }) {
   );
 }
 
-function getCaseStudySignalBars(caseStudy: CaseStudyRecord): number[] {
-  const values = [
-    caseStudy.context,
-    caseStudy.problem,
-    caseStudy.constraints,
-    caseStudy.action,
-    caseStudy.tradeoffs,
-    caseStudy.outcome,
-    caseStudy.learning,
-  ].map((value) => value.trim().length);
-  const max = Math.max(...values, 1);
+interface CaseStudyPartValue {
+  label: string;
+  value: string;
+}
 
-  return values.map((value) => Math.max(18, Math.round((value / max) * 92)));
+function CaseStudyPart({
+  part,
+  icon,
+}: {
+  part: CaseStudyPartValue;
+  icon: "problem" | "impact";
+}) {
+  const Icon = icon === "impact" ? OutcomeIcon : ProblemIcon;
+  const color =
+    icon === "impact"
+      ? "border-emerald-300/25 text-emerald-200"
+      : "border-sky-300/25 text-sky-200";
+
+  return (
+    <div className="flex gap-3">
+      <span
+        className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full border bg-white/[0.035] ${color}`}
+        aria-hidden
+      >
+        <Icon className="size-4" />
+      </span>
+      <div>
+        <p className="text-xs font-semibold text-ink">{part.label}</p>
+        <p className="mt-1 text-sm leading-6 text-muted">{compactText(part.value, 150)}</p>
+      </div>
+    </div>
+  );
+}
+
+function getCaseStudyPart(candidates: Array<[CaseStudyPartValue["label"], string]>): CaseStudyPartValue | null {
+  const match = candidates.find(([, value]) => value.trim().length > 0);
+
+  if (!match) {
+    return null;
+  }
+
+  const [partLabel, value] = match;
+
+  return {
+    label: partLabel,
+    value,
+  };
+}
+
+function getImpactSignal(value: string): string {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  const match = normalized.match(/(?:\b\d+(?:\.\d+)?\s?%[+\-]?|\b\d+(?:\.\d+)?x\b|\$\s?\d[\d,.]*[kmbKMB]?)/);
+
+  return match?.[0]?.replace(/\s+/g, "") ?? "";
+}
+
+function ImpactStoryIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
+      <path d="M4 19V5" />
+      <path d="M4 19h16" />
+      <path d="m7 15 3-3 3 2 5-6" />
+      <path d="M18 8h-4" />
+      <path d="M18 8v4" />
+    </svg>
+  );
+}
+
+function ProblemIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
+      <path d="M12 3.5 21 19H3L12 3.5Z" />
+      <path d="M12 9v4" />
+      <path d="M12 16.5h.01" />
+    </svg>
+  );
+}
+
+function OutcomeIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
+      <path d="M5 12.5 9.5 17 19 7" />
+      <path d="M19 7v5" />
+      <path d="M19 7h-5" />
+    </svg>
+  );
 }
 
 export function ProjectCard({ project, meta }: { project: ProjectRecord; meta: string }) {

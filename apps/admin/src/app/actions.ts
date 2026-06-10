@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { setFlash } from "@/lib/flash";
+
 import {
   bulkUpsertSkills,
   bulkUpsertTags,
@@ -217,6 +219,7 @@ export async function createLensAction(formData: FormData): Promise<void> {
     }),
   );
 
+  await setFlash("Lens created");
   refresh("/content/lenses");
   redirect("/content/lenses");
 }
@@ -234,6 +237,7 @@ export async function createPrincipleAction(formData: FormData): Promise<void> {
     }),
   );
 
+  await setFlash("Principle created");
   refresh("/content/principles");
   redirect("/content/principles");
 }
@@ -252,6 +256,7 @@ export async function createDecisionPatternAction(formData: FormData): Promise<v
     }),
   );
 
+  await setFlash("Decision pattern created");
   refresh("/content/decision-patterns");
   redirect("/content/decision-patterns");
 }
@@ -279,6 +284,7 @@ export async function createExperienceAction(formData: FormData): Promise<void> 
     }),
   );
 
+  await setFlash("Experience created");
   refresh("/content/experiences");
   redirect("/content/experiences");
 }
@@ -308,6 +314,7 @@ export async function createProjectAction(formData: FormData): Promise<void> {
     }),
   );
 
+  await setFlash("Project created");
   refresh("/content/projects");
   redirect("/content/projects");
 }
@@ -337,6 +344,7 @@ export async function createCaseStudyAction(formData: FormData): Promise<void> {
     }),
   );
 
+  await setFlash("Case study created");
   refresh("/content/case-studies");
   redirect("/content/case-studies");
 }
@@ -353,6 +361,7 @@ export async function createSkillAction(formData: FormData): Promise<void> {
     }),
   );
 
+  await setFlash("Skill created");
   refresh("/content/skills");
   redirect("/content/skills");
 }
@@ -367,6 +376,7 @@ export async function createTagAction(formData: FormData): Promise<void> {
     }),
   );
 
+  await setFlash("Tag created");
   refresh("/content/tags");
   redirect("/content/tags");
 }
@@ -378,6 +388,7 @@ export async function bulkUpsertSkillsAction(formData: FormData): Promise<void> 
     }),
   );
 
+  await setFlash("Skills saved");
   refresh("/content/skills");
   redirect("/content/skills");
 }
@@ -389,6 +400,7 @@ export async function bulkUpsertTagsAction(formData: FormData): Promise<void> {
     }),
   );
 
+  await setFlash("Tags saved");
   refresh("/content/tags");
   redirect("/content/tags");
 }
@@ -409,6 +421,7 @@ export async function upsertContactProfileAction(formData: FormData): Promise<vo
     }),
   );
 
+  await setFlash("Contact profile saved");
   revalidatePath("/contact");
   refresh("/content/contact-profile");
   redirect("/content/contact-profile");
@@ -438,6 +451,7 @@ export async function upsertHomepageSettingsAction(formData: FormData): Promise<
     }),
   );
 
+  await setFlash("Homepage saved");
   revalidatePath("/");
   refresh("/content/homepage");
   redirect("/content/homepage");
@@ -462,6 +476,7 @@ export async function updateLensAction(formData: FormData): Promise<void> {
     }),
   );
 
+  await setFlash("Lens updated");
   refresh("/content/lenses");
   redirect("/content/lenses");
 }
@@ -480,6 +495,7 @@ export async function updatePrincipleAction(formData: FormData): Promise<void> {
     }),
   );
 
+  await setFlash("Principle updated");
   refresh("/content/principles");
   redirect("/content/principles");
 }
@@ -499,6 +515,7 @@ export async function updateDecisionPatternAction(formData: FormData): Promise<v
     }),
   );
 
+  await setFlash("Decision pattern updated");
   refresh("/content/decision-patterns");
   redirect("/content/decision-patterns");
 }
@@ -527,6 +544,7 @@ export async function updateExperienceAction(formData: FormData): Promise<void> 
     }),
   );
 
+  await setFlash("Experience updated");
   refresh("/content/experiences");
   redirect("/content/experiences");
 }
@@ -557,6 +575,7 @@ export async function updateProjectAction(formData: FormData): Promise<void> {
     }),
   );
 
+  await setFlash("Project updated");
   refresh("/content/projects");
   redirect("/content/projects");
 }
@@ -587,6 +606,7 @@ export async function updateCaseStudyAction(formData: FormData): Promise<void> {
     }),
   );
 
+  await setFlash("Case study updated");
   refresh("/content/case-studies");
   redirect("/content/case-studies");
 }
@@ -604,6 +624,7 @@ export async function updateSkillAction(formData: FormData): Promise<void> {
     }),
   );
 
+  await setFlash("Skill updated");
   refresh("/content/skills");
   redirect("/content/skills");
 }
@@ -619,6 +640,7 @@ export async function updateTagAction(formData: FormData): Promise<void> {
     }),
   );
 
+  await setFlash("Tag updated");
   refresh("/content/tags");
   redirect("/content/tags");
 }
@@ -857,6 +879,7 @@ export async function patchTagAction(formData: FormData): Promise<void> {
 export async function deleteLensAction(formData: FormData): Promise<void> {
   const { id } = idInputSchema.parse({ id: text(formData, "id") });
   await deleteLens(id);
+  await setFlash("Lens deleted");
   refresh("/content/lenses");
   redirect("/content/lenses");
 }
@@ -864,6 +887,7 @@ export async function deleteLensAction(formData: FormData): Promise<void> {
 export async function deletePrincipleAction(formData: FormData): Promise<void> {
   const { id } = idInputSchema.parse({ id: text(formData, "id") });
   await deletePrinciple(id);
+  await setFlash("Principle deleted");
   refresh("/content/principles");
   redirect("/content/principles");
 }
@@ -871,6 +895,7 @@ export async function deletePrincipleAction(formData: FormData): Promise<void> {
 export async function deleteDecisionPatternAction(formData: FormData): Promise<void> {
   const { id } = idInputSchema.parse({ id: text(formData, "id") });
   await deleteDecisionPattern(id);
+  await setFlash("Decision pattern deleted");
   refresh("/content/decision-patterns");
   redirect("/content/decision-patterns");
 }
@@ -878,6 +903,7 @@ export async function deleteDecisionPatternAction(formData: FormData): Promise<v
 export async function deleteExperienceAction(formData: FormData): Promise<void> {
   const { id } = idInputSchema.parse({ id: text(formData, "id") });
   await deleteExperience(id);
+  await setFlash("Experience deleted");
   refresh("/content/experiences");
   redirect("/content/experiences");
 }
@@ -885,6 +911,7 @@ export async function deleteExperienceAction(formData: FormData): Promise<void> 
 export async function deleteProjectAction(formData: FormData): Promise<void> {
   const { id } = idInputSchema.parse({ id: text(formData, "id") });
   await deleteProject(id);
+  await setFlash("Project deleted");
   refresh("/content/projects");
   redirect("/content/projects");
 }
@@ -892,6 +919,7 @@ export async function deleteProjectAction(formData: FormData): Promise<void> {
 export async function deleteCaseStudyAction(formData: FormData): Promise<void> {
   const { id } = idInputSchema.parse({ id: text(formData, "id") });
   await deleteCaseStudy(id);
+  await setFlash("Case study deleted");
   refresh("/content/case-studies");
   redirect("/content/case-studies");
 }
@@ -899,6 +927,7 @@ export async function deleteCaseStudyAction(formData: FormData): Promise<void> {
 export async function deleteSkillAction(formData: FormData): Promise<void> {
   const { id } = idInputSchema.parse({ id: text(formData, "id") });
   await deleteSkill(id);
+  await setFlash("Skill deleted");
   refresh("/content/skills");
   redirect("/content/skills");
 }
@@ -916,6 +945,7 @@ export async function deleteSkillsAction(formData: FormData): Promise<void> {
 export async function deleteTagAction(formData: FormData): Promise<void> {
   const { id } = idInputSchema.parse({ id: text(formData, "id") });
   await deleteTag(id);
+  await setFlash("Tag deleted");
   refresh("/content/tags");
   redirect("/content/tags");
 }

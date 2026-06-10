@@ -68,7 +68,7 @@ export function SectionCard({
         description={modalDescription}
         triggerLabel={`Add ${title}`}
         size={modalSize}
-        triggerClassName="flex w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-line bg-white/[0.015] px-4 py-10 text-center text-sm font-medium text-muted transition hover:border-teal-300/50 hover:bg-white/[0.03] hover:text-ink"
+        triggerClassName="flex w-full flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-line bg-white/[0.015] px-4 py-10 text-center text-sm font-medium text-muted transition hover:border-accent-400/50 hover:bg-white/[0.03] hover:text-ink"
         triggerContent={
           <>
             <span className="flex size-9 items-center justify-center rounded-full border border-line bg-white/[0.03] text-muted transition group-hover:text-ink">

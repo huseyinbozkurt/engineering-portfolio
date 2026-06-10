@@ -9,10 +9,7 @@ export default function NotFoundPage() {
         title="Admin page not found"
         description="This content area or record could not be found. It may have been deleted or moved."
         actions={
-          <Link
-            href="/"
-            className="rounded-lg bg-teal-200 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-teal-100"
-          >
+          <Link href="/" className="ui-btn-primary">
             Back to dashboard
           </Link>
         }

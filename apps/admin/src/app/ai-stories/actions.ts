@@ -8,16 +8,20 @@ import {
   AiGeneratedStoryApplyError,
   applyAiGeneratedStory,
   createAiGeneratedStory,
+  deleteAiGeneratedStory,
   restoreAiGeneratedStoryPart,
   rollbackAiGeneratedStory,
   softDeleteAiGeneratedStoryPart,
   updateAiGeneratedStoryPart,
 } from "@portfolio/db/ai-stories";
 
-import { callInsightsLlm } from "@/lib/ai-insights/llm-client";
-import { parseAiGeneratedStory } from "@/lib/ai-stories/parse";
-import { buildAiStoryPrompt } from "@/lib/ai-stories/prompt";
-import { getLlmConnectionStatuses } from "@/lib/llm-config";
+import {
+  getStoryPromptVersion,
+  latestStoryPromptVersion,
+  parseAiGeneratedStory,
+} from "@portfolio/llm";
+
+import { resolveOnlineLlmAdapter } from "@/lib/llm/adapter";
 
 export interface CreateAiStoryActionState {
   status: "idle" | "error" | "success";
@@ -39,10 +43,9 @@ export async function createAiStoryAction(
     };
   }
 
-  const statuses = await getLlmConnectionStatuses();
-  const hasOnlineLlm = statuses.some((status) => status.status === "online");
+  const resolved = await resolveOnlineLlmAdapter();
 
-  if (!hasOnlineLlm) {
+  if (!resolved) {
     return {
       status: "error",
       message: "No LLM connection is online. Check provider configuration and try again.",
@@ -52,17 +55,27 @@ export async function createAiStoryAction(
 
   try {
     const content = await getAdminContentIndex();
-    const prompt = buildAiStoryPrompt(sourceStory, content);
-    const response = await callInsightsLlm(prompt);
-    const generatedContent = parseAiGeneratedStory(response.content);
+    // Stories build their own versioned prompt — fully separate from the AI
+    // insights prompts; only the provider transport (adapter) is shared.
+    const promptVersion = latestStoryPromptVersion;
+    const prompt = getStoryPromptVersion(promptVersion).build(sourceStory, content);
+    const response = await resolved.adapter.generate({
+      systemPrompt: prompt.system,
+      userPrompt: prompt.user,
+      schema: "json",
+    });
+    const generatedContent = parseAiGeneratedStory(response.text);
     const storyId = await createAiGeneratedStory({
       title: generatedContent.title,
       sourcePrompt: sourceStory,
-      providerName: response.provider.name,
-      providerModel: response.provider.model,
+      providerName: resolved.connection.name,
+      providerModel: resolved.connection.model,
+      promptVersion,
+      promptSystem: prompt.system,
+      promptUser: prompt.user,
       generatedContent,
-      rawResponse: response.content,
-      finishReason: response.finishReason,
+      rawResponse: response.text,
+      finishReason: response.finishReason ?? null,
     });
 
     revalidatePath("/");
@@ -137,6 +150,15 @@ export async function rollbackAiStoryAction(formData: FormData): Promise<void> {
   await rollbackAiGeneratedStory(storyId);
   revalidateAiStoryAndContent(storyId);
   redirect(redirectTo);
+}
+
+export async function deleteAiStoryAction(formData: FormData): Promise<void> {
+  const storyId = text(formData, "id");
+
+  await deleteAiGeneratedStory(storyId);
+  revalidatePath("/");
+  revalidatePath("/ai-stories");
+  redirect("/ai-stories");
 }
 
 function text(formData: FormData, key: string): string {

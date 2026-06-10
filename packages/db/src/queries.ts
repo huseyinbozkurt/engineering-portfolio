@@ -953,3 +953,181 @@ export async function getDBAvailability(
 
   return { isDbAvailable: result.ok };
 }
+
+// ---------------------------------------------------------------------------
+// AI insight source. Published records plus bulk relation pairs and per-type
+// draft counts — the raw material the insight pipeline normalizes into the
+// compact PortfolioInsightInput snapshot. Published-only by design: evidence
+// refs derived from this source are always safe to render publicly.
+// ---------------------------------------------------------------------------
+
+export interface InsightRelationPair {
+  left: string;
+  right: string;
+}
+
+export interface PublishedInsightSource {
+  lenses: LensRecord[];
+  principles: PrincipleRecord[];
+  decisionPatterns: DecisionPatternRecord[];
+  experiences: ExperienceRecord[];
+  projects: ProjectRecord[];
+  caseStudies: CaseStudyRecord[];
+  skills: SkillRecord[];
+  tags: TagRecord[];
+  /** Records still in draft per type (aggregate only — titles never leave admin). */
+  draftCounts: {
+    lenses: number;
+    principles: number;
+    decisionPatterns: number;
+    experiences: number;
+    projects: number;
+    caseStudies: number;
+    skills: number;
+    tags: number;
+  };
+  /** Join-table pairs, unfiltered; the normalizer keeps only published⇄published pairs. */
+  relations: {
+    experienceLenses: InsightRelationPair[];
+    experiencePrinciples: InsightRelationPair[];
+    experienceSkills: InsightRelationPair[];
+    experienceTags: InsightRelationPair[];
+    projectLenses: InsightRelationPair[];
+    projectPrinciples: InsightRelationPair[];
+    projectSkills: InsightRelationPair[];
+    projectTags: InsightRelationPair[];
+    caseStudyLenses: InsightRelationPair[];
+    caseStudyPrinciples: InsightRelationPair[];
+    caseStudyExperiences: InsightRelationPair[];
+    caseStudyProjects: InsightRelationPair[];
+    caseStudySkills: InsightRelationPair[];
+    caseStudyTags: InsightRelationPair[];
+    decisionPatternPrinciples: InsightRelationPair[];
+  };
+}
+
+export async function getPublishedInsightSource(): Promise<PublishedInsightSource> {
+  const [
+    index,
+    experienceLensRows,
+    experiencePrincipleRows,
+    experienceSkillRows,
+    experienceTagRows,
+    projectLensRows,
+    projectPrincipleRows,
+    projectSkillRows,
+    projectTagRows,
+    caseStudyLensRows,
+    caseStudyPrincipleRows,
+    caseStudyExperienceRows,
+    caseStudyProjectRows,
+    caseStudySkillRows,
+    caseStudyTagRows,
+    decisionPatternPrincipleRows,
+  ] = await Promise.all([
+    getAdminContentIndex(),
+    readArray((db) => db.select().from(experienceLenses)),
+    readArray((db) => db.select().from(experiencePrinciples)),
+    readArray((db) => db.select().from(experienceSkills)),
+    readArray((db) => db.select().from(experienceTags)),
+    readArray((db) => db.select().from(projectLenses)),
+    readArray((db) => db.select().from(projectPrinciples)),
+    readArray((db) => db.select().from(projectSkills)),
+    readArray((db) => db.select().from(projectTags)),
+    readArray((db) => db.select().from(caseStudyLenses)),
+    readArray((db) => db.select().from(caseStudyPrinciples)),
+    readArray((db) => db.select().from(caseStudyExperiences)),
+    readArray((db) => db.select().from(caseStudyProjects)),
+    readArray((db) => db.select().from(caseStudySkills)),
+    readArray((db) => db.select().from(caseStudyTags)),
+    readArray((db) => db.select().from(decisionPatternPrinciples)),
+  ]);
+
+  const published = <T extends { status: string }>(rows: T[]): T[] =>
+    rows.filter((row) => row.status === "published");
+  const draftCount = (rows: Array<{ status: string }>): number =>
+    rows.filter((row) => row.status === "draft").length;
+
+  return {
+    lenses: published(index.lenses),
+    principles: published(index.principles),
+    decisionPatterns: published(index.decisionPatterns),
+    experiences: published(index.experiences),
+    projects: published(index.projects),
+    caseStudies: published(index.caseStudies),
+    skills: published(index.skills),
+    tags: published(index.tags),
+    draftCounts: {
+      lenses: draftCount(index.lenses),
+      principles: draftCount(index.principles),
+      decisionPatterns: draftCount(index.decisionPatterns),
+      experiences: draftCount(index.experiences),
+      projects: draftCount(index.projects),
+      caseStudies: draftCount(index.caseStudies),
+      skills: draftCount(index.skills),
+      tags: draftCount(index.tags),
+    },
+    relations: {
+      experienceLenses: experienceLensRows.map((row) => ({
+        left: row.experienceId,
+        right: row.lensId,
+      })),
+      experiencePrinciples: experiencePrincipleRows.map((row) => ({
+        left: row.experienceId,
+        right: row.principleId,
+      })),
+      experienceSkills: experienceSkillRows.map((row) => ({
+        left: row.experienceId,
+        right: row.skillId,
+      })),
+      experienceTags: experienceTagRows.map((row) => ({
+        left: row.experienceId,
+        right: row.tagId,
+      })),
+      projectLenses: projectLensRows.map((row) => ({
+        left: row.projectId,
+        right: row.lensId,
+      })),
+      projectPrinciples: projectPrincipleRows.map((row) => ({
+        left: row.projectId,
+        right: row.principleId,
+      })),
+      projectSkills: projectSkillRows.map((row) => ({
+        left: row.projectId,
+        right: row.skillId,
+      })),
+      projectTags: projectTagRows.map((row) => ({
+        left: row.projectId,
+        right: row.tagId,
+      })),
+      caseStudyLenses: caseStudyLensRows.map((row) => ({
+        left: row.caseStudyId,
+        right: row.lensId,
+      })),
+      caseStudyPrinciples: caseStudyPrincipleRows.map((row) => ({
+        left: row.caseStudyId,
+        right: row.principleId,
+      })),
+      caseStudyExperiences: caseStudyExperienceRows.map((row) => ({
+        left: row.caseStudyId,
+        right: row.experienceId,
+      })),
+      caseStudyProjects: caseStudyProjectRows.map((row) => ({
+        left: row.caseStudyId,
+        right: row.projectId,
+      })),
+      caseStudySkills: caseStudySkillRows.map((row) => ({
+        left: row.caseStudyId,
+        right: row.skillId,
+      })),
+      caseStudyTags: caseStudyTagRows.map((row) => ({
+        left: row.caseStudyId,
+        right: row.tagId,
+      })),
+      decisionPatternPrinciples: decisionPatternPrincipleRows.map((row) => ({
+        left: row.decisionPatternId,
+        right: row.principleId,
+      })),
+    },
+  };
+}

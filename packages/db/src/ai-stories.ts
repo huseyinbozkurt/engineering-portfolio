@@ -62,6 +62,9 @@ export interface CreateAiGeneratedStoryInput {
   sourcePrompt: string;
   providerName: string | null;
   providerModel: string | null;
+  promptVersion?: string | null;
+  promptSystem?: string | null;
+  promptUser?: string | null;
   generatedContent: AiGeneratedStoryPayload;
   rawResponse?: string | null;
   finishReason?: string | null;
@@ -123,6 +126,9 @@ export async function createAiGeneratedStory(
       sourcePrompt: input.sourcePrompt,
       providerName: input.providerName,
       providerModel: input.providerModel,
+      promptVersion: input.promptVersion ?? null,
+      promptSystem: input.promptSystem ?? null,
+      promptUser: input.promptUser ?? null,
       generatedContent: input.generatedContent,
       rawResponse: input.rawResponse ?? null,
       finishReason: input.finishReason ?? null,
@@ -288,6 +294,18 @@ export async function rollbackAiGeneratedStory(storyId: string): Promise<void> {
       updatedAt: new Date(),
     })
     .where(eq(aiGeneratedStories.id, storyId));
+}
+
+export async function deleteAiGeneratedStory(storyId: string): Promise<void> {
+  const story = await requiredStory(storyId);
+  const [deleted] = await getDb()
+    .delete(aiGeneratedStories)
+    .where(eq(aiGeneratedStories.id, story.id))
+    .returning({ id: aiGeneratedStories.id });
+
+  if (!deleted) {
+    throw new Error("AI generated story was not found.");
+  }
 }
 
 async function requiredStory(

@@ -107,7 +107,7 @@ export function RichTextField({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-line bg-white/[0.03] transition focus-within:border-teal-300/50 focus-within:ring-2 focus-within:ring-teal-300/15">
+      <div className="overflow-hidden rounded-xl border border-line bg-white/[0.03] transition focus-within:border-accent-400/60 focus-within:ring-2 focus-within:ring-accent-400/20">
         {mode === "write" ? (
           <>
             <div className="flex flex-wrap gap-1 border-b border-line bg-white/[0.02] p-1.5">
@@ -137,7 +137,7 @@ export function RichTextField({
           <>
             {/* Preserve the value for submission while the textarea is unmounted. */}
             <input type="hidden" name={name} value={value} />
-            <div className="min-h-32 px-4 py-3 text-sm leading-6 text-muted [&_a]:text-teal-300 [&_blockquote]:border-l-2 [&_blockquote]:border-line [&_blockquote]:pl-3 [&_code]:rounded [&_code]:bg-white/10 [&_code]:px-1 [&_h2]:mt-3 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-ink [&_h3]:mt-3 [&_h3]:font-semibold [&_h3]:text-ink [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 [&_strong]:text-ink [&_ul]:list-disc [&_ul]:pl-5">
+            <div className="min-h-32 px-4 py-3 text-sm leading-6 text-muted [&_a]:text-accent-300 [&_blockquote]:border-l-2 [&_blockquote]:border-line [&_blockquote]:pl-3 [&_code]:rounded [&_code]:bg-white/10 [&_code]:px-1 [&_h2]:mt-3 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-ink [&_h3]:mt-3 [&_h3]:font-semibold [&_h3]:text-ink [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 [&_strong]:text-ink [&_ul]:list-disc [&_ul]:pl-5">
               {value.trim() ? (
                 <ReactMarkdown>{value}</ReactMarkdown>
               ) : (

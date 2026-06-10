@@ -1,10 +1,11 @@
+import { Plus } from "lucide-react";
+import Link from "next/link";
+
 import { getLenses } from "@portfolio/db/queries";
 
-import { createLensAction } from "@/app/actions";
 import { ContentList } from "@/components/content-list";
-import { LensForm } from "@/components/forms/lens-form";
-import { ModalPanel } from "@/components/modal-panel";
 import { PageTitle } from "@/components/page-title";
+import { formatDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -17,14 +18,9 @@ export default async function LensesPage() {
         title="Lenses"
         description="Create the perspectives visitors can use to explore the engineering work."
         actions={
-          <ModalPanel
-            triggerLabel="Create lens"
-            title="Create lens"
-            description="Add a new lens and confirm before saving it."
-            size="md"
-          >
-            <LensForm action={createLensAction} title="Create lens" submitLabel="Create Lens" />
-          </ModalPanel>
+          <Link href="/content/lenses/new" className="ui-btn-primary">
+            <Plus className="size-4" aria-hidden /> Create lens
+          </Link>
         }
       />
       <ContentList
@@ -35,9 +31,12 @@ export default async function LensesPage() {
           id: lens.id,
           title: lens.name,
           description: lens.summary,
-          meta: lens.slug,
           status: lens.status,
           editHref: `/content/lenses/${lens.id}`,
+          attributes: [
+            { label: "Slug", value: lens.slug },
+            { label: "Updated", value: formatDate(lens.updatedAt) },
+          ],
           ai: {
             contentQualityScore: lens.contentQualityScore,
             lastAiReviewAt: lens.lastAiReviewAt,

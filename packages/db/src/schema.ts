@@ -1,4 +1,5 @@
 import { relations, sql } from "drizzle-orm";
+import type { AiGeneratedStoryPayload } from "@portfolio/validators";
 import {
   boolean,
   date,
@@ -430,39 +431,91 @@ export const llmTasks = pgTable(
   }),
 );
 
-export interface AiGeneratedStoryPart {
-  id: string;
-  kind:
-    | "lens"
-    | "principle"
-    | "decisionPattern"
-    | "experience"
-    | "project"
-    | "caseStudy"
-    | "skill"
-    | "tag";
-  title: string;
-  summary: string;
-  fields: Record<string, unknown>;
-  relations?: Record<string, string[] | string | null>;
-  deletedAt?: string | null;
-  appliedRecordId?: string | null;
+export const aiInsightRunStatusEnum = pgEnum("ai_insight_run_status", [
+  "pending",
+  "running",
+  "succeeded",
+  "failed",
+  "published",
+]);
+
+export type AiInsightRunStatusValue = (typeof aiInsightRunStatusEnum.enumValues)[number];
+
+/** One LLM attempt within a run (retries append entries). Stored as jsonb. */
+export interface AiInsightRunAttempt {
+  attemptNo: number;
+  provider: string;
+  model: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  errorMessage: string | null;
+  usage?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+  } | null;
 }
 
-export interface AiGeneratedLensRenameSuggestion {
-  lensId: string;
-  currentName: string;
-  suggestedName: string;
-  reason: string;
-}
+/**
+ * Evidence-driven AI insight generation runs. Every generation is persisted —
+ * never overwritten — with its full audit trail: the normalized input snapshot,
+ * prompt version, provider metadata, raw + validated output, validation notes,
+ * and token usage. Publishing flips status to 'published'; a partial unique
+ * index guarantees at most one published run, which is what the public site
+ * renders. `outputJson` is typed `unknown` on purpose: readers re-validate with
+ * `portfolioInsightOutputSchema` from @portfolio/validators before rendering.
+ */
+export const aiInsightRuns = pgTable(
+  "ai_insight_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    status: aiInsightRunStatusEnum("status").notNull().default("pending"),
+    provider: varchar("provider", { length: 180 }),
+    model: varchar("model", { length: 220 }),
+    promptVersion: varchar("prompt_version", { length: 40 }).notNull(),
+    promptSystem: text("prompt_system").notNull().default(""),
+    promptUser: text("prompt_user").notNull().default(""),
+    inputSnapshot: jsonb("input_snapshot").$type<unknown>().notNull(),
+    rawResponse: text("raw_response"),
+    outputJson: jsonb("output_json").$type<unknown>(),
+    validationNotes: jsonb("validation_notes").$type<string[]>(),
+    tokenUsage: jsonb("token_usage").$type<{
+      promptTokens?: number;
+      completionTokens?: number;
+      totalTokens?: number;
+    }>(),
+    attempts: jsonb("attempts").$type<AiInsightRunAttempt[]>(),
+    errorStage: varchar("error_stage", { length: 80 }),
+    errorMessage: text("error_message"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    durationMs: integer("duration_ms"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => ({
+    createdAtIdx: index("ai_insight_runs_created_at_idx").on(table.createdAt),
+    statusIdx: index("ai_insight_runs_status_idx").on(table.status),
+    // At most one published run at any time — the public site's source of truth.
+    singlePublishedIdx: uniqueIndex("ai_insight_runs_single_published_idx")
+      .on(table.status)
+      .where(sql`${table.status} = 'published'`),
+    // At most one run per active status. Runs are created as 'running', so this
+    // (plus the app-level getActiveAiInsightRun guard) yields a single active run.
+    singleActiveIdx: uniqueIndex("ai_insight_runs_single_active_idx")
+      .on(table.status)
+      .where(sql`${table.status} in ('pending', 'running')`),
+  }),
+);
 
-export interface AiGeneratedStoryPayload {
-  version: 1;
-  title: string;
-  summary: string;
-  lensRenameSuggestions?: AiGeneratedLensRenameSuggestion[];
-  parts: AiGeneratedStoryPart[];
-}
+// Story content types live in @portfolio/validators (shared with the LLM
+// package); re-exported here so existing `@portfolio/db/schema` imports keep
+// working.
+export type {
+  AiGeneratedLensRenameSuggestion,
+  AiGeneratedStoryPart,
+  AiGeneratedStoryPayload,
+} from "@portfolio/validators";
 
 export const aiGeneratedStories = pgTable(
   "ai_generated_stories",
@@ -473,6 +526,10 @@ export const aiGeneratedStories = pgTable(
     status: aiGeneratedStoryStatusEnum("status").notNull().default("draft"),
     providerName: varchar("provider_name", { length: 180 }),
     providerModel: varchar("provider_model", { length: 220 }),
+    // Prompt audit trail (nullable: stories generated before prompt logging).
+    promptVersion: varchar("prompt_version", { length: 40 }),
+    promptSystem: text("prompt_system"),
+    promptUser: text("prompt_user"),
     generatedContent: jsonb("generated_content").$type<AiGeneratedStoryPayload>().notNull(),
     rawResponse: text("raw_response"),
     finishReason: varchar("finish_reason", { length: 120 }),

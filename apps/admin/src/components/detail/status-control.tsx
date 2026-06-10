@@ -11,8 +11,8 @@ interface StatusControlProps {
 }
 
 const statusDot: Record<string, string> = {
-  published: "bg-teal-300",
-  archived: "bg-amber-300",
+  published: "bg-success-400",
+  archived: "bg-warning-300",
   draft: "bg-white/40",
 };
 

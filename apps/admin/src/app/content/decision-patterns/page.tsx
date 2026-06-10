@@ -1,18 +1,16 @@
-import { getDecisionPatterns, getPrinciples } from "@portfolio/db/queries";
+import { Plus } from "lucide-react";
+import Link from "next/link";
 
-import { createDecisionPatternAction } from "@/app/actions";
+import { getDecisionPatterns } from "@portfolio/db/queries";
+
 import { ContentList } from "@/components/content-list";
-import { DecisionPatternForm } from "@/components/forms/decision-pattern-form";
-import { ModalPanel } from "@/components/modal-panel";
 import { PageTitle } from "@/components/page-title";
+import { formatDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
 export default async function DecisionPatternsPage() {
-  const [decisionPatterns, principles] = await Promise.all([
-    getDecisionPatterns(),
-    getPrinciples(),
-  ]);
+  const decisionPatterns = await getDecisionPatterns();
 
   return (
     <main className="px-5 py-8 lg:px-8">
@@ -20,25 +18,13 @@ export default async function DecisionPatternsPage() {
         title="Decision Patterns"
         description="Capture recurring ways of framing trade-offs and moving from ambiguity to execution."
         actions={
-          <ModalPanel
-            triggerLabel="Create pattern"
-            title="Create decision pattern"
-            description="Add a new decision pattern and confirm before saving it."
-            size="lg"
-          >
-            <DecisionPatternForm
-              action={createDecisionPatternAction}
-              title="Create decision pattern"
-              submitLabel="Create Pattern"
-              principleOptions={principles.map((principle) => ({
-                id: principle.id,
-                label: principle.title,
-              }))}
-            />
-          </ModalPanel>
+          <Link href="/content/decision-patterns/new" className="ui-btn-primary">
+            <Plus className="size-4" aria-hidden /> Create pattern
+          </Link>
         }
       />
       <ContentList
+        primaryLabel="Title"
         title="Existing decision patterns"
         emptyTitle="No decision patterns yet"
         emptyDescription="Decision patterns will appear here after they are created."
@@ -46,9 +32,12 @@ export default async function DecisionPatternsPage() {
           id: pattern.id,
           title: pattern.title,
           description: pattern.summary,
-          meta: pattern.slug,
           status: pattern.status,
           editHref: `/content/decision-patterns/${pattern.id}`,
+          attributes: [
+            { label: "Slug", value: pattern.slug },
+            { label: "Updated", value: formatDate(pattern.updatedAt) },
+          ],
           ai: {
             contentQualityScore: pattern.contentQualityScore,
             lastAiReviewAt: pattern.lastAiReviewAt,

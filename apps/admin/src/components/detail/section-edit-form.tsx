@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { ConfirmedForm } from "@/components/confirmed-form";
 import { SubmitButton } from "@/components/form-controls";
 import type { FormAction } from "@/components/forms/types";
+import { useToast } from "@/components/toast/toast-provider";
 
 interface SectionEditFormProps {
   action: FormAction;
@@ -33,22 +34,16 @@ export function SectionEditForm({
   fields,
   children,
   submitLabel = "Save changes",
-  confirmTitle,
-  confirmDescription,
 }: SectionEditFormProps) {
   const manifest = Array.isArray(fields) ? fields.join(" ") : (fields as string);
+  const { toast } = useToast();
 
   return (
     <ConfirmedForm
       action={action}
       className="grid gap-5"
-      confirmation={{
-        title: confirmTitle ?? "Save this change?",
-        description:
-          confirmDescription ??
-          "Only the fields in this section are updated. Everything else stays as-is.",
-        confirmLabel: submitLabel,
-      }}
+      confirm="off"
+      onSuccess={() => toast({ title: "Changes saved", tone: "success" })}
     >
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="__fields" value={manifest} />

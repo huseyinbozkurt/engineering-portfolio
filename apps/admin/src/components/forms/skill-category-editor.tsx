@@ -69,7 +69,7 @@ export function SkillCategoryEditor({
           type="submit"
           aria-label={`Delete ${groupName} skill group`}
           title={`Delete ${groupName} group`}
-          className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-rose-500/15 hover:text-rose-200"
+          className="inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-danger-500/15 hover:text-danger-200"
         >
           <Trash2 className="size-3.5" aria-hidden />
         </button>

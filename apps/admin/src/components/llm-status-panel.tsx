@@ -17,13 +17,13 @@ export function LlmStatusPanel({ statuses }: LlmStatusPanelProps) {
           </p>
         </div>
         {statuses.length > 0 ? (
-          <span className="rounded-full border border-line bg-white/[0.04] px-3 py-1 text-xs font-medium text-muted">
+          <span className="ui-chip font-medium tabular-nums">
             {onlineCount}/{statuses.length} online
           </span>
         ) : null}
       </div>
       {statuses.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-line bg-white/[0.025] p-5">
+        <div className="rounded-2xl border border-dashed border-line bg-white/[0.025] p-5">
           <h3 className="text-base font-semibold text-ink">No LLM providers configured</h3>
           <p className="mt-2 text-sm leading-6 text-muted">
             Add provider settings to `.env`, such as `LLM_PROVIDERS` and provider API keys, to
@@ -33,10 +33,7 @@ export function LlmStatusPanel({ statuses }: LlmStatusPanelProps) {
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {statuses.map((connection) => (
-            <article
-              key={connection.id}
-              className="rounded-lg border border-line bg-white/[0.03] p-4"
-            >
+            <article key={connection.id} className="ui-card p-4 shadow-card">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-semibold text-ink">{connection.name}</h3>
@@ -78,16 +75,10 @@ function StatusBadge({ status }: { status: LlmConnectionStatus["status"] }) {
   const isOnline = status === "online";
 
   return (
-    <span
-      className={
-        isOnline
-          ? "inline-flex items-center gap-1.5 rounded-full border border-teal-300/30 bg-teal-300/10 px-2 py-0.5 text-xs font-medium text-teal-100"
-          : "inline-flex items-center gap-1.5 rounded-full border border-rose-300/30 bg-rose-500/10 px-2 py-0.5 text-xs font-medium text-rose-100"
-      }
-    >
+    <span className={isOnline ? "ui-badge ui-badge-success" : "ui-badge ui-badge-danger"}>
       <span
         className={
-          isOnline ? "size-1.5 rounded-full bg-teal-200" : "size-1.5 rounded-full bg-rose-200"
+          isOnline ? "size-1.5 rounded-full bg-success-400" : "size-1.5 rounded-full bg-danger-200"
         }
       />
       {isOnline ? "Online" : "Offline"}

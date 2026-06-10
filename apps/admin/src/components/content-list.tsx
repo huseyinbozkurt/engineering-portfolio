@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Search } from "lucide-react";
+import { Pencil, Search } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, type ComponentType } from "react";
 
@@ -22,6 +22,8 @@ export interface ContentListItem {
   status?: string | undefined;
   ai?: ContentAiMeta | undefined;
   editHref?: string | undefined;
+  /** Optional extra table columns (label used for the header, value per row). */
+  attributes?: Array<{ label: string; value: string }> | undefined;
 }
 
 interface ContentListProps<TGroup = unknown> {
@@ -29,6 +31,8 @@ interface ContentListProps<TGroup = unknown> {
   emptyTitle: string;
   emptyDescription: string;
   items: ContentListItem[];
+  /** Header label for the primary (name) column. */
+  primaryLabel?: string;
   /**
    * Optional client component rendered in each group header (e.g. a per-category
    * editor), with its serializable payload looked up by group name. Passing a
@@ -39,38 +43,34 @@ interface ContentListProps<TGroup = unknown> {
   groupActionData?: Record<string, TGroup>;
 }
 
-function statusBadgeClasses(status: string): string {
+function statusBadgeClass(status: string): string {
   switch (status) {
     case "published":
-      return "border-teal-300/30 bg-teal-300/15 text-teal-100";
+      return "ui-badge ui-badge-success";
     case "archived":
-      return "border-amber-200/25 bg-amber-200/10 text-amber-200/90";
+      return "ui-badge ui-badge-warning";
     default:
-      return "border-line bg-white/[0.05] text-muted";
+      return "ui-badge ui-badge-neutral";
   }
 }
-
-const statusDotClasses: Record<string, string> = {
-  published: "bg-teal-300",
-  archived: "bg-amber-300",
-  draft: "bg-white/40",
-};
 
 function formatReviewDate(value: Date): string {
   return value.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 }
 
 /**
- * Filterable list of content records. The filter bar (free-text + status +
- * group facets, all derived from the items) narrows the list client-side, so
+ * Filterable data table of content records. The toolbar (free-text + status +
+ * group facets, all derived from the items) narrows the rows client-side, so
  * every content area becomes searchable without changing the server pages that
- * render it.
+ * render it. Optional `attributes` add extra columns; grouped items render as
+ * sectioned tables that share one column template.
  */
 export function ContentList<TGroup = unknown>({
   title,
   emptyTitle,
   emptyDescription,
   items,
+  primaryLabel = "Name",
   groupActionComponent: GroupAction,
   groupActionData,
 }: ContentListProps<TGroup>) {
@@ -108,13 +108,32 @@ export function ContentList<TGroup = unknown>({
     });
   }, [items, query, statusFilter, groupFilter]);
 
+  // Column shape, derived once from the data so the header and every row align.
+  const attrLabels = useMemo(() => {
+    const sample = items.find((item) => item.attributes && item.attributes.length > 0);
+    return sample?.attributes?.map((attribute) => attribute.label) ?? [];
+  }, [items]);
+  const hasStatus = items.some((item) => item.status);
+  const hasAction = items.some((item) => item.editHref);
+
+  const gridTemplate = [
+    "minmax(0,1.7fr)",
+    ...attrLabels.map(() => "minmax(0,1fr)"),
+    hasStatus ? "minmax(6.5rem,auto)" : null,
+    hasAction ? "2.5rem" : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const minWidth = `${30 + attrLabels.length * 11 + (hasStatus ? 7 : 0)}rem`;
+  const columns = { gridTemplate, minWidth, attrLabels, hasStatus, hasAction, primaryLabel };
+
   const hasGroups = filtered.some((item) => item.group);
   const groupedItems = hasGroups ? groupItems(filtered) : [];
 
   return (
     <section>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-base font-semibold text-ink">{title}</h2>
+        <h2 className="ui-section-title">{title}</h2>
         {items.length > 0 ? (
           <span className="ui-chip tabular-nums">
             {filtered.length} of {items.length}
@@ -126,7 +145,7 @@ export function ContentList<TGroup = unknown>({
         <EmptyPanel title={emptyTitle} description={emptyDescription} />
       ) : (
         <>
-          <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="ui-toolbar mb-4">
             <div className="relative min-w-[14rem] flex-1">
               <Search
                 aria-hidden
@@ -162,16 +181,16 @@ export function ContentList<TGroup = unknown>({
           </div>
 
           {filtered.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-line bg-white/[0.02] p-8 text-center text-sm text-muted">
+            <div className="rounded-2xl border border-dashed border-line bg-white/[0.02] p-10 text-center text-sm text-muted">
               No records match the current filters.
             </div>
           ) : hasGroups ? (
-            <div className="grid gap-5">
+            <div className="grid gap-4">
               {groupedItems.map((group) => {
                 const groupData = groupActionData?.[group.name];
 
                 return (
-                  <div key={group.name} className="ui-card overflow-hidden">
+                  <div key={group.name} className="ui-card overflow-hidden shadow-card">
                     <div className="flex items-center justify-between gap-3 border-b border-line bg-white/[0.02] px-4 py-3">
                       <h3 className="text-sm font-semibold text-ink">{group.name}</h3>
                       <div className="flex items-center gap-2">
@@ -181,25 +200,131 @@ export function ContentList<TGroup = unknown>({
                         ) : null}
                       </div>
                     </div>
-                    <div className="divide-y divide-line">
-                      {group.items.map((item) => (
-                        <ContentListArticle key={item.id} item={item} />
-                      ))}
-                    </div>
+                    <ContentTable items={group.items} columns={columns} />
                   </div>
                 );
               })}
             </div>
           ) : (
-            <div className="ui-card divide-y divide-line overflow-hidden">
-              {filtered.map((item) => (
-                <ContentListArticle key={item.id} item={item} />
-              ))}
+            <div className="ui-card overflow-hidden shadow-card">
+              <ContentTable items={filtered} columns={columns} />
             </div>
           )}
         </>
       )}
     </section>
+  );
+}
+
+interface TableColumns {
+  gridTemplate: string;
+  minWidth: string;
+  attrLabels: string[];
+  hasStatus: boolean;
+  hasAction: boolean;
+  primaryLabel: string;
+}
+
+function ContentTable({ items, columns }: { items: ContentListItem[]; columns: TableColumns }) {
+  return (
+    <div className="overflow-x-auto">
+      <div style={{ minWidth: columns.minWidth }}>
+        <div
+          className="ui-table-head grid items-center gap-x-4 border-b border-line bg-white/[0.015] px-4 py-2.5"
+          style={{ gridTemplateColumns: columns.gridTemplate }}
+          role="row"
+        >
+          <span>{columns.primaryLabel}</span>
+          {columns.attrLabels.map((label) => (
+            <span key={label}>{label}</span>
+          ))}
+          {columns.hasStatus ? <span>Status</span> : null}
+          {columns.hasAction ? <span className="sr-only">Actions</span> : null}
+        </div>
+        <div className="divide-y divide-line">
+          {items.map((item) => (
+            <ContentRow key={item.id} item={item} columns={columns} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ContentRow({ item, columns }: { item: ContentListItem; columns: TableColumns }) {
+  const rowInner = (
+    <div
+      className="grid items-center gap-x-4 px-4 py-3.5"
+      style={{ gridTemplateColumns: columns.gridTemplate }}
+    >
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="truncate text-sm font-semibold text-ink">{item.title}</h3>
+          {item.meta ? (
+            <span className="rounded-md border border-line bg-white/[0.03] px-1.5 py-0.5 text-[11px] text-muted">
+              {item.meta}
+            </span>
+          ) : null}
+        </div>
+        {item.description?.trim() ? (
+          <p className="mt-0.5 line-clamp-1 text-xs leading-5 text-muted">{item.description}</p>
+        ) : null}
+      </div>
+      {(item.attributes ?? columns.attrLabels.map((label) => ({ label, value: "" }))).map(
+        (attribute, index) => (
+          <div key={attribute.label || index} className="min-w-0 text-sm text-muted">
+            <span className="truncate">{attribute.value || "—"}</span>
+          </div>
+        ),
+      )}
+      {columns.hasStatus ? (
+        <div>
+          {item.status ? (
+            <span className={`${statusBadgeClass(item.status)} capitalize`}>{item.status}</span>
+          ) : null}
+        </div>
+      ) : null}
+      {columns.hasAction ? (
+        <div className="flex items-center justify-end">
+          {item.editHref ? (
+            <span className="flex size-8 items-center justify-center rounded-lg border border-line bg-white/[0.03] text-muted transition group-hover:border-accent-400/40 group-hover:text-ink">
+              <Pencil aria-hidden className="size-3.5" />
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+
+  return (
+    <article className="ui-row bg-white/[0.005]">
+      {item.editHref ? (
+        <Link href={item.editHref} className="group block">
+          {rowInner}
+        </Link>
+      ) : (
+        rowInner
+      )}
+      {item.ai ? (
+        <dl className="mx-4 mb-3.5 grid gap-1 rounded-xl border border-line bg-white/[0.02] p-3 text-xs text-muted">
+          <p className="ui-eyebrow">AI metadata · read-only</p>
+          <div className="flex items-center justify-between gap-3">
+            <dt className="font-medium text-ink/80">Quality score</dt>
+            <dd className="tabular-nums">{item.ai.contentQualityScore ?? "—"}</dd>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <dt className="font-medium text-ink/80">Last AI review</dt>
+            <dd>
+              {item.ai.lastAiReviewAt ? formatReviewDate(item.ai.lastAiReviewAt) : "Not yet reviewed"}
+            </dd>
+          </div>
+          <div>
+            <dt className="font-medium text-ink/80">AI summary</dt>
+            <dd className="mt-1 leading-5">{item.ai.aiSummary ?? "No AI summary generated yet."}</dd>
+          </div>
+        </dl>
+      ) : null}
+    </article>
   );
 }
 
@@ -230,78 +355,6 @@ function FilterSelect({
         </option>
       ))}
     </select>
-  );
-}
-
-function ContentListArticle({ item }: { item: ContentListItem }) {
-  const header = (
-    <div className="flex items-start gap-3">
-      {item.status ? (
-        <span
-          aria-hidden
-          className={`mt-1.5 size-2 shrink-0 rounded-full ${statusDotClasses[item.status] ?? statusDotClasses.draft}`}
-        />
-      ) : null}
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-sm font-semibold text-ink">{item.title}</h3>
-          {item.status ? (
-            <span
-              className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${statusBadgeClasses(item.status)}`}
-            >
-              {item.status}
-            </span>
-          ) : null}
-          {item.meta ? <span className="text-xs text-amber-200">{item.meta}</span> : null}
-        </div>
-        <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted">
-          {item.description || "Content coming soon."}
-        </p>
-      </div>
-      {item.editHref ? (
-        <ChevronRight
-          aria-hidden
-          className="mt-1 size-4 shrink-0 text-muted/50 transition group-hover:translate-x-0.5 group-hover:text-ink"
-        />
-      ) : null}
-    </div>
-  );
-
-  return (
-    <article className="bg-white/[0.01] transition hover:bg-white/[0.035]">
-      {item.editHref ? (
-        <Link href={item.editHref} className="group block px-4 py-3.5">
-          {header}
-        </Link>
-      ) : (
-        <div className="px-4 py-3.5">{header}</div>
-      )}
-      {item.ai ? (
-        <dl className="mx-4 mb-3.5 grid gap-1 rounded-xl border border-line bg-white/[0.02] p-3 text-xs text-muted">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted/60">
-            AI metadata · read-only
-          </p>
-          <div className="flex items-center justify-between gap-3">
-            <dt className="font-medium text-ink/80">Quality score</dt>
-            <dd className="tabular-nums">{item.ai.contentQualityScore ?? "—"}</dd>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <dt className="font-medium text-ink/80">Last AI review</dt>
-            <dd>
-              {item.ai.lastAiReviewAt
-                ? formatReviewDate(item.ai.lastAiReviewAt)
-                : "Not yet reviewed"}
-            </dd>
-          </div>
-          <div>
-            <dt className="font-medium text-ink/80">AI summary</dt>
-            <dd className="mt-1 leading-5">
-              {item.ai.aiSummary ?? "No AI summary generated yet."}
-            </dd>
-          </div>
-        </dl>
-      ) : null}
-    </article>
   );
 }
 

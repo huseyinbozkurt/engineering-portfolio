@@ -29,7 +29,7 @@ interface BulkSkillsFormProps {
 
 /** Compact cell input, denser than the standard `ui-input` to fit the grid. */
 const CELL =
-  "w-full min-w-0 rounded-lg border border-line bg-white/[0.03] px-2.5 py-1.5 text-sm text-ink outline-none transition placeholder:text-muted/50 focus:border-teal-300/50 focus:bg-white/[0.05] focus:ring-2 focus:ring-teal-300/15";
+  "w-full min-w-0 rounded-lg border border-line bg-white/[0.03] px-2.5 py-1.5 text-sm text-ink outline-none transition placeholder:text-muted/50 focus:border-accent-400/60 focus:bg-white/[0.05] focus:ring-2 focus:ring-accent-400/20";
 
 /** Shared 7-column template so the header and every row line up. */
 const GRID =
@@ -203,7 +203,7 @@ export function BulkSkillsForm({
                 aria-label={`Remove ${row.name || "row"}`}
                 title="Remove row"
                 onClick={() => removeRow(row.key)}
-                className="flex size-7 items-center justify-center rounded-lg text-muted transition hover:bg-rose-500/15 hover:text-rose-200"
+                className="flex size-7 items-center justify-center rounded-lg text-muted transition hover:bg-danger-500/15 hover:text-danger-200"
               >
                 <Trash2 className="size-4" aria-hidden />
               </button>
@@ -218,7 +218,7 @@ export function BulkSkillsForm({
         </button>
         <span className="text-xs tabular-nums">
           {filledCount === 0 ? (
-            <span className="text-amber-200/90">Add at least one named skill to save</span>
+            <span className="text-warning-200/90">Add at least one named skill to save</span>
           ) : (
             <span className="text-muted">
               {filledCount} skill{filledCount === 1 ? "" : "s"}

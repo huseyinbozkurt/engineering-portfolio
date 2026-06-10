@@ -25,8 +25,8 @@ export function AiStoryPartCard({ storyId, part, disabled }: AiStoryPartCardProp
     <article
       className={
         isDeleted
-          ? "rounded-lg border border-dashed border-amber-200/30 bg-amber-200/[0.04] p-4 opacity-65"
-          : "rounded-lg border border-line bg-white/[0.03] p-4"
+          ? "rounded-2xl border border-dashed border-warning-200/30 bg-warning-200/[0.04] p-4 opacity-65"
+          : "ui-card p-4 shadow-card"
       }
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -36,12 +36,12 @@ export function AiStoryPartCard({ storyId, part, disabled }: AiStoryPartCardProp
               {part.kind}
             </span>
             {isDeleted ? (
-              <span className="rounded-full border border-amber-200/30 bg-amber-200/10 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-amber-100">
+              <span className="rounded-full border border-warning-200/30 bg-warning-200/10 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-warning-100">
                 Deleted
               </span>
             ) : null}
             {part.appliedRecordId ? (
-              <span className="rounded-full border border-teal-300/30 bg-teal-300/10 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-teal-100">
+              <span className="rounded-full border border-success-400/30 bg-success-400/10 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-success-100">
                 Applied
               </span>
             ) : null}
@@ -91,10 +91,7 @@ export function AiStoryPartCard({ storyId, part, disabled }: AiStoryPartCardProp
                 defaultValue={JSON.stringify(part.relations ?? {}, null, 2)}
                 required
               />
-              <button
-                type="submit"
-                className="rounded-lg bg-teal-200 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-teal-100"
-              >
+              <button type="submit" className="ui-btn-primary">
                 Save part
               </button>
             </ConfirmedForm>
@@ -157,8 +154,8 @@ function IconButton({
       title={label}
       className={
         danger
-          ? "inline-flex size-9 items-center justify-center rounded-lg border border-rose-300/40 bg-rose-500/10 text-rose-100 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-40"
-          : "inline-flex size-9 items-center justify-center rounded-lg border border-line bg-white/[0.04] text-ink transition hover:border-teal-300/50 hover:bg-white/[0.07] disabled:cursor-not-allowed disabled:opacity-40"
+          ? "inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-danger-300/40 bg-danger-500/10 text-danger-100 transition hover:bg-danger-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+          : "ui-btn-icon"
       }
     >
       {children}

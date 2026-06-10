@@ -3,11 +3,13 @@ import { Undo2 } from "lucide-react";
 
 import { getAiGeneratedStories, type AiGeneratedStoryRecord } from "@portfolio/db/ai-stories";
 
-import { rollbackAiStoryAction } from "@/app/ai-stories/actions";
+import { deleteAiStoryAction, rollbackAiStoryAction } from "@/app/ai-stories/actions";
 import { ConfirmedForm } from "@/components/confirmed-form";
 import { CreateWithAiModal } from "@/components/create-with-ai-modal";
+import { DeleteForm } from "@/components/delete-form";
 import { EmptyPanel } from "@/components/empty-panel";
 import { PageTitle } from "@/components/page-title";
+import { TestLlmButton } from "@/components/test-llm-button";
 import { getLlmConnectionStatuses } from "@/lib/llm-config";
 
 export const dynamic = "force-dynamic";
@@ -36,12 +38,13 @@ export default async function AiStoriesPage() {
       <PageTitle
         title="AI Stories"
         description="Review LLM-generated portfolio stories before they become published content. Draft parts can be edited, soft-deleted, recreated, and then applied together."
-        actions={
-          <CreateWithAiModal
-            canCreate={onlineLlmCount > 0}
-            disabledReason={createWithAiDisabledReason}
+        actions={<>
+            <TestLlmButton disabled={!Boolean(onlineLlmCount > 0)} />
+            <CreateWithAiModal
+              canCreate={onlineLlmCount > 0}
+              disabledReason={createWithAiDisabledReason}
           />
-        }
+        </>}
       />
 
       {storyResult.error ? (
@@ -70,10 +73,7 @@ export default async function AiStoriesPage() {
               const deletedParts = story.generatedContent.parts.length - activePartCount;
 
               return (
-                <article
-                  key={story.id}
-                  className="rounded-lg border border-line bg-white/[0.025] p-5"
-                >
+                <article key={story.id} className="ui-card p-5 shadow-card">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
@@ -88,12 +88,19 @@ export default async function AiStoriesPage() {
                       {story.status === "applied" ? (
                         <RollbackStoryForm storyId={story.id} redirectTo="/ai-stories" />
                       ) : null}
-                      <Link
-                        className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-ink transition hover:border-teal-300/50 hover:bg-white/[0.06]"
-                        href={`/ai-stories/${story.id}`}
-                      >
+                      <Link className="ui-btn-outline" href={`/ai-stories/${story.id}`}>
                         Review story
                       </Link>
+                      <DeleteForm
+                        action={deleteAiStoryAction}
+                        id={story.id}
+                        label="Delete"
+                        confirmMessage={
+                          story.status === "applied"
+                            ? "Delete this AI story permanently? Published portfolio content will remain."
+                            : "Delete this AI story permanently? This cannot be undone."
+                        }
+                      />
                     </div>
                   </div>
 
@@ -130,7 +137,7 @@ function RollbackStoryForm({ storyId, redirectTo }: { storyId: string; redirectT
       <input type="hidden" name="redirectTo" value={redirectTo} />
       <button
         type="submit"
-        className="inline-flex items-center gap-2 rounded-lg border border-amber-200/40 bg-amber-200/10 px-3 py-1.5 text-sm font-medium text-amber-100 transition hover:bg-amber-200/20"
+        className="inline-flex items-center gap-2 rounded-lg border border-warning-200/40 bg-warning-200/10 px-3 py-1.5 text-sm font-medium text-warning-100 transition hover:bg-warning-200/20"
       >
         <Undo2 className="size-4" aria-hidden="true" />
         Rollback
@@ -152,8 +159,8 @@ async function readStories(): Promise<{
 
 function MetricCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-line bg-white/[0.03] p-5">
-      <p className="text-3xl font-semibold text-ink">{value}</p>
+    <div className="ui-card p-5 shadow-card">
+      <p className="text-3xl font-semibold tabular-nums text-ink">{value}</p>
       <p className="mt-2 text-sm text-muted">{label}</p>
     </div>
   );
@@ -161,7 +168,7 @@ function MetricCard({ label, value }: { label: string; value: number }) {
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-line bg-white/[0.025] p-3">
+    <div className="rounded-xl border border-line bg-white/[0.02] p-3">
       <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
       <p className="mt-1 break-words text-sm font-medium text-ink">{value}</p>
     </div>
@@ -169,18 +176,14 @@ function Detail({ label, value }: { label: string; value: string }) {
 }
 
 function StatusBadge({ status }: { status: AiGeneratedStoryRecord["status"] }) {
-  const className =
+  const tone =
     status === "applied"
-      ? "border-teal-300/30 bg-teal-300/10 text-teal-100"
+      ? "ui-badge-success"
       : status === "failed"
-        ? "border-rose-300/30 bg-rose-500/10 text-rose-100"
-        : "border-amber-200/30 bg-amber-200/10 text-amber-100";
+        ? "ui-badge-danger"
+        : "ui-badge-warning";
 
-  return (
-    <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${className}`}>
-      {status}
-    </span>
-  );
+  return <span className={`ui-badge capitalize ${tone}`}>{status}</span>;
 }
 
 function formatDate(value: Date): string {

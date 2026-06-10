@@ -2,7 +2,6 @@ import { getAdminContentIndex, getHomepageSettings } from "@portfolio/db/queries
 
 import { upsertHomepageSettingsAction } from "@/app/actions";
 import { HomepageSettingsForm } from "@/components/forms/homepage-settings-form";
-import { PageTitle } from "@/components/page-title";
 
 export const dynamic = "force-dynamic";
 
@@ -13,11 +12,7 @@ export default async function HomepageSettingsPage() {
   ]);
 
   return (
-    <main className="min-w-0 px-5 py-8 lg:px-8">
-      <PageTitle
-        title="Homepage"
-        description="Configure the public homepage hero, code panel, metrics, and featured records."
-      />
+    <main className="min-w-0">
       <HomepageSettingsForm
         action={upsertHomepageSettingsAction}
         defaults={settings}

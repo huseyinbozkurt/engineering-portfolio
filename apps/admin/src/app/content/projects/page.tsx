@@ -1,10 +1,11 @@
+import { Plus } from "lucide-react";
+import Link from "next/link";
+
 import { getAdminContentIndex } from "@portfolio/db/queries";
 
-import { createProjectAction } from "@/app/actions";
 import { ContentList } from "@/components/content-list";
-import { ProjectForm } from "@/components/forms/project-form";
-import { ModalPanel } from "@/components/modal-panel";
 import { PageTitle } from "@/components/page-title";
+import { formatDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -17,37 +18,9 @@ export default async function ProjectsPage() {
         title="Projects"
         description="Projects can be prepared as drafts, published publicly, and related to a position, lenses, principles, skills, and tags."
         actions={
-          <ModalPanel
-            triggerLabel="Create project"
-            title="Create project"
-            description="Add a new project and confirm before saving it."
-            size="lg"
-          >
-            <ProjectForm
-              action={createProjectAction}
-              title="Create project"
-              submitLabel="Create Project"
-              experienceOptions={content.experiences.map((experience) => ({
-                id: experience.id,
-                label: `${experience.role} at ${experience.company}`,
-              }))}
-              lensOptions={content.lenses.map((lens) => ({ id: lens.id, label: lens.name }))}
-              principleOptions={content.principles.map((principle) => ({
-                id: principle.id,
-                label: principle.title,
-              }))}
-              skillOptions={content.skills.map((skill) => ({
-                id: skill.id,
-                label: skill.name,
-                category: skill.category,
-              }))}
-              tagOptions={content.tags.map((tag) => ({
-                id: tag.id,
-                label: tag.name,
-                category: tag.category,
-              }))}
-            />
-          </ModalPanel>
+          <Link href="/content/projects/new" className="ui-btn-primary">
+            <Plus className="size-4" aria-hidden /> Create project
+          </Link>
         }
       />
       <ContentList
@@ -60,6 +33,10 @@ export default async function ProjectsPage() {
           description: project.description,
           status: project.status,
           editHref: `/content/projects/${project.id}`,
+          attributes: [
+            { label: "Slug", value: project.slug },
+            { label: "Updated", value: formatDate(project.updatedAt) },
+          ],
           ai: {
             contentQualityScore: project.contentQualityScore,
             lastAiReviewAt: project.lastAiReviewAt,

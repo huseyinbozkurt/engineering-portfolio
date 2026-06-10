@@ -5,6 +5,7 @@ interface FieldProps {
   placeholder?: string;
   type?: "text" | "number" | "url" | "date" | "email";
   defaultValue?: string | undefined;
+  hint?: string | undefined;
 }
 
 interface TextAreaProps {
@@ -14,6 +15,7 @@ interface TextAreaProps {
   rows?: number;
   placeholder?: string;
   defaultValue?: string | undefined;
+  hint?: string | undefined;
 }
 
 interface SelectProps {
@@ -21,6 +23,7 @@ interface SelectProps {
   name: string;
   options: Array<{ label: string; value: string }>;
   defaultValue?: string;
+  hint?: string | undefined;
 }
 
 interface CheckboxGroupProps {
@@ -31,6 +34,20 @@ interface CheckboxGroupProps {
   selectedIds?: readonly string[] | undefined;
 }
 
+/** Shared label, with a required marker and optional helper text. */
+function FieldLabel({ label, required }: { label: string; required?: boolean }) {
+  return (
+    <span className="ui-label">
+      {label}
+      {required ? (
+        <span className="ui-required" aria-hidden>
+          *
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 export function Field({
   label,
   name,
@@ -38,10 +55,11 @@ export function Field({
   placeholder,
   type = "text",
   defaultValue,
+  hint,
 }: FieldProps) {
   return (
-    <label className="grid min-w-0 gap-2">
-      <span className="ui-label">{label}</span>
+    <label className="ui-field">
+      <FieldLabel label={label} required={required} />
       <input
         className="ui-input"
         name={name}
@@ -50,6 +68,7 @@ export function Field({
         type={type}
         defaultValue={defaultValue}
       />
+      {hint ? <span className="ui-hint">{hint}</span> : null}
     </label>
   );
 }
@@ -61,10 +80,11 @@ export function TextArea({
   rows = 5,
   placeholder,
   defaultValue,
+  hint,
 }: TextAreaProps) {
   return (
-    <label className="grid min-w-0 gap-2">
-      <span className="ui-label">{label}</span>
+    <label className="ui-field">
+      <FieldLabel label={label} required={required} />
       <textarea
         className="ui-input leading-6"
         name={name}
@@ -73,14 +93,15 @@ export function TextArea({
         rows={rows}
         defaultValue={defaultValue}
       />
+      {hint ? <span className="ui-hint">{hint}</span> : null}
     </label>
   );
 }
 
-export function SelectField({ label, name, options, defaultValue }: SelectProps) {
+export function SelectField({ label, name, options, defaultValue, hint }: SelectProps) {
   return (
-    <label className="grid min-w-0 gap-2">
-      <span className="ui-label">{label}</span>
+    <label className="ui-field">
+      <FieldLabel label={label} />
       <select className="ui-select" name={name} defaultValue={defaultValue}>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -88,10 +109,16 @@ export function SelectField({ label, name, options, defaultValue }: SelectProps)
           </option>
         ))}
       </select>
+      {hint ? <span className="ui-hint">{hint}</span> : null}
     </label>
   );
 }
 
+/**
+ * Standalone boolean control, rendered as a toggle switch (the underlying
+ * element is still a native `input[type=checkbox]`, so form submission and the
+ * `name`/`defaultChecked` contract are unchanged).
+ */
 export function Checkbox({
   label,
   name,
@@ -102,14 +129,12 @@ export function Checkbox({
   defaultChecked?: boolean;
 }) {
   return (
-    <label className="flex min-w-0 items-center gap-2 text-sm text-muted">
-      <input
-        className="size-4 shrink-0 rounded border-line bg-white/[0.05] accent-teal-300"
-        name={name}
-        type="checkbox"
-        defaultChecked={defaultChecked}
-      />
-      <span className="min-w-0 break-words">{label}</span>
+    <label className="flex min-w-0 cursor-pointer items-center justify-between gap-3 rounded-xl border border-line bg-white/[0.02] px-3.5 py-2.5">
+      <span className="min-w-0 break-words text-sm font-medium text-ink">{label}</span>
+      <span className="ui-switch">
+        <input name={name} type="checkbox" defaultChecked={defaultChecked} />
+        <span />
+      </span>
     </label>
   );
 }
@@ -126,28 +151,23 @@ export function CheckboxGroup({
   const groupedOptions = hasCategories ? groupOptionsByCategory(options) : [];
 
   return (
-    <fieldset className="ui-card min-w-0 p-4">
-      <legend className="px-1 text-sm font-medium text-ink">{label}</legend>
+    <fieldset className="ui-fieldset">
+      <legend className="ui-legend">{label}</legend>
       {options.length === 0 ? (
-        <p className="mt-2 text-sm text-muted">{emptyLabel}</p>
+        <p className="text-sm text-muted">{emptyLabel}</p>
       ) : hasCategories ? (
-        <div className="mt-3 grid gap-4">
+        <div className="grid gap-4">
           {groupedOptions.map((group) => (
             <div key={group.name} className="grid min-w-0 gap-2">
               <div className="flex items-center justify-between gap-3 border-b border-line pb-1.5">
-                <p className="min-w-0 break-words text-xs font-semibold uppercase tracking-wide text-amber-200/90">
-                  {group.name}
-                </p>
-                <span className="text-xs text-muted">{group.options.length}</span>
+                <p className="ui-eyebrow min-w-0 break-words">{group.name}</p>
+                <span className="text-xs tabular-nums text-muted/70">{group.options.length}</span>
               </div>
-              <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+              <div className="grid min-w-0 gap-1.5 sm:grid-cols-2">
                 {group.options.map((option) => (
-                  <label
-                    key={option.id}
-                    className="flex min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-muted transition hover:bg-white/[0.03]"
-                  >
+                  <label key={option.id} className="ui-option">
                     <input
-                      className="size-4 shrink-0 rounded border-line bg-white/[0.05] accent-teal-300"
+                      className="ui-checkbox"
                       name={name}
                       type="checkbox"
                       value={option.id}
@@ -161,14 +181,11 @@ export function CheckboxGroup({
           ))}
         </div>
       ) : (
-        <div className="mt-3 grid min-w-0 gap-2 sm:grid-cols-2">
+        <div className="grid min-w-0 gap-1.5 sm:grid-cols-2">
           {options.map((option) => (
-            <label
-              key={option.id}
-              className="flex min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-muted transition hover:bg-white/[0.03]"
-            >
+            <label key={option.id} className="ui-option">
               <input
-                className="size-4 shrink-0 rounded border-line bg-white/[0.05] accent-teal-300"
+                className="ui-checkbox"
                 name={name}
                 type="checkbox"
                 value={option.id}
@@ -234,12 +251,19 @@ export interface SeoDefaults {
 
 /**
  * Optional SEO / Open Graph overrides. All three submit empty strings when left
- * blank; the validators coerce those to null so nothing is persisted.
+ * blank; the validators coerce those to null so nothing is persisted. Pass
+ * `bare` to emit just the fields (no fieldset chrome) when the caller already
+ * provides a grouping container such as a FormDisclosure.
  */
-export function SeoFields({ defaults }: { defaults?: SeoDefaults | undefined }) {
-  return (
-    <fieldset className="ui-card grid gap-4 p-4">
-      <legend className="px-1 text-sm font-medium text-ink">SEO &amp; social</legend>
+export function SeoFields({
+  defaults,
+  bare = false,
+}: {
+  defaults?: SeoDefaults | undefined;
+  bare?: boolean;
+}) {
+  const fields = (
+    <>
       <Field
         label="SEO title"
         name="seoTitle"
@@ -260,6 +284,17 @@ export function SeoFields({ defaults }: { defaults?: SeoDefaults | undefined }) 
         placeholder="https://…"
         defaultValue={defaults?.ogImage ?? undefined}
       />
+    </>
+  );
+
+  if (bare) {
+    return fields;
+  }
+
+  return (
+    <fieldset className="ui-fieldset gap-4">
+      <legend className="ui-legend">SEO &amp; social</legend>
+      {fields}
     </fieldset>
   );
 }

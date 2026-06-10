@@ -1,10 +1,11 @@
+import { Plus } from "lucide-react";
+import Link from "next/link";
+
 import { getAdminContentIndex } from "@portfolio/db/queries";
 
-import { createCaseStudyAction } from "@/app/actions";
 import { ContentList } from "@/components/content-list";
-import { CaseStudyForm } from "@/components/forms/case-study-form";
-import { ModalPanel } from "@/components/modal-panel";
 import { PageTitle } from "@/components/page-title";
+import { formatDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -17,44 +18,13 @@ export default async function CaseStudiesPage() {
         title="Case Studies"
         description="Case studies are the primary content type and connect work to lenses, principles, experience, projects, skills, and tags."
         actions={
-          <ModalPanel
-            triggerLabel="Create case study"
-            title="Create case study"
-            description="Add a new case study and confirm before saving it."
-            size="xl"
-          >
-            <CaseStudyForm
-              action={createCaseStudyAction}
-              title="Create case study"
-              submitLabel="Create Case Study"
-              lensOptions={content.lenses.map((lens) => ({ id: lens.id, label: lens.name }))}
-              principleOptions={content.principles.map((principle) => ({
-                id: principle.id,
-                label: principle.title,
-              }))}
-              experienceOptions={content.experiences.map((experience) => ({
-                id: experience.id,
-                label: `${experience.role} at ${experience.company}`,
-              }))}
-              projectOptions={content.projects.map((project) => ({
-                id: project.id,
-                label: project.name,
-              }))}
-              skillOptions={content.skills.map((skill) => ({
-                id: skill.id,
-                label: skill.name,
-                category: skill.category,
-              }))}
-              tagOptions={content.tags.map((tag) => ({
-                id: tag.id,
-                label: tag.name,
-                category: tag.category,
-              }))}
-            />
-          </ModalPanel>
+          <Link href="/content/case-studies/new" className="ui-btn-primary">
+            <Plus className="size-4" aria-hidden /> Create case study
+          </Link>
         }
       />
       <ContentList
+        primaryLabel="Title"
         title="Existing case studies"
         emptyTitle="No case studies yet"
         emptyDescription="Case studies will appear here after real content is created."
@@ -64,6 +34,10 @@ export default async function CaseStudiesPage() {
           description: caseStudy.excerpt,
           status: caseStudy.status,
           editHref: `/content/case-studies/${caseStudy.id}`,
+          attributes: [
+            { label: "Slug", value: caseStudy.slug },
+            { label: "Updated", value: formatDate(caseStudy.updatedAt) },
+          ],
           ai: {
             contentQualityScore: caseStudy.contentQualityScore,
             lastAiReviewAt: caseStudy.lastAiReviewAt,

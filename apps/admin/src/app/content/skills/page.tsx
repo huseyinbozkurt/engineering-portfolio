@@ -10,6 +10,7 @@ import {
 import { SkillForm } from "@/components/forms/skill-form";
 import { ModalPanel } from "@/components/modal-panel";
 import { PageTitle } from "@/components/page-title";
+import { formatDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -58,7 +59,7 @@ export default async function SkillsPage() {
             <ModalPanel
               triggerLabel="Create skill"
               title="Create skill"
-              description="Add a new skill and confirm before saving it."
+              description="Quick-add a skill to the library."
               size="sm"
             >
               <SkillForm action={createSkillAction} title="Create skill" submitLabel="Create Skill" />
@@ -89,10 +90,13 @@ export default async function SkillsPage() {
           id: skill.id,
           title: skill.name,
           description: skill.summary,
-          meta: skill.slug,
           group: skill.category,
           status: skill.status,
           editHref: `/content/skills/${skill.id}`,
+          attributes: [
+            { label: "Slug", value: skill.slug },
+            { label: "Updated", value: formatDate(skill.updatedAt) },
+          ],
           ai: {
             contentQualityScore: skill.contentQualityScore,
             lastAiReviewAt: skill.lastAiReviewAt,

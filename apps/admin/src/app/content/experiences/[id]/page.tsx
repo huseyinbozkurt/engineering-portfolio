@@ -13,6 +13,7 @@ import { SettingsModal } from "@/components/detail/settings-modal";
 import { Checkbox, CheckboxGroup, Field, SeoFields, TextArea } from "@/components/form-controls";
 import { RichTextField } from "@/components/forms/rich-text-field";
 import { ModalPanel } from "@/components/modal-panel";
+import { siblingLinks } from "@/lib/detail-nav";
 import { publicHrefs } from "@/lib/public-site";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,11 @@ export default async function EditExperiencePage({ params }: EditPageProps) {
   if (!experience) {
     notFound();
   }
+
+  const siblings = siblingLinks(content.experiences, experience.id, (item) => ({
+    href: `/content/experiences/${item.id}`,
+    label: `${item.role} at ${item.company}`,
+  }));
 
   const lensName = new Map(content.lenses.map((lens) => [lens.id, lens.name]));
   const principleName = new Map(content.principles.map((p) => [p.id, p.title]));
@@ -187,6 +193,8 @@ export default async function EditExperiencePage({ params }: EditPageProps) {
         backLabel="All experience"
         eyebrow="Experience"
         title={experience.role}
+        prev={siblings.prev}
+        next={siblings.next}
         id={experience.id}
         status={experience.status}
         statusAction={patchExperienceAction}
@@ -200,7 +208,7 @@ export default async function EditExperiencePage({ params }: EditPageProps) {
         subtitle={
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="text-base text-ink/90">{experience.company}</span>
-            {dateRange ? <span className="text-amber-200">{dateRange}</span> : null}
+            {dateRange ? <span className="text-warning-200">{dateRange}</span> : null}
             {experience.location ? <span>{experience.location}</span> : null}
           </div>
         }
@@ -277,7 +285,7 @@ export default async function EditExperiencePage({ params }: EditPageProps) {
         </aside>
       </div>
 
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-400/20 bg-rose-500/[0.04] p-5">
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-danger-400/20 bg-danger-500/[0.04] p-5">
         <p className="text-sm text-muted">Permanently remove this experience record.</p>
         <DeleteForm action={deleteExperienceAction} id={experience.id} label="Delete experience" />
       </div>
@@ -294,7 +302,7 @@ function AwardsRecognitionPreview({ items }: { items: string[] }) {
     <ol className="grid gap-3">
       {items.map((item, index) => (
         <li key={`${index}-${item}`} className="flex gap-3">
-          <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border border-line bg-white/[0.04] text-xs font-semibold text-teal-200">
+          <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border border-line bg-white/[0.04] text-xs font-semibold text-accent-200">
             {index + 1}
           </span>
           <p className="text-sm leading-6 text-muted">{item}</p>

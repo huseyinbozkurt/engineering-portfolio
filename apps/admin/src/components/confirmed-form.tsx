@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useCallback,
   useEffect,
   useId,
   useRef,
@@ -10,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { useDirtyState } from "@/components/providers/dirty-state";
 import type { FormAction } from "@/components/forms/types";
 
 /**
@@ -19,7 +21,17 @@ import type { FormAction } from "@/components/forms/types";
  */
 export const FormValidityContext = createContext(true);
 
+/**
+ * Whether the enclosing form has unsaved changes (only meaningful when the form
+ * opts into `trackDirty`). {@link SaveBar} reads this to show the dirty/saved
+ * indicator and enable the Save action.
+ */
+export const FormDirtyContext = createContext(false);
+
 type ConfirmTone = "default" | "danger";
+
+/** `"always"` keeps the confirm dialog; `"off"` saves directly + toasts. */
+type ConfirmMode = "always" | "off";
 
 interface ConfirmationCopy {
   title: string;
@@ -35,12 +47,31 @@ interface ConfirmedFormProps
   children: ReactNode;
   confirmation?: Partial<ConfirmationCopy>;
   /**
+   * Whether to gate submission behind a confirm dialog. Defaults to `"always"`
+   * (preserves the original behavior for create/update/delete). Detail-page
+   * section edits and the homepage builder pass `"off"` for a frictionless,
+   * toast-confirmed save.
+   */
+  confirm?: ConfirmMode;
+  /**
    * Extra validity signal beyond native HTML constraints — for dynamic forms
    * with no `required` inputs (e.g. the bulk skills editor needs at least one
    * row). The submit button stays disabled unless this is true AND the form's
    * native constraints pass. Defaults to `true`.
    */
   valid?: boolean;
+  /**
+   * Track unsaved changes: snapshots the form on mount, flags dirty on edits,
+   * and registers with the app-level {@link useDirtyState} guard so navigating
+   * away warns. Used by full-page editors with a {@link SaveBar}.
+   */
+  trackDirty?: boolean;
+  /**
+   * Runs after a non-redirecting action resolves (e.g. inline patch saves) —
+   * typically a success toast. Redirecting actions navigate away before this
+   * fires; surface their success via the flash cookie instead.
+   */
+  onSuccess?: () => void;
 }
 
 const defaultConfirmation: ConfirmationCopy = {
@@ -51,22 +82,38 @@ const defaultConfirmation: ConfirmationCopy = {
   tone: "default",
 };
 
+/** Stable, File-safe serialization of a form's current values for dirty checks. */
+function serializeForm(form: HTMLFormElement): string {
+  const parts: string[] = [];
+  for (const [key, value] of new FormData(form).entries()) {
+    parts.push(`${key}=${typeof value === "string" ? value : ""}`);
+  }
+  return parts.join("&");
+}
+
 export function ConfirmedForm({
   action,
   children,
   confirmation,
+  confirm = "always",
   className,
   valid = true,
+  trackDirty = false,
+  onSuccess,
   ...props
 }: ConfirmedFormProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const allowSubmitRef = useRef(false);
+  const initialSnapshot = useRef<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [nativeValid, setNativeValid] = useState(true);
+  const [dirty, setDirty] = useState(false);
   const titleId = useId();
   const descriptionId = useId();
+  const dirtyKey = useId();
   const copy = { ...defaultConfirmation, ...confirmation };
+  const dirtyState = useDirtyState();
 
   // Track native HTML constraint validity (required fields, url/email types, …)
   // so the submit button can disable itself until the form is complete. Listens
@@ -77,7 +124,16 @@ export function ConfirmedForm({
       return;
     }
 
-    const update = () => setNativeValid(form.checkValidity());
+    const update = () => {
+      setNativeValid(form.checkValidity());
+      if (trackDirty) {
+        setDirty(serializeForm(form) !== initialSnapshot.current);
+      }
+    };
+
+    if (trackDirty) {
+      initialSnapshot.current = serializeForm(form);
+    }
     update();
     form.addEventListener("input", update);
     form.addEventListener("change", update);
@@ -86,9 +142,45 @@ export function ConfirmedForm({
       form.removeEventListener("input", update);
       form.removeEventListener("change", update);
     };
-  }, []);
+  }, [trackDirty]);
+
+  // Mirror local dirty state into the app-level guard so leaving the page warns.
+  useEffect(() => {
+    if (!trackDirty) {
+      return;
+    }
+    dirtyState.setDirty(dirtyKey, dirty);
+    return () => dirtyState.setDirty(dirtyKey, false);
+  }, [trackDirty, dirty, dirtyKey, dirtyState]);
 
   const canSubmit = valid && nativeValid;
+
+  // Wrap the server action so success housekeeping (clear dirty, close an
+  // enclosing edit modal, toast) runs after it resolves. Redirecting actions
+  // throw internally (NEXT_REDIRECT) and skip the success tail — their feedback
+  // arrives via the flash cookie — but the `finally` still closes an enclosing
+  // modal so it doesn't linger over the refreshed page.
+  const runAction = useCallback(
+    async (formData: FormData) => {
+      try {
+        await action(formData);
+      } finally {
+        setIsSubmitting(false);
+        const dialog = formRef.current?.closest("dialog");
+        if (dialog instanceof HTMLDialogElement && dialog.open) {
+          dialog.close();
+        }
+      }
+      const form = formRef.current;
+      if (form && trackDirty) {
+        initialSnapshot.current = serializeForm(form);
+      }
+      setDirty(false);
+      dirtyState.setDirty(dirtyKey, false);
+      onSuccess?.();
+    },
+    [action, trackDirty, dirtyState, dirtyKey, onSuccess],
+  );
 
   function closeDialog() {
     dialogRef.current?.close();
@@ -103,62 +195,68 @@ export function ConfirmedForm({
 
   return (
     <FormValidityContext.Provider value={canSubmit}>
-      <form
-        {...props}
-        ref={formRef}
-        action={action}
-        className={className}
-        onSubmit={(event) => {
-          if (allowSubmitRef.current) {
-            allowSubmitRef.current = false;
-            setIsSubmitting(true);
-            return;
-          }
+      <FormDirtyContext.Provider value={dirty}>
+        <form
+          {...props}
+          ref={formRef}
+          action={runAction}
+          className={className}
+          onSubmit={(event) => {
+            // Relaxed mode: submit straight through (toast / flash confirms).
+            if (confirm === "off") {
+              setIsSubmitting(true);
+              return;
+            }
 
-          event.preventDefault();
+            // Confirm mode: the real submit only happens after the dialog's
+            // confirm button calls requestSubmit() and flips this flag.
+            if (allowSubmitRef.current) {
+              allowSubmitRef.current = false;
+              setIsSubmitting(true);
+              return;
+            }
 
-          if (dialogRef.current?.open) {
-            return;
-          }
-
-          dialogRef.current?.showModal();
-        }}
-      >
-        {children}
-      </form>
-      <dialog
-        ref={dialogRef}
-        aria-describedby={descriptionId}
-        aria-labelledby={titleId}
-        className="w-[min(calc(100vw-2rem),28rem)] rounded-2xl border border-line-strong bg-surface p-0 text-ink shadow-pop outline-none backdrop:bg-black/70 backdrop:backdrop-blur-sm"
-        onCancel={() => setIsSubmitting(false)}
-      >
-        <div className="p-6">
-          <h2 id={titleId} className="text-base font-semibold text-ink">
-            {copy.title}
-          </h2>
-          <p id={descriptionId} className="mt-2 text-sm leading-6 text-muted">
-            {copy.description}
-          </p>
-          <div className="mt-6 flex flex-wrap justify-end gap-2.5">
-            <button type="button" className="ui-btn-secondary" onClick={closeDialog}>
-              {copy.cancelLabel}
-            </button>
-            <button
-              type="button"
-              className={
-                copy.tone === "danger"
-                  ? "inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-300/50 bg-rose-500/15 px-4 py-2.5 text-sm font-semibold text-rose-100 transition hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-40"
-                  : "ui-btn-primary"
-              }
-              disabled={isSubmitting}
-              onClick={confirmSubmit}
-            >
-              {isSubmitting ? "Saving..." : copy.confirmLabel}
-            </button>
+            event.preventDefault();
+            if (dialogRef.current?.open) {
+              return;
+            }
+            dialogRef.current?.showModal();
+          }}
+        >
+          {children}
+        </form>
+      </FormDirtyContext.Provider>
+      {confirm === "always" ? (
+        <dialog
+          ref={dialogRef}
+          aria-describedby={descriptionId}
+          aria-labelledby={titleId}
+          className="w-[min(calc(100vw-2rem),28rem)] rounded-2xl border border-line-strong bg-surface p-0 text-ink shadow-pop outline-none backdrop:bg-black/70 backdrop:backdrop-blur-sm"
+          onCancel={() => setIsSubmitting(false)}
+        >
+          <div className="p-6">
+            <h2 id={titleId} className="text-base font-semibold text-ink">
+              {copy.title}
+            </h2>
+            <p id={descriptionId} className="mt-2 text-sm leading-6 text-muted">
+              {copy.description}
+            </p>
+            <div className="mt-6 flex flex-wrap justify-end gap-2.5">
+              <button type="button" className="ui-btn-secondary" onClick={closeDialog}>
+                {copy.cancelLabel}
+              </button>
+              <button
+                type="button"
+                className={copy.tone === "danger" ? "ui-btn-danger" : "ui-btn-primary"}
+                disabled={isSubmitting}
+                onClick={confirmSubmit}
+              >
+                {isSubmitting ? "Saving..." : copy.confirmLabel}
+              </button>
+            </div>
           </div>
-        </div>
-      </dialog>
+        </dialog>
+      ) : null}
     </FormValidityContext.Provider>
   );
 }

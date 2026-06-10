@@ -7,7 +7,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./admin": "./src/mutations.ts",
+    "./ai-insight-runs": "./src/ai-insight-runs.ts",
     "./ai-stories": "./src/ai-stories.ts",
+    "./client": "./src/client.ts",
     "./contact": "./src/contact.ts",
     "./llm-tasks": "./src/llm-tasks.ts",
     "./queries": "./src/queries.ts",
@@ -20,7 +22,8 @@
     "db:generate": "drizzle-kit generate --config drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config drizzle.config.ts",
     "db:push": "drizzle-kit push --config drizzle.config.ts --force",
-    "db:studio": "drizzle-kit studio --config drizzle.config.ts"
+    "db:studio": "drizzle-kit studio --config drizzle.config.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@portfolio/validators": "workspace:*",
@@ -28,6 +31,7 @@
     "postgres": "^3.4.7"
   },
   "devDependencies": {
-    "drizzle-kit": "^0.31.0"
+    "drizzle-kit": "^0.31.0",
+    "vitest": "^3.2.4"
   }
 }

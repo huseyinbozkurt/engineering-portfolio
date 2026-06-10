@@ -6,6 +6,7 @@ import { BulkTaxonomyForm } from "@/components/forms/bulk-taxonomy-form";
 import { TagForm } from "@/components/forms/tag-form";
 import { ModalPanel } from "@/components/modal-panel";
 import { PageTitle } from "@/components/page-title";
+import { formatDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ export default async function TagsPage() {
             <ModalPanel
               triggerLabel="Create tag"
               title="Create tag"
-              description="Add a new tag and confirm before saving it."
+              description="Quick-add a tag for lightweight categorization."
               size="sm"
             >
               <TagForm action={createTagAction} title="Create tag" submitLabel="Create Tag" />
@@ -53,10 +54,14 @@ export default async function TagsPage() {
         items={tags.map((tag) => ({
           id: tag.id,
           title: tag.name,
-          description: tag.slug,
+          description: "",
           group: tag.category,
           status: tag.status,
           editHref: `/content/tags/${tag.id}`,
+          attributes: [
+            { label: "Slug", value: tag.slug },
+            { label: "Updated", value: formatDate(tag.updatedAt) },
+          ],
         }))}
       />
     </main>

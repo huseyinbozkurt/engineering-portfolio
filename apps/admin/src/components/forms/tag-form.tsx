@@ -12,38 +12,33 @@ interface TagFormProps {
   defaults?: TagRecord | undefined;
 }
 
-export function TagForm({ action, title, submitLabel, defaults }: TagFormProps) {
-  const isEditing = Boolean(defaults);
-
+/**
+ * Quick-create tag form, kept as a compact modal (tags are lightweight taxonomy).
+ * Saves directly — success is confirmed by the flash toast after the redirect.
+ * Field names match `createTagAction`.
+ */
+export function TagForm({ action, submitLabel, defaults }: TagFormProps) {
   return (
-    <ConfirmedForm
-      action={action}
-      className="grid gap-5"
-      confirmation={{
-        title: isEditing ? "Save tag changes?" : "Create this tag?",
-        description: isEditing
-          ? "This will update the tag and its visibility."
-          : "This will add a new tag to the admin content library.",
-        confirmLabel: submitLabel,
-      }}
-    >
+    <ConfirmedForm action={action} confirm="off" className="grid gap-5">
       <div className="grid gap-4">
         {defaults ? <input type="hidden" name="id" value={defaults.id} /> : null}
-        <Field label="Name" name="name" required defaultValue={defaults?.name} />
-        <Field
-          label="Slug"
-          name="slug"
-          required
-          placeholder="platform"
-          defaultValue={defaults?.slug}
-        />
-        <Field
-          label="Category"
-          name="category"
-          placeholder="Domain"
-          defaultValue={defaults?.category ?? undefined}
-        />
-        <StatusSelect defaultValue={defaults?.status} />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Name" name="name" required defaultValue={defaults?.name} />
+          <Field
+            label="Slug"
+            name="slug"
+            required
+            placeholder="platform"
+            defaultValue={defaults?.slug}
+          />
+          <Field
+            label="Category"
+            name="category"
+            placeholder="Domain"
+            defaultValue={defaults?.category ?? undefined}
+          />
+          <StatusSelect defaultValue={defaults?.status} />
+        </div>
         <SubmitButton label={submitLabel} />
       </div>
     </ConfirmedForm>

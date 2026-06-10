@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+export * from "./insights";
+export * from "./stories";
+
 export const contentStatusSchema = z.enum(["draft", "published", "archived"]);
 
 export const slugSchema = z

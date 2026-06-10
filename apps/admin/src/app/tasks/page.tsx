@@ -35,17 +35,14 @@ export default async function LlmTasksPage() {
       ) : (
         <div className="grid gap-5">
           <section className="grid gap-4 md:grid-cols-3">
-            <MetricCard label="Running" value={runningCount} tone="teal" />
+            <MetricCard label="Running" value={runningCount} tone="violet" />
             <MetricCard label="Succeeded" value={succeededCount} tone="default" />
             <MetricCard label="Failed" value={failedCount} tone="rose" />
           </section>
 
           <section className="grid gap-3">
             {tasks.map((task) => (
-              <article
-                key={task.id}
-                className="rounded-lg border border-line bg-white/[0.025] p-5"
-              >
+              <article key={task.id} className="ui-card p-5 shadow-card">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -56,10 +53,7 @@ export default async function LlmTasksPage() {
                       {task.taskType.replace(/_/g, " ")} started {formatDate(task.createdAt)}
                     </p>
                   </div>
-                  <Link
-                    className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-ink transition hover:border-teal-300/50 hover:bg-white/[0.06]"
-                    href={`/tasks/${task.id}`}
-                  >
+                  <Link className="ui-btn-outline" href={`/tasks/${task.id}`}>
                     View trace
                   </Link>
                 </div>
@@ -73,7 +67,7 @@ export default async function LlmTasksPage() {
                 </div>
 
                 {task.errorMessage ? (
-                  <p className="mt-4 rounded-lg border border-rose-300/30 bg-rose-500/10 px-3 py-2 text-sm leading-6 text-rose-100">
+                  <p className="mt-4 rounded-lg border border-danger-300/30 bg-danger-500/10 px-3 py-2 text-sm leading-6 text-danger-100">
                     {task.errorMessage}
                   </p>
                 ) : null}
@@ -101,14 +95,14 @@ function MetricCard({
 }: {
   label: string;
   value: number;
-  tone: "default" | "rose" | "teal";
+  tone: "default" | "rose" | "violet";
 }) {
   const valueClass =
-    tone === "rose" ? "text-rose-100" : tone === "teal" ? "text-teal-100" : "text-ink";
+    tone === "rose" ? "text-danger-100" : tone === "violet" ? "text-accent-200" : "text-ink";
 
   return (
-    <div className="rounded-lg border border-line bg-white/[0.03] p-5">
-      <p className={`text-3xl font-semibold ${valueClass}`}>{value}</p>
+    <div className="ui-card p-5 shadow-card">
+      <p className={`text-3xl font-semibold tabular-nums ${valueClass}`}>{value}</p>
       <p className="mt-2 text-sm text-muted">{label}</p>
     </div>
   );
@@ -116,7 +110,7 @@ function MetricCard({
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-line bg-white/[0.025] p-3">
+    <div className="rounded-xl border border-line bg-white/[0.02] p-3">
       <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
       <p className="mt-1 break-words text-sm font-medium text-ink">{value}</p>
     </div>
@@ -124,18 +118,14 @@ function Detail({ label, value }: { label: string; value: string }) {
 }
 
 function StatusBadge({ status }: { status: LlmTaskRecord["status"] }) {
-  const className =
+  const tone =
     status === "succeeded"
-      ? "border-teal-300/30 bg-teal-300/10 text-teal-100"
+      ? "ui-badge-success"
       : status === "failed"
-        ? "border-rose-300/30 bg-rose-500/10 text-rose-100"
-        : "border-amber-200/30 bg-amber-200/10 text-amber-100";
+        ? "ui-badge-danger"
+        : "ui-badge-warning";
 
-  return (
-    <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${className}`}>
-      {status}
-    </span>
-  );
+  return <span className={`ui-badge capitalize ${tone}`}>{status}</span>;
 }
 
 function formatDate(value: Date): string {

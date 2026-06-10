@@ -32,10 +32,7 @@ export function DeleteForm({
       }}
     >
       <input type="hidden" name="id" value={id} />
-      <button
-        type="submit"
-        className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-400/40 bg-rose-500/10 px-4 py-2.5 text-sm font-semibold text-rose-200 transition hover:border-rose-300/60 hover:bg-rose-500/20"
-      >
+      <button type="submit" className="ui-btn-danger">
         {label}
       </button>
     </ConfirmedForm>

@@ -26,9 +26,7 @@ export function MetaSidebar({ groups, emptyHint }: MetaSidebarProps) {
 
   return (
     <aside className="ui-card grid h-fit content-start gap-5 p-5 shadow-card lg:sticky lg:top-6">
-      <p className="text-xs font-semibold uppercase tracking-wider text-amber-200/90">
-        Relationships
-      </p>
+      <p className="ui-eyebrow">Relationships</p>
 
       {populated.length === 0 ? (
         <p className="text-sm text-muted">

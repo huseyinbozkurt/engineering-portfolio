@@ -48,9 +48,9 @@ export default async function LlmTaskDetailPage({ params }: LlmTaskDetailPagePro
       <TaskTimeline task={task} />
 
       {task.errorMessage ? (
-        <section className="mt-5 rounded-lg border border-rose-300/30 bg-rose-500/10 p-4">
-          <h2 className="text-sm font-semibold text-rose-100">Error</h2>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-rose-100">
+        <section className="mt-5 rounded-2xl border border-danger-300/30 bg-danger-500/10 p-4">
+          <h2 className="text-sm font-semibold text-danger-100">Error</h2>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-danger-100">
             {task.errorMessage}
           </p>
         </section>
@@ -84,7 +84,7 @@ function TaskTimeline({ task }: { task: LlmTaskRecord }) {
   ];
 
   return (
-    <section className="mt-5 rounded-lg border border-line bg-white/[0.025] p-5">
+    <section className="mt-5 ui-card p-5 shadow-card">
       <h2 className="text-base font-semibold text-ink">Trace timeline</h2>
       <div className="mt-4 grid gap-3 md:grid-cols-4">
         {steps.map((step) => (
@@ -92,8 +92,8 @@ function TaskTimeline({ task }: { task: LlmTaskRecord }) {
             key={step.label}
             className={
               step.done
-                ? "rounded-lg border border-teal-300/30 bg-teal-300/10 p-3 text-teal-100"
-                : "rounded-lg border border-line bg-white/[0.025] p-3 text-muted"
+                ? "rounded-xl border border-success-400/30 bg-success-400/10 p-3 text-success-100"
+                : "rounded-xl border border-line bg-white/[0.02] p-3 text-muted"
             }
           >
             <p className="text-sm font-medium">{step.label}</p>
@@ -106,9 +106,9 @@ function TaskTimeline({ task }: { task: LlmTaskRecord }) {
 
 function TraceBlock({ title, content }: { title: string; content: string }) {
   return (
-    <section className="rounded-lg border border-line bg-white/[0.025] p-5">
+    <section className="ui-card p-5 shadow-card">
       <h2 className="text-base font-semibold text-ink">{title}</h2>
-      <pre className="mt-4 max-h-[32rem] overflow-auto whitespace-pre-wrap rounded-lg border border-line bg-black/20 p-4 text-xs leading-5 text-muted">
+      <pre className="mt-4 max-h-[32rem] overflow-auto whitespace-pre-wrap rounded-xl border border-line bg-black/20 p-4 text-xs leading-5 text-muted">
         {content}
       </pre>
     </section>
@@ -117,7 +117,7 @@ function TraceBlock({ title, content }: { title: string; content: string }) {
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-line bg-white/[0.03] p-4">
+    <div className="ui-card p-4 shadow-card">
       <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
       <p className="mt-1 break-words text-sm font-medium text-ink">{value}</p>
     </div>

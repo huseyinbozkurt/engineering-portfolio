@@ -1,7 +1,7 @@
 import { Pencil } from "lucide-react";
 import { notFound } from "next/navigation";
 
-import { getDecisionPatternById, getPrinciples } from "@portfolio/db/queries";
+import { getDecisionPatternById, getDecisionPatterns, getPrinciples } from "@portfolio/db/queries";
 
 import { deleteDecisionPatternAction, patchDecisionPatternAction } from "@/app/actions";
 import { DeleteForm } from "@/components/delete-form";
@@ -13,6 +13,7 @@ import { SettingsModal } from "@/components/detail/settings-modal";
 import { CheckboxGroup, Field, SeoFields } from "@/components/form-controls";
 import { RichTextField } from "@/components/forms/rich-text-field";
 import { ModalPanel } from "@/components/modal-panel";
+import { siblingLinks } from "@/lib/detail-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -22,14 +23,20 @@ interface EditPageProps {
 
 export default async function EditDecisionPatternPage({ params }: EditPageProps) {
   const { id } = await params;
-  const [pattern, principles] = await Promise.all([
+  const [pattern, principles, patterns] = await Promise.all([
     getDecisionPatternById(id),
     getPrinciples(),
+    getDecisionPatterns(),
   ]);
 
   if (!pattern) {
     notFound();
   }
+
+  const siblings = siblingLinks(patterns, pattern.id, (item) => ({
+    href: `/content/decision-patterns/${item.id}`,
+    label: item.title,
+  }));
 
   const principleName = new Map(principles.map((p) => [p.id, p.title]));
   const principleOptions = principles.map((p) => ({ id: p.id, label: p.title }));
@@ -92,6 +99,8 @@ export default async function EditDecisionPatternPage({ params }: EditPageProps)
         backLabel="All decision patterns"
         eyebrow="Decision pattern"
         title={pattern.title}
+        prev={siblings.prev}
+        next={siblings.next}
         id={pattern.id}
         status={pattern.status}
         statusAction={patchDecisionPatternAction}
@@ -140,7 +149,7 @@ export default async function EditDecisionPatternPage({ params }: EditPageProps)
         <MetaSidebar groups={metaGroups} emptyHint="No related principles yet — add them in Settings." />
       </div>
 
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-400/20 bg-rose-500/[0.04] p-5">
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-danger-400/20 bg-danger-500/[0.04] p-5">
         <p className="text-sm text-muted">Permanently remove this decision pattern.</p>
         <DeleteForm action={deleteDecisionPatternAction} id={pattern.id} label="Delete pattern" />
       </div>

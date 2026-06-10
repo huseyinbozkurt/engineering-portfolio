@@ -13,6 +13,7 @@ import { SettingsModal } from "@/components/detail/settings-modal";
 import { CheckboxGroup, Field, SeoFields } from "@/components/form-controls";
 import { RichTextField } from "@/components/forms/rich-text-field";
 import { ModalPanel } from "@/components/modal-panel";
+import { siblingLinks } from "@/lib/detail-nav";
 import { publicHrefs } from "@/lib/public-site";
 
 export const dynamic = "force-dynamic";
@@ -78,6 +79,11 @@ export default async function EditCaseStudyPage({ params }: EditPageProps) {
   const projectOptions = content.projects.map((p) => ({ id: p.id, label: p.name }));
   const skillOptions = content.skills.map((s) => ({ id: s.id, label: s.name, category: s.category }));
   const tagOptions = content.tags.map((t) => ({ id: t.id, label: t.name, category: t.category }));
+
+  const siblings = siblingLinks(content.caseStudies, caseStudy.id, (item) => ({
+    href: `/content/case-studies/${item.id}`,
+    label: item.title,
+  }));
 
   const toItems = (ids: string[], lookup: Map<string, string>) =>
     ids.flatMap((rid) => (lookup.has(rid) ? [{ id: rid, label: lookup.get(rid)! }] : []));
@@ -186,6 +192,8 @@ export default async function EditCaseStudyPage({ params }: EditPageProps) {
       <DetailHeader
         backHref="/content/case-studies"
         backLabel="All case studies"
+        prev={siblings.prev}
+        next={siblings.next}
         eyebrow="Case study"
         title={caseStudy.title}
         id={caseStudy.id}
@@ -223,7 +231,7 @@ export default async function EditCaseStudyPage({ params }: EditPageProps) {
         <MetaSidebar groups={metaGroups} />
       </div>
 
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-400/20 bg-rose-500/[0.04] p-5">
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-danger-400/20 bg-danger-500/[0.04] p-5">
         <p className="text-sm text-muted">Permanently remove this case study and its relationships.</p>
         <DeleteForm action={deleteCaseStudyAction} id={caseStudy.id} label="Delete case study" />
       </div>
