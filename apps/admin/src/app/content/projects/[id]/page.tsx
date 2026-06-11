@@ -63,6 +63,9 @@ export default async function EditProjectPage({ params }: EditPageProps) {
   const architectureEmpty =
     project.architecture.trim().length === 0 && stackBoxes.length === 0;
 
+  // Shown in the header only when at least one date is set.
+  const projectDateRange = formatProjectDateRange(project.startDate, project.endDate);
+
   const metaGroups = [
     {
       title: "Position",
@@ -102,6 +105,8 @@ export default async function EditProjectPage({ params }: EditPageProps) {
       action={patchProjectAction}
       fields={[
         "slug",
+        "startDate",
+        "endDate",
         "position",
         "experienceId",
         "lensIds",
@@ -126,6 +131,20 @@ export default async function EditProjectPage({ params }: EditPageProps) {
         options={positionOptions}
         defaultValue={project.experienceId ?? ""}
       />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field
+          label="Start date"
+          name="startDate"
+          type="date"
+          defaultValue={project.startDate ?? undefined}
+        />
+        <Field
+          label="End date"
+          name="endDate"
+          type="date"
+          defaultValue={project.endDate ?? undefined}
+        />
+      </div>
       <CheckboxGroup
         label="Related lenses"
         name="lensIds"
@@ -204,12 +223,19 @@ export default async function EditProjectPage({ params }: EditPageProps) {
         settings={settings}
         headerEdit={headerEdit}
         subtitle={
-          experience ? (
-            <span>
-              Built during{" "}
-              <span className="text-warning-200">
-                {experience.role} at {experience.company}
-              </span>
+          experience || projectDateRange ? (
+            <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+              {projectDateRange ? (
+                <span className="text-accent-200">{projectDateRange}</span>
+              ) : null}
+              {experience ? (
+                <span>
+                  Built during{" "}
+                  <span className="text-warning-200">
+                    {experience.role} at {experience.company}
+                  </span>
+                </span>
+              ) : null}
             </span>
           ) : null
         }
@@ -357,4 +383,26 @@ export default async function EditProjectPage({ params }: EditPageProps) {
       </div>
     </main>
   );
+}
+
+function formatProjectDateRange(startDate: string | null, endDate: string | null): string {
+  const format = (value: string | null): string | null => {
+    if (!value) {
+      return null;
+    }
+    const date = new Date(`${value}T00:00:00Z`);
+    if (Number.isNaN(date.getTime())) {
+      return null;
+    }
+    return date.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+  };
+
+  const start = format(startDate);
+  const end = format(endDate);
+
+  if (start && end) {
+    return `${start} – ${end}`;
+  }
+
+  return start ?? end ?? "";
 }

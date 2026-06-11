@@ -147,29 +147,25 @@ function getTimelineItems(
     };
   });
   const projectItems = projects.map((project) => {
-    const linkedExperience = project.experienceId
-      ? experiencesById.get(project.experienceId)
-      : undefined;
-    const linkedDateRange = linkedExperience
-      ? formatDateRange(
-          linkedExperience.startDate,
-          linkedExperience.endDate,
-          linkedExperience.isCurrent,
-        )
-      : "";
-    const publishedDate = formatTimestamp(project.publishedAt ?? project.createdAt);
+    // Linked experience is used only for timeline ORDERING; the displayed range
+    // is always the project's own dates — and only when they are actually set.
+    // No "Present" or published-at placeholders for date-less projects.
+    console.log("Project", project.name, "dates", project.startDate, project.endDate);
+    const projectDateRange = formatDateRange(project.startDate, project.endDate, false);
 
     return {
       id: `project-${project.id}`,
       kind: "project" as const,
       name: project.name,
       role: "Owner / Lead Developer",
-      dateRange: linkedDateRange || publishedDate,
+      dateRange: projectDateRange,
       summary: compactText(project.description),
       tags: getProjectTags(project),
       href: projectHref(project),
       sortTime:
-        getDateTime(linkedExperience?.startDate ?? null) ??
+        // Prefer linked experience start date, then project's own dates, then published/created
+        getDateTime(project.startDate) ??
+        getDateTime(project.endDate) ??
         getDateTime(project.publishedAt) ??
         getDateTime(project.createdAt),
       sortPosition: project.position,
@@ -228,24 +224,6 @@ function compactText(value: string, maxLength = 180): string {
   }
 
   return `${normalized.slice(0, Math.max(0, maxLength - 3)).trim()}...`;
-}
-
-function formatTimestamp(value: Date | string | null): string {
-  if (!value) {
-    return "";
-  }
-
-  const date = value instanceof Date ? value : new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  return new Intl.DateTimeFormat("en", {
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(date);
 }
 
 function getDateTime(value: Date | string | null): number | null {

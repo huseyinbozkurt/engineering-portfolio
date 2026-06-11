@@ -67,6 +67,18 @@ export function ProjectForm({
                 type="url"
                 defaultValue={defaults?.githubUrl ?? undefined}
               />
+              <Field
+                label="Start date"
+                name="startDate"
+                type="date"
+                defaultValue={defaults?.startDate ?? undefined}
+              />
+              <Field
+                label="End date"
+                name="endDate"
+                type="date"
+                defaultValue={defaults?.endDate ?? undefined}
+              />
             </div>
             <StatusSelect defaultValue={defaults?.status} />
           </FormSection>

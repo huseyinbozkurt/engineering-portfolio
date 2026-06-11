@@ -25,6 +25,8 @@ export interface ResolvedLlmAdapter {
 
 const defaultTimeoutMs = 900000;
 const defaultMaxTokens = 12000;
+/** Generation requests never run with less than 15 minutes, regardless of env. */
+const minimumTimeoutMs = 900000;
 
 export async function resolveOnlineLlmAdapter(): Promise<ResolvedLlmAdapter | null> {
   const [statuses, configs] = await Promise.all([
@@ -42,7 +44,10 @@ export async function resolveOnlineLlmAdapter(): Promise<ResolvedLlmAdapter | nu
     return null;
   }
 
-  const timeoutMs = positiveNumber(process.env.LLM_ANALYSIS_TIMEOUT_MS) ?? defaultTimeoutMs;
+  const timeoutMs = Math.max(
+    positiveNumber(process.env.LLM_ANALYSIS_TIMEOUT_MS) ?? defaultTimeoutMs,
+    minimumTimeoutMs,
+  );
   const maxTokens = positiveNumber(process.env.LLM_ANALYSIS_MAX_TOKENS) ?? defaultMaxTokens;
 
   if (connection.provider === "anthropic") {

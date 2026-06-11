@@ -141,8 +141,10 @@ describe("undici transport (real fetch path, no mocks)", () => {
     const { createServer } = await import("node:http");
     const server = createServer((req, res) => {
       // /slow delays HEADERS — the failure mode Node's built-in fetch kills at
-      // a hard 300s; scaled down here to keep the test fast.
-      const delay = req.url?.includes("slow") ? 1200 : 50;
+      // a hard 300s; scaled down here to keep the test fast. The margin between
+      // the 300ms app timeout and this delay is deliberately huge so the abort
+      // assertion can never lose a wall-clock race on a loaded machine.
+      const delay = req.url?.includes("slow") ? 5000 : 50;
       setTimeout(() => {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(

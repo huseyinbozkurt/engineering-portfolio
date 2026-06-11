@@ -1,21 +1,27 @@
 // Returns "" when there is nothing meaningful to show so callers can omit the
-// element entirely rather than rendering a placeholder.
+// element entirely rather than rendering a placeholder. "Present" is only ever
+// shown for explicitly current records — never as a fallback for missing dates.
 export function formatDateRange(
   startDate: string | null,
   endDate: string | null,
   isCurrent: boolean,
 ): string {
-  const start = startDate ? formatDate(startDate) : null;
-  const end = isCurrent ? "Present" : endDate ? formatDate(endDate) : null;
+  const start = formatDate(startDate);
+  const end = isCurrent ? "Present" : formatDate(endDate);
 
   if (start && end) {
+    if (start === end) {
+      return start;
+    }
     return `${start} - ${end}`;
   }
 
   return start ?? end ?? "";
 }
 
-function formatDate(value: string): string {
+export function formatDate(value: string | null): string | null {
+  if (!value) return null;
+  
   const date = new Date(`${value}T00:00:00Z`);
 
   return new Intl.DateTimeFormat("en", {

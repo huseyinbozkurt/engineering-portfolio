@@ -2,7 +2,6 @@ import { relations, sql } from "drizzle-orm";
 import type { AiGeneratedStoryPayload } from "@portfolio/validators";
 import {
   boolean,
-  customType,
   date,
   index,
   integer,
@@ -16,13 +15,6 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
-
-/** Postgres bytea for small binary payloads (e.g. the uploaded resume). */
-const bytea = customType<{ data: Buffer; driverData: Buffer }>({
-  dataType() {
-    return "bytea";
-  },
-});
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -110,11 +102,11 @@ export const lenses = pgTable(
     position: integer("position").notNull().default(0),
     ...timestamps,
   },
-  (table) => [
-    uniqueIndex("lenses_slug_idx").on(table.slug),
-    index("lenses_status_idx").on(table.status),
-    index("lenses_position_idx").on(table.position),
-  ]
+  (table) => ({
+    slugIdx: uniqueIndex("lenses_slug_idx").on(table.slug),
+    statusIdx: index("lenses_status_idx").on(table.status),
+    positionIdx: index("lenses_position_idx").on(table.position),
+  }),
 );
 
 export const principles = pgTable(
@@ -131,11 +123,11 @@ export const principles = pgTable(
     position: integer("position").notNull().default(0),
     ...timestamps,
   },
-  (table) => [
-    uniqueIndex("principles_slug_idx").on(table.slug),
-    index("principles_status_idx").on(table.status),
-    index("principles_position_idx").on(table.position),
-  ]
+  (table) => ({
+    slugIdx: uniqueIndex("principles_slug_idx").on(table.slug),
+    statusIdx: index("principles_status_idx").on(table.status),
+    positionIdx: index("principles_position_idx").on(table.position),
+  }),
 );
 
 export const decisionPatterns = pgTable(
@@ -152,11 +144,11 @@ export const decisionPatterns = pgTable(
     position: integer("position").notNull().default(0),
     ...timestamps,
   },
-  (table) => [
-    uniqueIndex("decision_patterns_slug_idx").on(table.slug),
-    index("decision_patterns_status_idx").on(table.status),
-    index("decision_patterns_position_idx").on(table.position),
-  ],
+  (table) => ({
+    slugIdx: uniqueIndex("decision_patterns_slug_idx").on(table.slug),
+    statusIdx: index("decision_patterns_status_idx").on(table.status),
+    positionIdx: index("decision_patterns_position_idx").on(table.position),
+  }),
 );
 
 export const experiences = pgTable(
@@ -182,15 +174,17 @@ export const experiences = pgTable(
     position: integer("position").notNull().default(0),
     ...timestamps,
   },
-  (table) => [
-    uniqueIndex("experiences_slug_idx").on(table.slug),
-    index("experiences_status_idx").on(table.status),
-    index("experiences_date_idx").on(table.startDate, table.endDate),
-    index("experiences_position_idx").on(table.position),
-  ],
+  (table) => ({
+    slugIdx: uniqueIndex("experiences_slug_idx").on(table.slug),
+    statusIdx: index("experiences_status_idx").on(table.status),
+    dateIdx: index("experiences_date_idx").on(table.startDate, table.endDate),
+    positionIdx: index("experiences_position_idx").on(table.position),
+  }),
 );
 
-export const projects = pgTable("projects",{
+export const projects = pgTable(
+  "projects",
+  {
     id: uuid("id").primaryKey().defaultRandom(),
     slug: varchar("slug", { length: 120 }).notNull(),
     name: varchar("name", { length: 180 }).notNull(),
@@ -205,8 +199,6 @@ export const projects = pgTable("projects",{
     deploymentTechStack: text("deployment_tech_stack").notNull().default(""),
     url: text("url"),
     githubUrl: text("github_url"),
-    startDate: date("start_date", { mode: "string" }),
-    endDate: date("end_date", { mode: "string" }),
     // Optional "position" a project was built during. Nullable: a project need
     // not belong to an experience, and removing the experience just unlinks it.
     experienceId: uuid("experience_id").references(() => experiences.id, {
@@ -218,13 +210,12 @@ export const projects = pgTable("projects",{
     position: integer("position").notNull().default(0),
     ...timestamps,
   },
-  (table) => [
-    uniqueIndex("projects_slug_idx").on(table.slug),
-    index("projects_status_idx").on(table.status),
-    index("projects_position_idx").on(table.position),
-    index("projects_experience_idx").on(table.experienceId),
-    index("projects_date_idx").on(table.startDate, table.endDate),
-  ],
+  (table) => ({
+    slugIdx: uniqueIndex("projects_slug_idx").on(table.slug),
+    statusIdx: index("projects_status_idx").on(table.status),
+    positionIdx: index("projects_position_idx").on(table.position),
+    experienceIdx: index("projects_experience_idx").on(table.experienceId),
+  }),
 );
 
 export const projectLinks = pgTable(
@@ -239,9 +230,9 @@ export const projectLinks = pgTable(
     position: integer("position").notNull().default(0),
     ...timestamps,
   },
-  (table) => [
-    index("project_links_project_idx").on(table.projectId),
-  ],
+  (table) => ({
+    projectIdx: index("project_links_project_idx").on(table.projectId),
+  }),
 );
 
 export const caseStudies = pgTable(
@@ -264,11 +255,11 @@ export const caseStudies = pgTable(
     position: integer("position").notNull().default(0),
     ...timestamps,
   },
-  (table) => [
-    uniqueIndex("case_studies_slug_idx").on(table.slug),
-    index("case_studies_status_idx").on(table.status),
-    index("case_studies_position_idx").on(table.position),
-  ],
+  (table) => ({
+    slugIdx: uniqueIndex("case_studies_slug_idx").on(table.slug),
+    statusIdx: index("case_studies_status_idx").on(table.status),
+    positionIdx: index("case_studies_position_idx").on(table.position),
+  }),
 );
 
 export const skills = pgTable(
@@ -284,12 +275,12 @@ export const skills = pgTable(
     position: integer("position").notNull().default(0),
     ...timestamps,
   },
-  (table) => [
-    uniqueIndex("skills_slug_idx").on(table.slug),
-    index("skills_status_idx").on(table.status),
-    index("skills_category_idx").on(table.category),
-    index("skills_position_idx").on(table.position),
-  ],
+  (table) => ({
+    slugIdx: uniqueIndex("skills_slug_idx").on(table.slug),
+    statusIdx: index("skills_status_idx").on(table.status),
+    categoryIdx: index("skills_category_idx").on(table.category),
+    positionIdx: index("skills_position_idx").on(table.position),
+  }),
 );
 
 export const tags = pgTable(
@@ -302,11 +293,11 @@ export const tags = pgTable(
     ...workflow,
     ...timestamps,
   },
-  (table) => [
-    uniqueIndex("tags_slug_idx").on(table.slug),
-    index("tags_status_idx").on(table.status),
-    index("tags_category_idx").on(table.category),
-  ],
+  (table) => ({
+    slugIdx: uniqueIndex("tags_slug_idx").on(table.slug),
+    statusIdx: index("tags_status_idx").on(table.status),
+    categoryIdx: index("tags_category_idx").on(table.category),
+  }),
 );
 
 export const contactSubmissions = pgTable(
@@ -327,10 +318,10 @@ export const contactSubmissions = pgTable(
     message: text("message").notNull(),
     ...timestamps,
   },
-  (table) => [
-    index("contact_submissions_created_at_idx").on(table.createdAt),
-    index("contact_submissions_wants_response_idx").on(table.wantsResponse),
-  ],
+  (table) => ({
+    createdAtIdx: index("contact_submissions_created_at_idx").on(table.createdAt),
+    wantsResponseIdx: index("contact_submissions_wants_response_idx").on(table.wantsResponse),
+  }),
 );
 
 export const contactProfiles = pgTable(
@@ -352,24 +343,10 @@ export const contactProfiles = pgTable(
       .default(sql`'[]'::jsonb`),
     ...timestamps,
   },
-  (table) => [
-    index("contact_profiles_updated_at_idx").on(table.updatedAt),
-  ],
+  (table) => ({
+    updatedAtIdx: index("contact_profiles_updated_at_idx").on(table.updatedAt),
+  }),
 );
-
-/**
- * The uploaded resume file (at most one row — uploads replace the previous
- * file). Stored in its own table, not on contact_profiles, so profile reads
- * never drag the binary payload along; routes stream it on demand.
- */
-export const contactResume = pgTable("contact_resume", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  fileName: varchar("file_name", { length: 255 }).notNull(),
-  fileType: varchar("file_type", { length: 120 }).notNull(),
-  fileSize: integer("file_size").notNull(),
-  data: bytea("data").notNull(),
-  uploadedAt: timestamp("uploaded_at", { withTimezone: true }).defaultNow().notNull(),
-});
 
 export const homepageSettings = pgTable(
   "homepage_settings",
@@ -413,12 +390,12 @@ export const homepageSettings = pgTable(
     ),
     ...timestamps,
   },
-  (table) => [
-    index("homepage_settings_updated_at_idx").on(table.updatedAt),
-    index("homepage_settings_recognition_experience_idx").on(
+  (table) => ({
+    updatedAtIdx: index("homepage_settings_updated_at_idx").on(table.updatedAt),
+    recognitionExperienceIdx: index("homepage_settings_recognition_experience_idx").on(
       table.featuredRecognitionExperienceId,
     ),
-  ],
+  }),
 );
 
 export const llmTasks = pgTable(
@@ -442,16 +419,16 @@ export const llmTasks = pgTable(
     durationMs: integer("duration_ms"),
     ...timestamps,
   },
-  (table) => [
-    index("llm_tasks_created_at_idx").on(table.createdAt),
-    index("llm_tasks_status_idx").on(table.status),
-    index("llm_tasks_task_type_idx").on(table.taskType),
-    uniqueIndex("llm_tasks_active_ai_insights_idx")
+  (table) => ({
+    createdAtIdx: index("llm_tasks_created_at_idx").on(table.createdAt),
+    statusIdx: index("llm_tasks_status_idx").on(table.status),
+    taskTypeIdx: index("llm_tasks_task_type_idx").on(table.taskType),
+    activeAiInsightsIdx: uniqueIndex("llm_tasks_active_ai_insights_idx")
       .on(table.taskType)
       .where(
         sql`${table.taskType} = 'ai_insights' and ${table.status} in ('pending', 'running')`,
       ),
-  ],
+  }),
 );
 
 export const aiInsightRunStatusEnum = pgEnum("ai_insight_run_status", [
@@ -516,19 +493,19 @@ export const aiInsightRuns = pgTable(
     publishedAt: timestamp("published_at", { withTimezone: true }),
     ...timestamps,
   },
-  (table) => [
-    index("ai_insight_runs_created_at_idx").on(table.createdAt),
-    index("ai_insight_runs_status_idx").on(table.status),
+  (table) => ({
+    createdAtIdx: index("ai_insight_runs_created_at_idx").on(table.createdAt),
+    statusIdx: index("ai_insight_runs_status_idx").on(table.status),
     // At most one published run at any time — the public site's source of truth.
-    uniqueIndex("ai_insight_runs_single_published_idx")
+    singlePublishedIdx: uniqueIndex("ai_insight_runs_single_published_idx")
       .on(table.status)
       .where(sql`${table.status} = 'published'`),
     // At most one run per active status. Runs are created as 'running', so this
     // (plus the app-level getActiveAiInsightRun guard) yields a single active run.
-    uniqueIndex("ai_insight_runs_single_active_idx")
+    singleActiveIdx: uniqueIndex("ai_insight_runs_single_active_idx")
       .on(table.status)
       .where(sql`${table.status} in ('pending', 'running')`),
-  ]
+  }),
 );
 
 // Story content types live in @portfolio/validators (shared with the LLM
@@ -562,10 +539,10 @@ export const aiGeneratedStories = pgTable(
     appliedAt: timestamp("applied_at", { withTimezone: true }),
     ...timestamps,
   },
-  (table) => [
-    index("ai_generated_stories_created_at_idx").on(table.createdAt),
-    index("ai_generated_stories_status_idx").on(table.status),
-  ],
+  (table) => ({
+    createdAtIdx: index("ai_generated_stories_created_at_idx").on(table.createdAt),
+    statusIdx: index("ai_generated_stories_status_idx").on(table.status),
+  }),
 );
 
 export const experienceLenses = pgTable(
@@ -579,9 +556,9 @@ export const experienceLenses = pgTable(
       .references(() => lenses.id, { onDelete: "cascade" }),
     relevanceScore: integer("relevance_score"),
   },
-  (table) => [
-    primaryKey({ columns: [table.experienceId, table.lensId] }),
-  ],
+  (table) => ({
+    pk: primaryKey({ columns: [table.experienceId, table.lensId] }),
+  }),
 );
 
 export const experiencePrinciples = pgTable(
@@ -595,9 +572,9 @@ export const experiencePrinciples = pgTable(
       .references(() => principles.id, { onDelete: "cascade" }),
     relevanceScore: integer("relevance_score"),
   },
-  (table) => [
-    primaryKey({ columns: [table.experienceId, table.principleId] }),
-  ],
+  (table) => ({
+    pk: primaryKey({ columns: [table.experienceId, table.principleId] }),
+  }),
 );
 
 export const experienceSkills = pgTable(
@@ -610,9 +587,9 @@ export const experienceSkills = pgTable(
       .notNull()
       .references(() => skills.id, { onDelete: "cascade" }),
   },
-  (table) => [
-    primaryKey({ columns: [table.experienceId, table.skillId] }),
-  ],
+  (table) => ({
+    pk: primaryKey({ columns: [table.experienceId, table.skillId] }),
+  }),
 );
 
 export const experienceTags = pgTable(
@@ -625,9 +602,9 @@ export const experienceTags = pgTable(
       .notNull()
       .references(() => tags.id, { onDelete: "cascade" }),
   },
-  (table) => [
-    primaryKey({ columns: [table.experienceId, table.tagId] }),
-  ],
+  (table) => ({
+    pk: primaryKey({ columns: [table.experienceId, table.tagId] }),
+  }),
 );
 
 export const projectLenses = pgTable(
@@ -641,9 +618,9 @@ export const projectLenses = pgTable(
       .references(() => lenses.id, { onDelete: "cascade" }),
     relevanceScore: integer("relevance_score"),
   },
-  (table) => [
-    primaryKey({ columns: [table.projectId, table.lensId] }),
-  ],
+  (table) => ({
+    pk: primaryKey({ columns: [table.projectId, table.lensId] }),
+  }),
 );
 
 export const projectPrinciples = pgTable(
@@ -657,9 +634,9 @@ export const projectPrinciples = pgTable(
       .references(() => principles.id, { onDelete: "cascade" }),
     relevanceScore: integer("relevance_score"),
   },
-  (table) => [
-    primaryKey({ columns: [table.projectId, table.principleId] }),
-  ],
+  (table) => ({
+    pk: primaryKey({ columns: [table.projectId, table.principleId] }),
+  }),
 );
 
 export const projectSkills = pgTable(
@@ -672,9 +649,9 @@ export const projectSkills = pgTable(
       .notNull()
       .references(() => skills.id, { onDelete: "cascade" }),
   },
-  (table) => [
-    primaryKey({ columns: [table.projectId, table.skillId] }),
-  ],
+  (table) => ({
+    pk: primaryKey({ columns: [table.projectId, table.skillId] }),
+  }),
 );
 
 export const projectTags = pgTable(
@@ -687,9 +664,9 @@ export const projectTags = pgTable(
       .notNull()
       .references(() => tags.id, { onDelete: "cascade" }),
   },
-  (table) => [
-    primaryKey({ columns: [table.projectId, table.tagId] }),
-  ],
+  (table) => ({
+    pk: primaryKey({ columns: [table.projectId, table.tagId] }),
+  }),
 );
 
 export const caseStudyLenses = pgTable(
@@ -703,9 +680,9 @@ export const caseStudyLenses = pgTable(
       .references(() => lenses.id, { onDelete: "cascade" }),
     relevanceScore: integer("relevance_score"),
   },
-  (table) => [
-    primaryKey({ columns: [table.caseStudyId, table.lensId] }),
-  ],
+  (table) => ({
+    pk: primaryKey({ columns: [table.caseStudyId, table.lensId] }),
+  }),
 );
 
 export const caseStudyPrinciples = pgTable(
@@ -719,9 +696,9 @@ export const caseStudyPrinciples = pgTable(
       .references(() => principles.id, { onDelete: "cascade" }),
     relevanceScore: integer("relevance_score"),
   },
-  (table) => [
-    primaryKey({ columns: [table.caseStudyId, table.principleId] }),
-  ],
+  (table) => ({
+    pk: primaryKey({ columns: [table.caseStudyId, table.principleId] }),
+  }),
 );
 
 export const caseStudyExperiences = pgTable(
@@ -734,9 +711,9 @@ export const caseStudyExperiences = pgTable(
       .notNull()
       .references(() => experiences.id, { onDelete: "cascade" }),
   },
-  (table) => [
-    primaryKey({ columns: [table.caseStudyId, table.experienceId] }),
-  ],
+  (table) => ({
+    pk: primaryKey({ columns: [table.caseStudyId, table.experienceId] }),
+  }),
 );
 
 export const caseStudyProjects = pgTable(
@@ -749,9 +726,9 @@ export const caseStudyProjects = pgTable(
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
   },
-  (table) => [
-    primaryKey({ columns: [table.caseStudyId, table.projectId] }),
-  ],
+  (table) => ({
+    pk: primaryKey({ columns: [table.caseStudyId, table.projectId] }),
+  }),
 );
 
 export const caseStudySkills = pgTable(
@@ -764,9 +741,9 @@ export const caseStudySkills = pgTable(
       .notNull()
       .references(() => skills.id, { onDelete: "cascade" }),
   },
-  (table) => [
-    primaryKey({ columns: [table.caseStudyId, table.skillId] }),
-  ],
+  (table) => ({
+    pk: primaryKey({ columns: [table.caseStudyId, table.skillId] }),
+  }),
 );
 
 export const caseStudyTags = pgTable(
@@ -779,9 +756,9 @@ export const caseStudyTags = pgTable(
       .notNull()
       .references(() => tags.id, { onDelete: "cascade" }),
   },
-  (table) => [
-    primaryKey({ columns: [table.caseStudyId, table.tagId] }),
-  ],
+  (table) => ({
+    pk: primaryKey({ columns: [table.caseStudyId, table.tagId] }),
+  }),
 );
 
 export const decisionPatternPrinciples = pgTable(
@@ -794,9 +771,9 @@ export const decisionPatternPrinciples = pgTable(
       .notNull()
       .references(() => principles.id, { onDelete: "cascade" }),
   },
-  (table) => [
-    primaryKey({ columns: [table.decisionPatternId, table.principleId] }),
-  ],
+  (table) => ({
+    pk: primaryKey({ columns: [table.decisionPatternId, table.principleId] }),
+  }),
 );
 
 export const lensRelations = relations(lenses, ({ many }) => ({

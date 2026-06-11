@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { getContactProfile, type ContactProfileRecord } from "@portfolio/db/queries";
+import { getContactResumeMeta } from "@portfolio/db/resume";
 
 import { PageHeader } from "@/components/page-header";
 import { getComingSoonFallback } from "@/lib/coming-soon-gate";
@@ -25,7 +26,7 @@ export default async function ContactPage() {
     return comingSoon;
   }
 
-  const profile = await getContactProfile();
+  const [profile, resume] = await Promise.all([getContactProfile(), getContactResumeMeta()]);
 
   return (
     <>
@@ -38,7 +39,7 @@ export default async function ContactPage() {
       <section className="mx-auto grid max-w-7xl gap-5 px-5 py-14 lg:grid-cols-[17rem_minmax(0,1fr)_17rem] lg:px-8 lg:py-16 xl:grid-cols-[19rem_minmax(0,1fr)_19rem]">
         <ContactProfileSidebar profile={profile} />
         <ContactForm />
-        <ConnectDirectlyCards profile={profile} />
+        <ConnectDirectlyCards profile={profile} hasResumeFile={Boolean(resume)} />
       </section>
     </>
   );
@@ -94,7 +95,13 @@ function ContactProfileSidebar({ profile }: { profile: ContactProfileRecord | nu
   );
 }
 
-function ConnectDirectlyCards({ profile }: { profile: ContactProfileRecord | null }) {
+function ConnectDirectlyCards({
+  profile,
+  hasResumeFile,
+}: {
+  profile: ContactProfileRecord | null;
+  hasResumeFile: boolean;
+}) {
   const cards = [
     {
       label: "LinkedIn",
@@ -113,8 +120,11 @@ function ConnectDirectlyCards({ profile }: { profile: ContactProfileRecord | nul
     },
     {
       label: "Resume",
-      description: "Latest experience and skills.",
-      href: profile?.resumeUrl,
+      description: hasResumeFile
+        ? "Download the latest resume (PDF)."
+        : "Latest experience and skills.",
+      // The uploaded file takes precedence over the external URL.
+      href: hasResumeFile ? "/resume" : profile?.resumeUrl,
     },
   ].filter((card) => card.href);
 

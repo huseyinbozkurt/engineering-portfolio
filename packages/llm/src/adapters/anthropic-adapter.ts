@@ -35,7 +35,10 @@ export class AnthropicAdapter implements LLMAdapter {
     this.baseUrl = config.baseUrl ?? "https://api.anthropic.com/v1";
     this.apiKey = config.apiKey;
     this.model = config.model;
-    this.timeoutMs = 900000;
+    // Honor the caller's timeout; the admin resolver enforces the 15-minute
+    // production floor. A hardcoded value here would silently cap higher
+    // configs (and break injectable timeouts in tests).
+    this.timeoutMs = config.timeoutMs ?? 900000;
     this.maxTokens = config.maxTokens ?? 12000;
     this.temperature = config.temperature ?? 0.2;
     this.apiVersion = config.apiVersion ?? "2023-06-01";

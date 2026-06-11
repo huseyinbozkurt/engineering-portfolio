@@ -851,6 +851,8 @@ function toProjectInput(
     principleIds: relationIds(part, "principleIds", idMap, existingRelationIds),
     skillIds: relationIds(part, "skillIds", idMap, existingRelationIds),
     tagIds: relationIds(part, "tagIds", idMap, existingRelationIds),
+    startDate: nullableDateField(part, "startDate"),
+    endDate: nullableDateField(part, "endDate"),
     position: numberField(part, "position"),
   };
 }
@@ -915,6 +917,10 @@ function nullableTextField(part: AiGeneratedStoryPart, key: string): string | nu
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function nullableDateField(part: AiGeneratedStoryPart, key: string): string | null {
+  const value = part.fields[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
 function numberField(part: AiGeneratedStoryPart, key: string): number {
   const value = part.fields[key];
   const numeric = typeof value === "number" ? value : Number(value);

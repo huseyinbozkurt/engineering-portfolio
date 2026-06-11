@@ -127,6 +127,20 @@
       "when": 1781093348496,
       "tag": "0017_wise_franklin_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1781130317386,
+      "tag": "0018_groovy_vance_astro",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1781149448423,
+      "tag": "0019_huge_invisible_woman",
+      "breakpoints": true
     }
   ]
 }

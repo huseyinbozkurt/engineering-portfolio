@@ -32,7 +32,8 @@ export class LocalQwenAdapter implements LLMAdapter {
       baseUrl: joinUrl(baseUrl, "v1"),
       apiKey: process.env.LOCAL_LLM_API_KEY ?? null,
       model: config.model ?? process.env.LOCAL_LLM_MODEL ?? "qwen-coder-next-q4",
-      timeoutMs: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 900000,
+      // 15-minute floor: local models routinely need long generation windows.
+      timeoutMs: Math.max(Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 900000, 900000),
       jsonResponseFormat: true,
     });
   }

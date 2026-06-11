@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export * from "./insights";
+export * from "./resume";
 export * from "./stories";
 
 export const contentStatusSchema = z.enum(["draft", "published", "archived"]);
@@ -139,6 +140,8 @@ export const createProjectSchema = z.object({
   status: contentStatusSchema.default("draft"),
   url: nullableUrlSchema,
   githubUrl: nullableUrlSchema,
+  startDate: nullableDateSchema,
+  endDate: nullableDateSchema,
   ...seoFields,
   experienceId: nullableUuidSchema,
   lensIds: relationIdsSchema,

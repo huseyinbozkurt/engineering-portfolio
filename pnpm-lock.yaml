@@ -11,6 +11,10 @@ overrides:
 importers:
 
   .:
+    dependencies:
+      drizzle-kit:
+        specifier: ^0.31.10
+        version: 0.31.10
     devDependencies:
       '@types/node':
         specifier: ^22.15.0
@@ -66,6 +70,13 @@ importers:
       react-markdown:
         specifier: ^10.1.0
         version: 10.1.0(@types/react@19.2.16)(react@19.2.7)
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
+    devDependencies:
+      '@next/env':
+        specifier: 16.2.7
+        version: 16.2.7
 
   apps/public-site:
     dependencies:

@@ -9,6 +9,7 @@ import { RichText } from "@/components/rich-text";
 import { SectionHeading } from "@/components/section-heading";
 import { StatusPill } from "@/components/status-pill";
 import { getComingSoonFallback } from "@/lib/coming-soon-gate";
+import { formatDateRange } from "@/lib/format";
 import { experienceHref, projectHref } from "@/lib/paths";
 import { siteConfig } from "@/lib/site";
 
@@ -131,6 +132,8 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
     detail.principles.length > 0 ||
     detail.tags.length > 0;
   const hasLinks = Boolean(project.url || project.githubUrl);
+  // Rendered only when at least one date is set — never a placeholder.
+  const projectDateRange = formatDateRange(project.startDate, project.endDate, false);
 
   return (
     <>
@@ -147,6 +150,9 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
             Project
           </p>
           <h1 className="mt-4 text-4xl font-semibold text-ink md:text-6xl">{project.name}</h1>
+          {projectDateRange ? (
+            <p className="mt-3 text-sm font-medium text-violet-200">{projectDateRange}</p>
+          ) : null}
           {detail.experience ? (
             <p className="mt-3 text-sm text-muted">
               Built during{" "}

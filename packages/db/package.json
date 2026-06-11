@@ -13,6 +13,7 @@
     "./contact": "./src/contact.ts",
     "./llm-tasks": "./src/llm-tasks.ts",
     "./queries": "./src/queries.ts",
+    "./resume": "./src/resume.ts",
     "./schema": "./src/schema.ts",
     "./cached-queries": "./src/cached-queries.ts"
   },

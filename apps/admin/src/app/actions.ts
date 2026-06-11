@@ -44,6 +44,7 @@ import {
   upsertContactProfile,
   upsertHomepageSettings,
 } from "@portfolio/db/admin";
+import { clearContactResume, setContactResume } from "@portfolio/db/resume";
 import type {
   CreateCaseStudyInput,
   CreateDecisionPatternInput,
@@ -84,6 +85,7 @@ import {
   updateProjectSchema,
   updateSkillSchema,
   updateTagSchema,
+  validateResumeFile,
 } from "@portfolio/validators";
 import type { z } from "zod";
 
@@ -311,6 +313,8 @@ export async function createProjectAction(formData: FormData): Promise<void> {
       skillIds: ids(formData, "skillIds"),
       tagIds: ids(formData, "tagIds"),
       position: text(formData, "position"),
+      startDate: text(formData, "startDate"),
+      endDate: text(formData, "endDate")
     }),
   );
 
@@ -572,6 +576,8 @@ export async function updateProjectAction(formData: FormData): Promise<void> {
       skillIds: ids(formData, "skillIds"),
       tagIds: ids(formData, "tagIds"),
       position: text(formData, "position"),
+      startDate: text(formData, "startDate"),
+      endDate: text(formData, "endDate")
     }),
   );
 
@@ -812,6 +818,8 @@ export async function patchProjectAction(formData: FormData): Promise<void> {
       "status",
       "url",
       "githubUrl",
+      "startDate",
+      "endDate",
       "experienceId",
       "seoTitle",
       "seoDescription",
@@ -948,4 +956,47 @@ export async function deleteTagAction(formData: FormData): Promise<void> {
   await setFlash("Tag deleted");
   refresh("/content/tags");
   redirect("/content/tags");
+}
+
+// ---------------------------------------------------------------------------
+// Resume file. Uploads replace the stored file (single-row table); the public
+// site streams it from /resume. Validation rules live in @portfolio/validators
+// so they are unit-tested and shared.
+// ---------------------------------------------------------------------------
+
+export async function uploadResumeAction(formData: FormData): Promise<void> {
+  const file = formData.get("resume");
+
+  if (!(file instanceof File) || file.size === 0) {
+    await setFlash("Choose a resume file to upload.", "error");
+    redirect("/content/contact-profile");
+  }
+
+  const validation = validateResumeFile({ name: file.name, type: file.type, size: file.size });
+
+  if (!validation.ok) {
+    await setFlash(validation.reason, "error");
+    redirect("/content/contact-profile");
+  }
+
+  await setContactResume({
+    fileName: file.name,
+    fileType: file.type,
+    fileSize: file.size,
+    data: Buffer.from(await file.arrayBuffer()),
+  });
+
+  await setFlash("Resume uploaded");
+  revalidatePath("/contact");
+  refresh("/content/contact-profile");
+  redirect("/content/contact-profile");
+}
+
+export async function deleteResumeAction(_formData: FormData): Promise<void> {
+  await clearContactResume();
+
+  await setFlash("Resume removed");
+  revalidatePath("/contact");
+  refresh("/content/contact-profile");
+  redirect("/content/contact-profile");
 }
