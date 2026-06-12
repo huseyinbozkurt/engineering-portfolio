@@ -518,6 +518,65 @@ function parseDraftProject(): CreateProjectInput {
   });
 }
 
+type ProjectModelExtensionValues = Pick<
+  CreateProjectInput,
+  | "visibility"
+  | "featured"
+  | "projectType"
+  | "projectStatus"
+  | "projectRole"
+  | "confidentiality"
+  | "ownership"
+  | "teamSize"
+  | "durationMonths"
+  | "motivation"
+  | "problem"
+  | "constraints"
+  | "tradeOffs"
+  | "whatILearned"
+  | "contributions"
+  | "decisions"
+  | "outcomes"
+  | "metrics"
+  | "evidence"
+  | "engineeringSignals"
+  | "projectSignals"
+  | "repositoryVisibility"
+  | "repositoryUrl"
+  | "demoAvailable"
+  | "demoUrl"
+>;
+
+function projectModelExtensionValues(project: ProjectModelExtensionValues): ProjectModelExtensionValues {
+  return {
+    visibility: project.visibility,
+    featured: project.featured,
+    projectType: project.projectType,
+    projectStatus: project.projectStatus,
+    projectRole: project.projectRole,
+    confidentiality: project.confidentiality,
+    ownership: project.ownership,
+    teamSize: project.teamSize,
+    durationMonths: project.durationMonths,
+    motivation: project.motivation,
+    problem: project.problem,
+    constraints: project.constraints,
+    tradeOffs: project.tradeOffs,
+    whatILearned: project.whatILearned,
+    contributions: project.contributions,
+    decisions: project.decisions,
+    outcomes: project.outcomes,
+    metrics: project.metrics,
+    evidence: project.evidence,
+    engineeringSignals: project.engineeringSignals,
+    projectSignals: project.projectSignals,
+    repositoryVisibility: project.repositoryVisibility,
+    repositoryUrl: project.repositoryUrl,
+    demoAvailable: project.demoAvailable,
+    demoUrl: project.demoUrl,
+  };
+}
+
 function parseDraftCaseStudy(): CreateCaseStudyInput {
   return createCaseStudySchema.parse({
     slug: draftSlug("case-study"),
@@ -1181,6 +1240,7 @@ export async function duplicateProjectAction(formData: FormData): Promise<void> 
       status: "draft",
       url: source.url ?? "",
       githubUrl: source.githubUrl ?? "",
+      ...projectModelExtensionValues(source),
       seoTitle: source.seoTitle ?? "",
       seoDescription: source.seoDescription ?? "",
       ogImage: source.ogImage ?? "",
@@ -1734,9 +1794,17 @@ export async function updateExperienceAction(formData: FormData): Promise<void> 
 }
 
 export async function updateProjectAction(formData: FormData): Promise<void> {
+  const id = text(formData, "id");
+  const existing = await getProjectById(id);
+
+  if (!existing) {
+    await setFlash("Project not found.", "error");
+    redirect("/content/projects");
+  }
+
   await updateProject(
     updateProjectSchema.parse({
-      id: text(formData, "id"),
+      id,
       slug: text(formData, "slug"),
       name: text(formData, "name"),
       description: text(formData, "description"),
@@ -1749,6 +1817,7 @@ export async function updateProjectAction(formData: FormData): Promise<void> {
       status: status(formData),
       url: text(formData, "url"),
       githubUrl: text(formData, "githubUrl"),
+      ...projectModelExtensionValues(existing),
       ...seo(formData),
       experienceId: text(formData, "experienceId"),
       lensIds: ids(formData, "lensIds"),
@@ -1849,6 +1918,7 @@ async function applyPatch(
   options: {
     schema: z.ZodTypeAny;
     scalarKeys: readonly string[];
+    jsonKeys?: readonly string[];
     relationKeys: readonly string[];
     listPath: string;
     run: (args: {
@@ -1860,12 +1930,14 @@ async function applyPatch(
 ): Promise<void> {
   const id = text(formData, "id");
   const declared = declaredFields(formData);
+  const jsonKeys = new Set(options.jsonKeys ?? []);
 
   // Only fields the section explicitly declared are read and validated.
-  const rawScalars: Record<string, string> = {};
+  const rawScalars: Record<string, unknown> = {};
   for (const key of options.scalarKeys) {
     if (declared.has(key)) {
-      rawScalars[key] = text(formData, key);
+      const rawValue = text(formData, key);
+      rawScalars[key] = jsonKeys.has(key) ? parseJsonFormField(rawValue, key) : rawValue;
     }
   }
 
@@ -1893,6 +1965,14 @@ async function applyPatch(
   revalidatePath(options.listPath);
   revalidatePath(`${options.listPath}/${id}`);
   revalidatePath(`${options.listPath}/${id}/preview`);
+}
+
+function parseJsonFormField(value: string, key: string): unknown {
+  try {
+    return value.trim() ? JSON.parse(value) : undefined;
+  } catch {
+    throw new Error(`Invalid JSON payload for ${key}.`);
+  }
 }
 
 export async function patchLensAction(formData: FormData): Promise<void> {
@@ -1996,6 +2076,31 @@ export async function patchProjectAction(formData: FormData): Promise<void> {
       "qaTechStack",
       "aiIntegrationTechStack",
       "deploymentTechStack",
+      "visibility",
+      "featured",
+      "projectType",
+      "projectStatus",
+      "projectRole",
+      "confidentiality",
+      "ownership",
+      "teamSize",
+      "durationMonths",
+      "motivation",
+      "problem",
+      "constraints",
+      "tradeOffs",
+      "whatILearned",
+      "contributions",
+      "decisions",
+      "outcomes",
+      "metrics",
+      "evidence",
+      "engineeringSignals",
+      "projectSignals",
+      "repositoryVisibility",
+      "repositoryUrl",
+      "demoAvailable",
+      "demoUrl",
       "status",
       "url",
       "githubUrl",
@@ -2006,6 +2111,18 @@ export async function patchProjectAction(formData: FormData): Promise<void> {
       "seoDescription",
       "ogImage",
       "position",
+    ],
+    jsonKeys: [
+      "constraints",
+      "tradeOffs",
+      "whatILearned",
+      "contributions",
+      "decisions",
+      "outcomes",
+      "metrics",
+      "evidence",
+      "engineeringSignals",
+      "projectSignals",
     ],
     relationKeys: ["lensIds", "principleIds", "skillIds", "tagIds"],
     listPath: "/content/projects",

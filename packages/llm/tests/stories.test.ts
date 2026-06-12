@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  PORTFOLIO_INSIGHT_PROMPT_V1,
   getInsightPromptVersion,
+  latestInsightPromptVersion,
 } from "../src/insights/prompt";
 import {
   AI_STORY_PROMPT_V1,
@@ -72,7 +72,7 @@ describe("AI_STORY_PROMPT_V1", () => {
   });
 
   it("never shares a system prompt with the insights pipeline (regression)", () => {
-    const insightPrompt = getInsightPromptVersion(PORTFOLIO_INSIGHT_PROMPT_V1).build(makeInput());
+    const insightPrompt = getInsightPromptVersion(latestInsightPromptVersion).build(makeInput());
 
     expect(prompt.system).not.toBe(insightPrompt.system);
     // Mutually exclusive identifying phrases — a swap in either direction fails loudly.

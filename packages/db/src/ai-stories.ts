@@ -1,5 +1,6 @@
 import { desc, eq, type InferSelectModel } from "drizzle-orm";
 
+import { createProjectSchema } from "@portfolio/validators";
 import type {
   CreateCaseStudyInput,
   CreateDecisionPatternInput,
@@ -830,7 +831,7 @@ function toProjectInput(
   idMap: Map<string, string>,
   existingRelationIds: ExistingRelationIds,
 ): CreateProjectInput {
-  return {
+  return createProjectSchema.parse({
     slug: slug(part, "slug", part.title),
     name: textField(part, "name", part.title),
     description: textField(part, "description", part.summary),
@@ -854,7 +855,7 @@ function toProjectInput(
     startDate: nullableDateField(part, "startDate"),
     endDate: nullableDateField(part, "endDate"),
     position: numberField(part, "position"),
-  };
+  });
 }
 
 function toCaseStudyInput(

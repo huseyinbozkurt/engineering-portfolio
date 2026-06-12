@@ -289,8 +289,8 @@ export async function getPublishedProjects(): Promise<ProjectRecord[]> {
     db
       .select()
       .from(projects)
-      .where(eq(projects.status, "published"))
-      .orderBy(asc(projects.position), asc(projects.name)),
+      .where(and(eq(projects.status, "published"), eq(projects.visibility, "public")))
+      .orderBy(desc(projects.featured), asc(projects.position), asc(projects.name)),
   );
 }
 
@@ -614,6 +614,7 @@ export async function getCaseStudyBySlug(
           and(
             eq(caseStudyProjects.caseStudyId, caseStudy.id),
             eq(projects.status, "published"),
+            eq(projects.visibility, "public"),
           ),
         )
         .orderBy(asc(projects.position), asc(projects.name)),
@@ -713,6 +714,7 @@ export async function getExperienceBySlug(
               eq(caseStudyExperiences.experienceId, experience.id),
               eq(caseStudies.status, "published"),
               eq(projects.status, "published"),
+              eq(projects.visibility, "public"),
             ),
           )
           .orderBy(asc(projects.position), asc(projects.name)),
@@ -721,7 +723,11 @@ export async function getExperienceBySlug(
           .select()
           .from(projects)
           .where(
-            and(eq(projects.experienceId, experience.id), eq(projects.status, "published")),
+            and(
+              eq(projects.experienceId, experience.id),
+              eq(projects.status, "published"),
+              eq(projects.visibility, "public"),
+            ),
           )
           .orderBy(asc(projects.position), asc(projects.name)),
         db
@@ -760,7 +766,13 @@ export async function getProjectBySlug(slug: string): Promise<ProjectDetailRecor
     const [project] = await db
       .select()
       .from(projects)
-      .where(and(eq(projects.slug, slug), eq(projects.status, "published")))
+      .where(
+        and(
+          eq(projects.slug, slug),
+          eq(projects.status, "published"),
+          eq(projects.visibility, "public"),
+        ),
+      )
       .limit(1);
 
     if (!project) {
@@ -883,6 +895,7 @@ export async function getLensBySlug(slug: string): Promise<LensDetailRecord | nu
             eq(caseStudyLenses.lensId, lens.id),
             eq(caseStudies.status, "published"),
             eq(projects.status, "published"),
+            eq(projects.visibility, "public"),
           ),
         )
         .orderBy(asc(projects.position), asc(projects.name)),

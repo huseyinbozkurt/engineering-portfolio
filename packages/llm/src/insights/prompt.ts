@@ -17,6 +17,7 @@ export interface InsightPromptVersion {
 }
 
 export const PORTFOLIO_INSIGHT_PROMPT_V1 = "portfolio-insight-v1";
+export const PORTFOLIO_INSIGHT_PROMPT_V2 = "portfolio-insight-v2";
 
 const promptV1: InsightPromptVersion = {
   version: PORTFOLIO_INSIGHT_PROMPT_V1,
@@ -89,11 +90,85 @@ const promptV1: InsightPromptVersion = {
   },
 };
 
-export const insightPromptVersions: Record<string, InsightPromptVersion> = {
-  [PORTFOLIO_INSIGHT_PROMPT_V1]: promptV1,
+const promptV2: InsightPromptVersion = {
+  version: PORTFOLIO_INSIGHT_PROMPT_V2,
+  build(input) {
+    return {
+      system: [
+        "You are a rigorous career-intelligence analyst evaluating an engineering portfolio for an executive readout.",
+        "",
+        "Analyze ONLY the provided dataset. Do not invent achievements, metrics, projects, employers, dates, skills, responsibilities, outcomes, leadership claims, or evidence refs.",
+        "",
+        "EVIDENCE RULES:",
+        "",
+        "* Primary evidence: experiences, projects, caseStudies.",
+        "* Supporting evidence: principles, lenses, decisionPatterns, skills, tags, relatedRefs.",
+        "* Supporting evidence can reinforce a claim but must never justify high confidence alone.",
+        "* If an experience, project, and case study describe the same work, treat them as one evidence cluster.",
+        "* Every claim must cite dataset refs exactly as written.",
+        '* Evidence objects must use this format only: {"ref": "...", "note": "..."}.',
+        "* Never fabricate refs or evidence notes.",
+        "",
+        "CONFIDENCE RULES:",
+        "",
+        "* high: at least two strong primary evidence clusters support the claim.",
+        "* medium: one strong primary evidence cluster OR two medium primary evidence records support the claim.",
+        "* low: evidence is thin, ambiguous, metadata-heavy, summary-level, or mostly supported by non-primary records.",
+        "* When in doubt, lower confidence.",
+        "",
+        "RADAR SCORING RULES:",
+        "",
+        "* 90-100: repeated strong evidence across multiple evidence clusters.",
+        "* 75-89: multiple strong primary records with demonstrated outcomes.",
+        "* 60-74: at least one strong implementation example.",
+        "* 40-59: mostly summary-level support.",
+        "* 20-39: weak signal with limited support.",
+        "* 0-19: little or no meaningful evidence.",
+        "* Scores must be integers from 0 to 100.",
+        "",
+        "BLIND SPOTS:",
+        "",
+        "* Describe only presentation gaps in the portfolio.",
+        "* Do not invent missing experience.",
+        "* Frame each blind spot as an actionable improvement to the portfolio using existing material.",
+        "",
+        "OUTPUT RULES:",
+        "",
+        "* Return valid JSON only.",
+        "* Do not include markdown, commentary, warnings, or explanations outside JSON.",
+        "* Match the response shape exactly.",
+        '* Do not add, remove, rename, reorder, or omit keys.',
+        '* Use enum values exactly: "low", "medium", "high".',
+        "* Keep evidence arrays to max 6 entries.",
+        "* Keep strengthSignals, blindSpots, trajectory stages, opportunityHeatmap, and groundedDataNotes within the requested limits.",
+        "",
+        "BEFORE RETURNING:",
+        "",
+        "* Validate every evidence ref exists in input.records.",
+        "* Validate all required fields are present.",
+        "* Validate enum values.",
+        "* Validate radar scores are integers between 0 and 100.",
+        "* Validate output is strict JSON only.",
+      ].join("\n"),
+      user: [
+        "Produce the portfolio intelligence report for the dataset below.",
+        "",
+        "RESPONSE SHAPE:",
+        JSON.stringify(responseShape(), null, 2),
+        "",
+        "DATASET:",
+        JSON.stringify(input, null, 2),
+      ].join("\n"),
+    };
+  },
 };
 
-export const latestInsightPromptVersion = PORTFOLIO_INSIGHT_PROMPT_V1;
+export const insightPromptVersions: Record<string, InsightPromptVersion> = {
+  [PORTFOLIO_INSIGHT_PROMPT_V1]: promptV1,
+  [PORTFOLIO_INSIGHT_PROMPT_V2]: promptV2,
+};
+
+export const latestInsightPromptVersion = PORTFOLIO_INSIGHT_PROMPT_V2;
 
 export function getInsightPromptVersion(version: string): InsightPromptVersion {
   const entry = insightPromptVersions[version];

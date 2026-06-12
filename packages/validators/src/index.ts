@@ -58,6 +58,11 @@ export const nullableDateSchema = z.preprocess(
     .default(null),
 );
 
+export const nullableIntegerSchema = z.preprocess(
+  emptyStringToNull,
+  z.coerce.number().int().nullable().default(null),
+);
+
 export const nullableSlugSchema = z.preprocess(
   emptyStringToNull,
   z
@@ -127,6 +132,144 @@ export const createExperienceSchema = z.object({
   position: z.coerce.number().int().default(0),
 });
 
+export const projectVisibilitySchema = z.enum(["public", "private"]);
+export const projectTypeSchema = z.enum([
+  "product",
+  "internal-tool",
+  "experiment",
+  "client-work",
+  "open-source",
+  "learning",
+]);
+export const projectStatusSchema = z.enum([
+  "idea",
+  "planning",
+  "in-progress",
+  "active",
+  "maintenance",
+  "completed",
+  "sunset",
+]);
+export const projectRoleSchema = z.enum([
+  "solo-builder",
+  "technical-lead",
+  "team-member",
+  "founder",
+  "maintainer",
+  "advisor",
+]);
+export const projectConfidentialitySchema = z.enum(["none", "anonymized", "nda"]);
+export const projectOwnershipSchema = z.enum([
+  "contributor",
+  "primary-owner",
+  "end-to-end-owner",
+]);
+export const projectContributionCategorySchema = z.enum([
+  "architecture",
+  "backend",
+  "frontend",
+  "infrastructure",
+  "testing",
+  "delivery",
+  "product",
+]);
+export const projectOutcomeTypeSchema = z.enum([
+  "business",
+  "engineering",
+  "operational",
+  "learning",
+]);
+export const projectEvidenceTypeSchema = z.enum([
+  "architecture-diagram",
+  "screenshot",
+  "demo-video",
+  "store-listing",
+  "blog-post",
+  "documentation",
+  "presentation",
+  "other",
+]);
+export const projectEvidenceVisibilitySchema = z.enum(["public", "private"]);
+export const projectSignalStrengthSchema = z.enum(["none", "basic", "strong"]);
+export const repositoryVisibilitySchema = z.enum(["public", "private", "unavailable"]);
+
+const projectStringListSchema = z.array(z.string().trim().min(1).max(1000)).default([]);
+
+export const projectContributionSchema = z.object({
+  category: projectContributionCategorySchema,
+  description: z.string().trim().min(1).max(2000),
+});
+
+export const projectDecisionSchema = z.object({
+  title: z.string().trim().min(1).max(220),
+  context: z.string().trim().max(4000).default(""),
+  alternativesConsidered: projectStringListSchema,
+  selectedApproach: z.string().trim().max(4000).default(""),
+  rationale: z.string().trim().max(4000).default(""),
+});
+
+export const projectOutcomeSchema = z.object({
+  type: projectOutcomeTypeSchema,
+  description: z.string().trim().min(1).max(2000),
+});
+
+export const projectMetricSchema = z.object({
+  label: z.string().trim().min(1).max(160),
+  value: z.string().trim().min(1).max(160),
+});
+
+export const projectEvidenceSchema = z.object({
+  type: projectEvidenceTypeSchema,
+  title: z.string().trim().min(1).max(220),
+  description: z.string().trim().max(2000).optional(),
+  url: z.string().trim().url().optional(),
+  visibility: projectEvidenceVisibilitySchema.default("public"),
+});
+
+export const defaultProjectEngineeringSignals = {
+  testing: "none",
+  ciCd: "none",
+  observability: "none",
+  documentation: "none",
+  security: "none",
+  infrastructure: "none",
+  aiIntegration: "none",
+} as const;
+
+export const projectEngineeringSignalsSchema = z
+  .object({
+    testing: projectSignalStrengthSchema.default("none"),
+    ciCd: projectSignalStrengthSchema.default("none"),
+    observability: projectSignalStrengthSchema.default("none"),
+    documentation: projectSignalStrengthSchema.default("none"),
+    security: projectSignalStrengthSchema.default("none"),
+    infrastructure: projectSignalStrengthSchema.default("none"),
+    aiIntegration: projectSignalStrengthSchema.default("none"),
+  })
+  .default(defaultProjectEngineeringSignals);
+
+export const defaultProjectSignals = {
+  complexity: 3,
+  ambiguity: 3,
+  ownership: 3,
+  crossFunctionality: 3,
+  operationalResponsibility: 3,
+  innovation: 3,
+} as const;
+
+const projectSignalScoreSchema = z.coerce.number().int().min(1).max(5).default(3);
+
+export const projectSignalsSchema = z
+  .object({
+    complexity: projectSignalScoreSchema,
+    ambiguity: projectSignalScoreSchema,
+    ownership: projectSignalScoreSchema,
+    crossFunctionality: projectSignalScoreSchema,
+    operationalResponsibility: projectSignalScoreSchema,
+    innovation: projectSignalScoreSchema,
+  })
+  .default(defaultProjectSignals);
+
 export const createProjectSchema = z.object({
   slug: slugSchema,
   name: z.string().trim().max(180).default(""),
@@ -137,6 +280,31 @@ export const createProjectSchema = z.object({
   qaTechStack: richTextSchema,
   aiIntegrationTechStack: richTextSchema,
   deploymentTechStack: richTextSchema,
+  visibility: projectVisibilitySchema.default("public"),
+  featured: z.coerce.boolean().default(false),
+  projectType: projectTypeSchema.default("product"),
+  projectStatus: projectStatusSchema.default("completed"),
+  projectRole: projectRoleSchema.default("solo-builder"),
+  confidentiality: projectConfidentialitySchema.default("none"),
+  ownership: projectOwnershipSchema.default("end-to-end-owner"),
+  teamSize: nullableIntegerSchema,
+  durationMonths: nullableIntegerSchema,
+  motivation: richTextSchema,
+  problem: richTextSchema,
+  constraints: projectStringListSchema,
+  tradeOffs: projectStringListSchema,
+  whatILearned: projectStringListSchema,
+  contributions: z.array(projectContributionSchema).default([]),
+  decisions: z.array(projectDecisionSchema).default([]),
+  outcomes: z.array(projectOutcomeSchema).default([]),
+  metrics: z.array(projectMetricSchema).default([]),
+  evidence: z.array(projectEvidenceSchema).default([]),
+  engineeringSignals: projectEngineeringSignalsSchema,
+  projectSignals: projectSignalsSchema,
+  repositoryVisibility: repositoryVisibilitySchema.default("unavailable"),
+  repositoryUrl: nullableUrlSchema,
+  demoAvailable: z.coerce.boolean().default(false),
+  demoUrl: nullableUrlSchema,
   status: contentStatusSchema.default("draft"),
   url: nullableUrlSchema,
   githubUrl: nullableUrlSchema,
@@ -295,6 +463,20 @@ export type CreateLensInput = z.infer<typeof createLensSchema>;
 export type CreatePrincipleInput = z.infer<typeof createPrincipleSchema>;
 export type CreateDecisionPatternInput = z.infer<typeof createDecisionPatternSchema>;
 export type CreateExperienceInput = z.infer<typeof createExperienceSchema>;
+export type ProjectVisibility = z.infer<typeof projectVisibilitySchema>;
+export type ProjectType = z.infer<typeof projectTypeSchema>;
+export type ProjectStatus = z.infer<typeof projectStatusSchema>;
+export type ProjectRole = z.infer<typeof projectRoleSchema>;
+export type ProjectConfidentiality = z.infer<typeof projectConfidentialitySchema>;
+export type ProjectOwnership = z.infer<typeof projectOwnershipSchema>;
+export type ProjectContribution = z.infer<typeof projectContributionSchema>;
+export type ProjectDecision = z.infer<typeof projectDecisionSchema>;
+export type ProjectOutcome = z.infer<typeof projectOutcomeSchema>;
+export type ProjectMetric = z.infer<typeof projectMetricSchema>;
+export type ProjectEvidence = z.infer<typeof projectEvidenceSchema>;
+export type ProjectEngineeringSignals = z.infer<typeof projectEngineeringSignalsSchema>;
+export type ProjectSignals = z.infer<typeof projectSignalsSchema>;
+export type RepositoryVisibility = z.infer<typeof repositoryVisibilitySchema>;
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type CreateCaseStudyInput = z.infer<typeof createCaseStudySchema>;
 export type CreateSkillInput = z.infer<typeof createSkillSchema>;

@@ -8,6 +8,7 @@ import type {
 } from "@portfolio/db/queries";
 
 import { formatDateRange } from "@/lib/format";
+import { projectTypeLabels } from "@/lib/project-display";
 
 export interface RecognitionItem {
   id: string;
@@ -99,18 +100,11 @@ export function getRecognitionItems(experiences: ExperienceRecord[]): Recognitio
 }
 
 export function getProjectMeta(project: ProjectRecord): string {
-  const stackCount = [
-    project.developmentTechStack,
-    project.qaTechStack,
-    project.aiIntegrationTechStack,
-    project.deploymentTechStack,
-  ].filter((value) => value.trim()).length;
-
-  if (stackCount > 0) {
-    return `${stackCount} stack areas`;
+  if (project.featured) {
+    return "Featured Project";
   }
 
-  return project.url || project.githubUrl ? "Linked project" : "Published project";
+  return projectTypeLabels[project.projectType];
 }
 
 function parseAwards(value: string): string[] {

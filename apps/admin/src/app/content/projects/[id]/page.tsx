@@ -1,7 +1,11 @@
 import { Pencil } from "lucide-react";
 import { notFound } from "next/navigation";
 
-import { getAdminContentIndex, getProjectById } from "@portfolio/db/queries";
+import {
+  getAdminContentIndex,
+  getProjectById,
+  type ProjectEditRecord,
+} from "@portfolio/db/queries";
 
 import {
   archiveProjectAction,
@@ -21,7 +25,17 @@ import { SectionEditForm } from "@/components/detail/section-edit-form";
 import { SettingsModal } from "@/components/detail/settings-modal";
 import { AiReviewPanel } from "@/components/editorial/ai-review-panel";
 import { WorkflowActions } from "@/components/editorial/workflow-actions";
-import { CheckboxGroup, Field, SelectField, SeoFields } from "@/components/form-controls";
+import { Checkbox, CheckboxGroup, Field, SelectField, SeoFields } from "@/components/form-controls";
+import {
+  ProjectContributionsEditor,
+  ProjectDecisionsEditor,
+  ProjectEngineeringSignalsEditor,
+  ProjectEvidenceEditor,
+  ProjectMetricsEditor,
+  ProjectOutcomesEditor,
+  ProjectSignalsEditor,
+  ProjectStringListEditor,
+} from "@/components/forms/project-structured-editors";
 import { RichTextField } from "@/components/forms/rich-text-field";
 import { LlmTaskAutoStarter } from "@/components/llm-task-auto-starter";
 import { ModalPanel } from "@/components/modal-panel";
@@ -31,6 +45,24 @@ import { siblingLinks } from "@/lib/detail-nav";
 import { formatProjectDateRange, projectTitleLabel } from "@/lib/editorial-display";
 import { formatDate } from "@/lib/format";
 import { getLlmConnectionStatuses } from "@/lib/llm-config";
+import {
+  contributionCategoryOptions,
+  engineeringSignalLabels,
+  evidenceTypeOptions,
+  normalizeEngineeringSignals,
+  normalizeProjectSignals,
+  optionLabel,
+  outcomeTypeOptions,
+  projectConfidentialityOptions,
+  projectLifecycleOptions,
+  projectOwnershipOptions,
+  projectRoleOptions,
+  projectSignalLabels,
+  projectTypeOptions,
+  projectVisibilityOptions,
+  repositoryVisibilityOptions,
+  signalStrengthOptions,
+} from "@/lib/project-model";
 import { publicHrefs } from "@/lib/public-site";
 
 export const dynamic = "force-dynamic";
@@ -92,6 +124,19 @@ export default async function EditProjectPage({ params }: EditPageProps) {
   ].filter((box) => box.value.trim().length > 0);
   const architectureEmpty =
     project.architecture.trim().length === 0 && stackBoxes.length === 0;
+  const engineeringSignals = normalizeEngineeringSignals(project.engineeringSignals);
+  const projectSignals = normalizeProjectSignals(project.projectSignals);
+  const narrativeEmpty =
+    project.motivation.trim().length === 0 &&
+    project.problem.trim().length === 0 &&
+    project.constraints.length === 0 &&
+    project.tradeOffs.length === 0 &&
+    project.whatILearned.length === 0;
+  const repositoryDemoEmpty =
+    project.repositoryVisibility === "unavailable" &&
+    !project.repositoryUrl &&
+    !project.demoAvailable &&
+    !project.demoUrl;
 
   // Shown in the header only when at least one date is set.
   const projectDateRange = formatProjectDateRange(project.startDate, project.endDate);
@@ -315,38 +360,244 @@ export default async function EditProjectPage({ params }: EditPageProps) {
             title="Overview"
             id={project.id}
             action={patchProjectAction}
-            fields="description"
-            value={project.description}
+            fields={["description", "details"]}
+            isEmpty={project.description.trim().length === 0 && project.details.trim().length === 0}
             addLabel="Add an overview"
+            modalDescription="Edit the public summary and longer-form project detail."
+            preview={
+              <div className="grid gap-5">
+                {project.description.trim().length > 0 ? (
+                  <div>
+                    <h3 className="ui-eyebrow mb-3">Summary</h3>
+                    <RichTextView value={project.description} />
+                  </div>
+                ) : null}
+                {project.details.trim().length > 0 ? (
+                  <div>
+                    <h3 className="ui-eyebrow mb-3">Details</h3>
+                    <RichTextView value={project.details} />
+                  </div>
+                ) : null}
+              </div>
+            }
             formFields={
-              <RichTextField
-                label="Overview"
-                name="description"
-                rows={6}
-                defaultValue={project.description}
-                hint="Short summary shown on project cards and at the top of the project page."
-              />
+              <>
+                <RichTextField
+                  label="Summary"
+                  name="description"
+                  rows={6}
+                  defaultValue={project.description}
+                  hint="Short summary shown on project cards and at the top of the project page."
+                />
+                <RichTextField
+                  label="Details"
+                  name="details"
+                  rows={12}
+                  defaultValue={project.details}
+                  hint="Long-form, in-depth content shown on the project detail page."
+                />
+              </>
             }
           />
           <SectionCard
-            title="Details"
+            title="Classification"
             id={project.id}
             action={patchProjectAction}
-            fields="details"
-            value={project.details}
-            addLabel="Add details"
+            fields={[
+              "visibility",
+              "featured",
+              "projectType",
+              "projectStatus",
+              "projectRole",
+              "confidentiality",
+              "ownership",
+              "teamSize",
+              "durationMonths",
+            ]}
+            isEmpty={false}
+            addLabel="Edit classification"
+            modalDescription="Classify the project separately from its editorial draft/published status."
+            eyebrow="Editorial status controls publishing. Project lifecycle status describes the work itself."
+            preview={<ClassificationPreview project={project} />}
             formFields={
-              <RichTextField
-                label="Details"
-                name="details"
-                rows={14}
-                defaultValue={project.details}
-                hint="Long-form, in-depth content shown on the project detail page."
-              />
+              <>
+                <div className="rounded-xl border border-line bg-white/[0.02] p-4 text-sm leading-6 text-muted">
+                  <p>
+                    Editorial status controls whether this record is draft, published, or archived.
+                    Project lifecycle status describes whether the underlying project is active,
+                    completed, in maintenance, or similar.
+                  </p>
+                  <p className="mt-2">
+                    Visibility controls admin/public presentation. Confidentiality describes how much
+                    sensitive detail the project can safely disclose.
+                  </p>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <SelectField
+                    label="Visibility"
+                    name="visibility"
+                    options={[...projectVisibilityOptions]}
+                    defaultValue={project.visibility}
+                  />
+                  <Checkbox label="Featured" name="featured" defaultChecked={project.featured} />
+                  <SelectField
+                    label="Project type"
+                    name="projectType"
+                    options={[...projectTypeOptions]}
+                    defaultValue={project.projectType}
+                  />
+                  <SelectField
+                    label="Lifecycle status"
+                    name="projectStatus"
+                    options={[...projectLifecycleOptions]}
+                    defaultValue={project.projectStatus}
+                  />
+                  <SelectField
+                    label="Role"
+                    name="projectRole"
+                    options={[...projectRoleOptions]}
+                    defaultValue={project.projectRole}
+                  />
+                  <SelectField
+                    label="Ownership"
+                    name="ownership"
+                    options={[...projectOwnershipOptions]}
+                    defaultValue={project.ownership}
+                  />
+                  <SelectField
+                    label="Confidentiality"
+                    name="confidentiality"
+                    options={[...projectConfidentialityOptions]}
+                    defaultValue={project.confidentiality}
+                  />
+                  <Field
+                    label="Team size"
+                    name="teamSize"
+                    type="number"
+                    defaultValue={project.teamSize === null ? undefined : String(project.teamSize)}
+                    hint="Leave empty when unknown or not useful."
+                  />
+                  <Field
+                    label="Duration in months"
+                    name="durationMonths"
+                    type="number"
+                    defaultValue={
+                      project.durationMonths === null ? undefined : String(project.durationMonths)
+                    }
+                    hint="Leave empty when the work was open-ended."
+                  />
+                </div>
+              </>
             }
           />
           <SectionCard
-            title="Architecture"
+            title="Narrative"
+            id={project.id}
+            action={patchProjectAction}
+            fields={["motivation", "problem", "constraints", "tradeOffs", "whatILearned"]}
+            isEmpty={narrativeEmpty}
+            addLabel="Add narrative"
+            modalDescription="Capture why the project exists, what made it hard, and what changed your thinking."
+            preview={
+              <div className="grid gap-5">
+                {project.motivation.trim().length > 0 ? (
+                  <NarrativeBlock title="Motivation" value={project.motivation} />
+                ) : null}
+                {project.problem.trim().length > 0 ? (
+                  <NarrativeBlock title="Problem" value={project.problem} />
+                ) : null}
+                <StringListPreview title="Constraints" items={project.constraints} />
+                <StringListPreview title="Trade-offs" items={project.tradeOffs} />
+                <StringListPreview title="What I Learned" items={project.whatILearned} />
+              </div>
+            }
+            formFields={
+              <>
+                <RichTextField
+                  label="Motivation"
+                  name="motivation"
+                  rows={6}
+                  defaultValue={project.motivation}
+                  hint="Why this project exists and what triggered the work."
+                />
+                <RichTextField
+                  label="Problem"
+                  name="problem"
+                  rows={6}
+                  defaultValue={project.problem}
+                  hint="The challenge this project was meant to solve."
+                />
+                <ProjectStringListEditor
+                  name="constraints"
+                  label="Constraints"
+                  defaultItems={project.constraints}
+                  placeholder="Privacy requirement, cost limit, compatibility constraint..."
+                  hint="Privacy, cost, time, compatibility, operational, or regulatory limits."
+                  addLabel="Add constraint"
+                />
+                <ProjectStringListEditor
+                  name="tradeOffs"
+                  label="Trade-offs"
+                  defaultItems={project.tradeOffs}
+                  placeholder="Chose local processing over hosted inference to protect privacy."
+                  hint="What you chose, and what you consciously did not choose."
+                  addLabel="Add trade-off"
+                />
+                <ProjectStringListEditor
+                  name="whatILearned"
+                  label="What I learned"
+                  defaultItems={project.whatILearned}
+                  placeholder="Operational lesson, product lesson, engineering lesson..."
+                  hint="Engineering, product, or operational lessons."
+                  addLabel="Add lesson"
+                />
+              </>
+            }
+          />
+          <SectionCard
+            title="Contributions"
+            id={project.id}
+            action={patchProjectAction}
+            fields="contributions"
+            isEmpty={project.contributions.length === 0}
+            addLabel="Add contributions"
+            preview={<ContributionsPreview items={project.contributions} />}
+            formFields={<ProjectContributionsEditor name="contributions" defaultItems={project.contributions} />}
+          />
+          <SectionCard
+            title="Key Decisions"
+            id={project.id}
+            action={patchProjectAction}
+            fields="decisions"
+            isEmpty={project.decisions.length === 0}
+            addLabel="Add key decisions"
+            modalDescription="Use this to capture engineering judgment: what alternatives existed, what you selected, and why."
+            preview={<DecisionsPreview items={project.decisions} />}
+            formFields={<ProjectDecisionsEditor name="decisions" defaultItems={project.decisions} />}
+            modalSize="xl"
+          />
+          <SectionCard
+            title="Outcomes"
+            id={project.id}
+            action={patchProjectAction}
+            fields="outcomes"
+            isEmpty={project.outcomes.length === 0}
+            addLabel="Add outcomes"
+            preview={<OutcomesPreview items={project.outcomes} />}
+            formFields={<ProjectOutcomesEditor name="outcomes" defaultItems={project.outcomes} />}
+          />
+          <SectionCard
+            title="Metrics"
+            id={project.id}
+            action={patchProjectAction}
+            fields="metrics"
+            isEmpty={project.metrics.length === 0}
+            addLabel="Add metrics"
+            preview={<MetricsPreview items={project.metrics} />}
+            formFields={<ProjectMetricsEditor name="metrics" defaultItems={project.metrics} />}
+          />
+          <SectionCard
+            title="Architecture & Tech Stacks"
             id={project.id}
             action={patchProjectAction}
             fields={[
@@ -358,6 +609,7 @@ export default async function EditProjectPage({ params }: EditPageProps) {
             ]}
             isEmpty={architectureEmpty}
             addLabel="Add architecture"
+            modalDescription="Preserve the existing architecture narrative and stack fields."
             preview={
               <div className="grid gap-4">
                 {project.architecture.trim().length > 0 ? (
@@ -420,6 +672,207 @@ export default async function EditProjectPage({ params }: EditPageProps) {
               </>
             }
           />
+          <SectionCard
+            title="Engineering Maturity"
+            id={project.id}
+            action={patchProjectAction}
+            fields="engineeringSignals"
+            isEmpty={false}
+            addLabel="Edit engineering maturity"
+            preview={<EngineeringSignalsPreview signals={engineeringSignals} />}
+            formFields={
+              <ProjectEngineeringSignalsEditor
+                name="engineeringSignals"
+                defaultValue={engineeringSignals}
+              />
+            }
+          />
+          <SectionCard
+            title="Project Signals"
+            id={project.id}
+            action={patchProjectAction}
+            fields="projectSignals"
+            isEmpty={false}
+            addLabel="Edit project signals"
+            modalDescription="Self-assessed supporting signals. These help editorial prioritization; they are not proof by themselves."
+            preview={<ProjectSignalsPreview signals={projectSignals} />}
+            formFields={<ProjectSignalsEditor name="projectSignals" defaultValue={projectSignals} />}
+          />
+          <SectionCard
+            title="Evidence"
+            id={project.id}
+            action={patchProjectAction}
+            fields="evidence"
+            isEmpty={project.evidence.length === 0}
+            addLabel="Add evidence"
+            preview={<EvidencePreview items={project.evidence} />}
+            formFields={<ProjectEvidenceEditor name="evidence" defaultItems={project.evidence} />}
+            modalSize="xl"
+          />
+          <SectionCard
+            title="Repository & Demo"
+            id={project.id}
+            action={patchProjectAction}
+            fields={[
+              "repositoryVisibility",
+              "repositoryUrl",
+              "demoAvailable",
+              "demoUrl",
+              "url",
+              "githubUrl",
+            ]}
+            isEmpty={repositoryDemoEmpty && !project.url && !project.githubUrl}
+            addLabel="Add repository or demo"
+            modalDescription="Use repository/demo as the preferred fields. Legacy URL and GitHub URL remain for compatibility."
+            preview={<RepositoryDemoPreview project={project} />}
+            formFields={
+              <>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <SelectField
+                    label="Repository visibility"
+                    name="repositoryVisibility"
+                    options={[...repositoryVisibilityOptions]}
+                    defaultValue={project.repositoryVisibility}
+                    hint="Use unavailable when source access should not be represented."
+                  />
+                  <Field
+                    label="Repository URL"
+                    name="repositoryUrl"
+                    type="url"
+                    defaultValue={project.repositoryUrl ?? undefined}
+                  />
+                  <Checkbox
+                    label="Demo available"
+                    name="demoAvailable"
+                    defaultChecked={project.demoAvailable}
+                  />
+                  <Field
+                    label="Demo URL"
+                    name="demoUrl"
+                    type="url"
+                    defaultValue={project.demoUrl ?? undefined}
+                  />
+                </div>
+                <div className="grid gap-4 rounded-xl border border-line bg-white/[0.02] p-4 md:grid-cols-2">
+                  <Field
+                    label="Legacy URL"
+                    name="url"
+                    type="url"
+                    defaultValue={project.url ?? undefined}
+                    hint="Compatibility field. Keep saving it until public pages move to demoUrl."
+                  />
+                  <Field
+                    label="Legacy GitHub URL"
+                    name="githubUrl"
+                    type="url"
+                    defaultValue={project.githubUrl ?? undefined}
+                    hint="Compatibility field. Keep saving it until public pages move to repositoryUrl."
+                  />
+                </div>
+              </>
+            }
+          />
+          <SectionCard
+            title="Relationships"
+            id={project.id}
+            action={patchProjectAction}
+            fields={["experienceId", "lensIds", "principleIds", "skillIds", "tagIds"]}
+            isEmpty={metaGroups.every((group) => group.items.length === 0)}
+            addLabel="Add relationships"
+            preview={<RelationshipsPreview groups={metaGroups} />}
+            formFields={
+              <>
+                <SelectField
+                  label="Related position"
+                  name="experienceId"
+                  options={positionOptions}
+                  defaultValue={project.experienceId ?? ""}
+                />
+                <CheckboxGroup
+                  label="Related lenses"
+                  name="lensIds"
+                  emptyLabel="No lenses available."
+                  options={lensOptions}
+                  selectedIds={project.lensIds}
+                />
+                <CheckboxGroup
+                  label="Related principles"
+                  name="principleIds"
+                  emptyLabel="No principles available."
+                  options={principleOptions}
+                  selectedIds={project.principleIds}
+                />
+                <CheckboxGroup
+                  label="Skills"
+                  name="skillIds"
+                  emptyLabel="No skills available."
+                  options={skillOptions}
+                  selectedIds={project.skillIds}
+                />
+                <CheckboxGroup
+                  label="Tags"
+                  name="tagIds"
+                  emptyLabel="No tags available."
+                  options={tagOptions}
+                  selectedIds={project.tagIds}
+                />
+              </>
+            }
+          />
+          <SectionCard
+            title="Publishing / Metadata"
+            id={project.id}
+            action={patchProjectAction}
+            fields={[
+              "slug",
+              "startDate",
+              "endDate",
+              "position",
+              "seoTitle",
+              "seoDescription",
+              "ogImage",
+            ]}
+            isEmpty={false}
+            addLabel="Edit metadata"
+            eyebrow="Draft, publish, unpublish, and archive actions stay in the page header."
+            preview={
+              <MetadataPreview
+                slug={project.slug}
+                position={project.position}
+                dateRange={projectDateRange}
+                seoTitle={project.seoTitle}
+                seoDescription={project.seoDescription}
+                ogImage={project.ogImage}
+              />
+            }
+            formFields={
+              <>
+                <Field label="Slug" name="slug" required defaultValue={project.slug} />
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <Field
+                    label="Start date"
+                    name="startDate"
+                    type="date"
+                    defaultValue={project.startDate ?? undefined}
+                  />
+                  <Field
+                    label="End date"
+                    name="endDate"
+                    type="date"
+                    defaultValue={project.endDate ?? undefined}
+                  />
+                  <Field
+                    label="Order"
+                    name="position"
+                    type="number"
+                    defaultValue={String(project.position)}
+                    hint="Lower shows first."
+                  />
+                </div>
+                <SeoFields defaults={project} />
+              </>
+            }
+          />
         </div>
 
         <aside className="grid h-fit content-start gap-6">
@@ -445,5 +898,310 @@ export default async function EditProjectPage({ params }: EditPageProps) {
         <DeleteForm action={deleteProjectAction} id={project.id} label="Delete project" />
       </div>
     </main>
+  );
+}
+
+function ClassificationPreview({ project }: { project: ProjectEditRecord }) {
+  return (
+    <DefinitionGrid
+      items={[
+        ["Visibility", optionLabel(projectVisibilityOptions, project.visibility)],
+        ["Featured", project.featured ? "Yes" : "No"],
+        ["Type", optionLabel(projectTypeOptions, project.projectType)],
+        ["Lifecycle", optionLabel(projectLifecycleOptions, project.projectStatus)],
+        ["Role", optionLabel(projectRoleOptions, project.projectRole)],
+        ["Ownership", optionLabel(projectOwnershipOptions, project.ownership)],
+        ["Confidentiality", optionLabel(projectConfidentialityOptions, project.confidentiality)],
+        ["Team size", project.teamSize === null ? "Not set" : String(project.teamSize)],
+        [
+          "Duration",
+          project.durationMonths === null ? "Not set" : `${project.durationMonths} months`,
+        ],
+      ]}
+    />
+  );
+}
+
+function NarrativeBlock({ title, value }: { title: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-line bg-white/[0.02] p-5">
+      <h3 className="ui-eyebrow mb-3">{title}</h3>
+      <RichTextView value={value} dense />
+    </div>
+  );
+}
+
+function StringListPreview({ title, items }: { title: string; items: readonly string[] }) {
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <div>
+      <h3 className="ui-eyebrow mb-3">{title}</h3>
+      <ul className="grid gap-2">
+        {items.map((item, index) => (
+          <li key={`${title}-${index}`} className="rounded-lg border border-line bg-white/[0.02] px-3 py-2 text-sm leading-6 text-muted">
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ContributionsPreview({ items }: { items: ProjectEditRecord["contributions"] }) {
+  return (
+    <ul className="grid gap-3">
+      {items.map((item, index) => (
+        <li key={`${item.category}-${index}`} className="rounded-xl border border-line bg-white/[0.02] p-4">
+          <p className="ui-eyebrow">
+            {optionLabel(contributionCategoryOptions, item.category)}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-muted">{item.description}</p>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function DecisionsPreview({ items }: { items: ProjectEditRecord["decisions"] }) {
+  return (
+    <ul className="grid gap-4">
+      {items.map((item, index) => (
+        <li key={`${item.title}-${index}`} className="rounded-xl border border-line bg-white/[0.02] p-4">
+          <h3 className="font-semibold text-ink">{item.title}</h3>
+          <div className="mt-3 grid gap-3 text-sm leading-6 text-muted">
+            {item.context ? <PreviewText label="Context" value={item.context} /> : null}
+            {item.alternativesConsidered.length > 0 ? (
+              <div>
+                <p className="ui-eyebrow mb-2">Alternatives</p>
+                <ul className="grid gap-1.5">
+                  {item.alternativesConsidered.map((alternative, alternativeIndex) => (
+                    <li key={alternativeIndex}>{alternative}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {item.selectedApproach ? (
+              <PreviewText label="Selected approach" value={item.selectedApproach} />
+            ) : null}
+            {item.rationale ? <PreviewText label="Rationale" value={item.rationale} /> : null}
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function OutcomesPreview({ items }: { items: ProjectEditRecord["outcomes"] }) {
+  return (
+    <ul className="grid gap-3">
+      {items.map((item, index) => (
+        <li key={`${item.type}-${index}`} className="rounded-xl border border-line bg-white/[0.02] p-4">
+          <p className="ui-eyebrow">{optionLabel(outcomeTypeOptions, item.type)}</p>
+          <p className="mt-2 text-sm leading-6 text-muted">{item.description}</p>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function MetricsPreview({ items }: { items: ProjectEditRecord["metrics"] }) {
+  return (
+    <dl className="grid gap-3 sm:grid-cols-2">
+      {items.map((item, index) => (
+        <div key={`${item.label}-${index}`} className="rounded-xl border border-line bg-white/[0.02] p-4">
+          <dt className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">
+            {item.label}
+          </dt>
+          <dd className="mt-2 text-xl font-semibold text-ink">{item.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function EngineeringSignalsPreview({
+  signals,
+}: {
+  signals: ReturnType<typeof normalizeEngineeringSignals>;
+}) {
+  const keys = Object.keys(engineeringSignalLabels) as Array<keyof typeof engineeringSignalLabels>;
+
+  return (
+    <DefinitionGrid
+      items={keys.map((key) => [
+        engineeringSignalLabels[key],
+        optionLabel(signalStrengthOptions, signals[key]),
+      ])}
+    />
+  );
+}
+
+function ProjectSignalsPreview({
+  signals,
+}: {
+  signals: ReturnType<typeof normalizeProjectSignals>;
+}) {
+  const keys = Object.keys(projectSignalLabels) as Array<keyof typeof projectSignalLabels>;
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {keys.map((key) => (
+        <div key={key} className="rounded-xl border border-line bg-white/[0.02] p-4">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <p className="text-sm font-medium text-ink">{projectSignalLabels[key]}</p>
+            <span className="ui-chip tabular-nums">{signals[key]}/5</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
+            <div
+              className="h-full rounded-full bg-accent-400"
+              style={{ width: `${(signals[key] / 5) * 100}%` }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EvidencePreview({ items }: { items: ProjectEditRecord["evidence"] }) {
+  return (
+    <ul className="grid gap-3">
+      {items.map((item, index) => (
+        <li key={`${item.title}-${index}`} className="rounded-xl border border-line bg-white/[0.02] p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="ui-chip">{optionLabel(evidenceTypeOptions, item.type)}</span>
+            <span className="ui-chip">{item.visibility}</span>
+          </div>
+          <h3 className="mt-3 font-semibold text-ink">{item.title}</h3>
+          {item.description ? (
+            <p className="mt-2 text-sm leading-6 text-muted">{item.description}</p>
+          ) : null}
+          {item.url ? <ExternalLinkValue href={item.url} label={item.url} /> : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function RepositoryDemoPreview({ project }: { project: ProjectEditRecord }) {
+  return (
+    <div className="grid gap-4">
+      <DefinitionGrid
+        items={[
+          [
+            "Repository visibility",
+            optionLabel(repositoryVisibilityOptions, project.repositoryVisibility),
+          ],
+          ["Repository URL", project.repositoryUrl ? project.repositoryUrl : "Not set"],
+          ["Demo available", project.demoAvailable ? "Yes" : "No"],
+          ["Demo URL", project.demoUrl ? project.demoUrl : "Not set"],
+        ]}
+      />
+      {project.url || project.githubUrl ? (
+        <div className="rounded-xl border border-line bg-white/[0.02] p-4">
+          <p className="ui-eyebrow mb-3">Legacy compatibility fields</p>
+          <DefinitionGrid
+            items={[
+              ["Legacy URL", project.url ?? "Not set"],
+              ["Legacy GitHub URL", project.githubUrl ?? "Not set"],
+            ]}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function RelationshipsPreview({
+  groups,
+}: {
+  groups: Array<{ title: string; items: Array<{ id: string; label: string }> }>;
+}) {
+  return (
+    <div className="grid gap-4">
+      {groups.map((group) =>
+        group.items.length > 0 ? (
+          <div key={group.title}>
+            <h3 className="ui-eyebrow mb-2">{group.title}</h3>
+            <ul className="flex flex-wrap gap-2">
+              {group.items.map((item) => (
+                <li key={item.id} className="ui-chip">
+                  {item.label}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null,
+      )}
+    </div>
+  );
+}
+
+function MetadataPreview({
+  slug,
+  position,
+  dateRange,
+  seoTitle,
+  seoDescription,
+  ogImage,
+}: {
+  slug: string;
+  position: number;
+  dateRange: string;
+  seoTitle: string | null;
+  seoDescription: string | null;
+  ogImage: string | null;
+}) {
+  return (
+    <DefinitionGrid
+      items={[
+        ["Slug", slug],
+        ["Dates", dateRange || "Not set"],
+        ["Order", String(position)],
+        ["SEO title", seoTitle ?? "Not set"],
+        ["SEO description", seoDescription ?? "Not set"],
+        ["OG image", ogImage ?? "Not set"],
+      ]}
+    />
+  );
+}
+
+function PreviewText({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="ui-eyebrow mb-1.5">{label}</p>
+      <p>{value}</p>
+    </div>
+  );
+}
+
+function ExternalLinkValue({ href, label }: { href: string; label: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="mt-3 inline-flex max-w-full break-all text-sm text-accent-200 underline-offset-4 transition hover:underline"
+    >
+      {label}
+    </a>
+  );
+}
+
+function DefinitionGrid({ items }: { items: Array<[string, string]> }) {
+  return (
+    <dl className="grid gap-3 sm:grid-cols-2">
+      {items.map(([label, value]) => (
+        <div key={label} className="rounded-xl border border-line bg-white/[0.02] p-4">
+          <dt className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">
+            {label}
+          </dt>
+          <dd className="mt-2 break-words text-sm leading-6 text-ink">{value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }

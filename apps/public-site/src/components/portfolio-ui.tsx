@@ -12,6 +12,14 @@ import {
   InteractiveTimeline,
   type InteractiveTimelineItem,
 } from "@/components/interactive-timeline";
+import {
+  getProjectTechTags,
+  getSafeProjectLinks,
+  getVisibleMetrics,
+  projectRoleLabels,
+  projectStatusLabels,
+  projectTypeLabels,
+} from "@/lib/project-display";
 import { type RecognitionItem } from "@/lib/portfolio-content";
 import { formatDateRange } from "@/lib/format";
 import { experienceHref, projectHref } from "@/lib/paths";
@@ -150,14 +158,13 @@ function getTimelineItems(
     // Linked experience is used only for timeline ORDERING; the displayed range
     // is always the project's own dates — and only when they are actually set.
     // No "Present" or published-at placeholders for date-less projects.
-    console.log("Project", project.name, "dates", project.startDate, project.endDate);
     const projectDateRange = formatDateRange(project.startDate, project.endDate, false);
 
     return {
       id: `project-${project.id}`,
       kind: "project" as const,
       name: project.name,
-      role: "Owner / Lead Developer",
+      role: projectRoleLabels[project.projectRole],
       dateRange: projectDateRange,
       summary: compactText(project.description),
       tags: getProjectTags(project),
@@ -196,21 +203,7 @@ function getTimelineItems(
 }
 
 function getProjectTags(project: ProjectRecord): string[] {
-  return uniqueStrings(
-    [
-      project.developmentTechStack,
-      project.qaTechStack,
-      project.aiIntegrationTechStack,
-      project.deploymentTechStack,
-    ].flatMap(splitStackItems),
-  ).slice(0, 5);
-}
-
-function splitStackItems(value: string): string[] {
-  return value
-    .split(/\r?\n|[,;|]/)
-    .map((item) => item.trim().replace(/^(?:[-*]|\d+[.)])\s+/, ""))
-    .filter((item) => item.length > 0 && item.length <= 40);
+  return getProjectTechTags(project);
 }
 
 function compactText(value: string, maxLength = 180): string {
@@ -235,10 +228,6 @@ function getDateTime(value: Date | string | null): number | null {
   const time = date.getTime();
 
   return Number.isNaN(time) ? null : time;
-}
-
-function uniqueStrings(values: string[]): string[] {
-  return Array.from(new Set(values));
 }
 
 interface CaseStudyCardProps {
@@ -396,24 +385,99 @@ function OutcomeIcon(props: SVGProps<SVGSVGElement>) {
 }
 
 export function ProjectCard({ project, meta }: { project: ProjectRecord; meta: string }) {
+  const metrics = getVisibleMetrics(project).slice(0, 2);
+  const techTags = getProjectTechTags(project, 4);
+  const { demoHref, repositoryHref } = getSafeProjectLinks(project);
+  const classificationChips = [
+    project.featured ? "Featured" : null,
+    projectTypeLabels[project.projectType],
+    projectStatusLabels[project.projectStatus],
+    projectRoleLabels[project.projectRole],
+  ].filter((chip): chip is string => Boolean(chip));
+
   return (
-    <Link href={projectHref(project)} className="group block h-full">
-      <article className="glass-panel flex h-full min-h-56 flex-col rounded-lg p-5 transition hover:border-sky-300/40 hover:bg-white/[0.07]">
-        <p className="text-xs font-medium uppercase tracking-[0.18em] text-sky-300">{meta}</p>
-        <h3 className="mt-3 text-lg font-semibold text-ink transition group-hover:text-sky-100">
+    <article className="glass-panel flex h-full min-h-72 flex-col rounded-lg p-5 transition hover:border-sky-300/40 hover:bg-white/[0.07]">
+      <p className="text-xs font-medium uppercase tracking-[0.18em] text-sky-300">{meta}</p>
+      <h3 className="mt-3 text-lg font-semibold text-ink">
+        <Link href={projectHref(project)} className="transition hover:text-sky-100">
           {project.name}
-        </h3>
-        {project.description ? (
-          <p className="mt-3 flex-1 text-sm leading-6 text-muted">{project.description}</p>
-        ) : null}
-        <span className="mt-5 inline-flex text-sm font-semibold text-sky-300">
+        </Link>
+      </h3>
+      {classificationChips.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {classificationChips.map((chip) => (
+            <span
+              key={chip}
+              className="rounded-md border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs text-muted"
+            >
+              {chip}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {project.description ? (
+        <p className="mt-4 flex-1 text-sm leading-6 text-muted">
+          {compactText(project.description, 210)}
+        </p>
+      ) : (
+        <div className="flex-1" />
+      )}
+      {metrics.length > 0 ? (
+        <dl className="mt-4 grid gap-2 sm:grid-cols-2">
+          {metrics.map((metric) => (
+            <div
+              key={`${metric.label}-${metric.value}`}
+              className="rounded-lg border border-emerald-300/15 bg-emerald-300/[0.06] p-3"
+            >
+              <dt className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-emerald-200/80">
+                {metric.label}
+              </dt>
+              <dd className="mt-1 text-sm font-semibold text-ink">{metric.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+      {techTags.length > 0 ? (
+        <ul className="mt-4 flex flex-wrap gap-2">
+          {techTags.map((tag) => (
+            <li
+              key={tag}
+              className="rounded-md border border-sky-300/15 bg-sky-300/[0.06] px-2 py-1 text-xs text-sky-100/90"
+            >
+              {tag}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        <Link href={projectHref(project)} className="inline-flex text-sm font-semibold text-sky-300">
           View project
           <span className="ml-2" aria-hidden>
             →
           </span>
-        </span>
-      </article>
-    </Link>
+        </Link>
+        {demoHref ? (
+          <a
+            href={demoHref}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm font-semibold text-muted transition hover:text-ink"
+          >
+            Demo ↗
+          </a>
+        ) : null}
+        {repositoryHref ? (
+          <a
+            href={repositoryHref}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm font-semibold text-muted transition hover:text-ink"
+          >
+            Source ↗
+          </a>
+        ) : null}
+      </div>
+    </article>
   );
 }
 

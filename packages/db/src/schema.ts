@@ -1,5 +1,21 @@
 import { relations, sql } from "drizzle-orm";
-import type { AiGeneratedStoryPayload } from "@portfolio/validators";
+import type {
+  AiGeneratedStoryPayload,
+  ProjectConfidentiality,
+  ProjectContribution,
+  ProjectDecision,
+  ProjectEngineeringSignals,
+  ProjectEvidence,
+  ProjectMetric,
+  ProjectOutcome,
+  ProjectOwnership,
+  ProjectRole,
+  ProjectSignals,
+  ProjectStatus,
+  ProjectType,
+  ProjectVisibility,
+  RepositoryVisibility,
+} from "@portfolio/validators";
 import {
   boolean,
   customType,
@@ -216,6 +232,77 @@ export const projects = pgTable("projects",{
     deploymentTechStack: text("deployment_tech_stack").notNull().default(""),
     url: text("url"),
     githubUrl: text("github_url"),
+    visibility: varchar("visibility", { length: 20 })
+      .$type<ProjectVisibility>()
+      .notNull()
+      .default("public"),
+    featured: boolean("featured").notNull().default(false),
+    projectType: varchar("project_type", { length: 40 })
+      .$type<ProjectType>()
+      .notNull()
+      .default("product"),
+    projectStatus: varchar("project_status", { length: 40 })
+      .$type<ProjectStatus>()
+      .notNull()
+      .default("completed"),
+    projectRole: varchar("project_role", { length: 40 })
+      .$type<ProjectRole>()
+      .notNull()
+      .default("solo-builder"),
+    confidentiality: varchar("confidentiality", { length: 40 })
+      .$type<ProjectConfidentiality>()
+      .notNull()
+      .default("none"),
+    ownership: varchar("ownership", { length: 40 })
+      .$type<ProjectOwnership>()
+      .notNull()
+      .default("end-to-end-owner"),
+    teamSize: integer("team_size"),
+    durationMonths: integer("duration_months"),
+    motivation: text("motivation").notNull().default(""),
+    problem: text("problem").notNull().default(""),
+    constraints: jsonb("constraints").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    tradeOffs: jsonb("trade_offs").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    whatILearned: jsonb("what_i_learned").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    contributions: jsonb("contributions")
+      .$type<ProjectContribution[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    decisions: jsonb("decisions")
+      .$type<ProjectDecision[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    outcomes: jsonb("outcomes")
+      .$type<ProjectOutcome[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    metrics: jsonb("metrics")
+      .$type<ProjectMetric[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    evidence: jsonb("evidence")
+      .$type<ProjectEvidence[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    engineeringSignals: jsonb("engineering_signals")
+      .$type<ProjectEngineeringSignals>()
+      .notNull()
+      .default(
+        sql`'{"testing":"none","ciCd":"none","observability":"none","documentation":"none","security":"none","infrastructure":"none","aiIntegration":"none"}'::jsonb`,
+      ),
+    projectSignals: jsonb("project_signals")
+      .$type<ProjectSignals>()
+      .notNull()
+      .default(
+        sql`'{"complexity":3,"ambiguity":3,"ownership":3,"crossFunctionality":3,"operationalResponsibility":3,"innovation":3}'::jsonb`,
+      ),
+    repositoryVisibility: varchar("repository_visibility", { length: 20 })
+      .$type<RepositoryVisibility>()
+      .notNull()
+      .default("unavailable"),
+    repositoryUrl: text("repository_url"),
+    demoAvailable: boolean("demo_available").notNull().default(false),
+    demoUrl: text("demo_url"),
     startDate: date("start_date", { mode: "string" }),
     endDate: date("end_date", { mode: "string" }),
     // Optional "position" a project was built during. Nullable: a project need

@@ -162,6 +162,13 @@
       "when": 1781227194490,
       "tag": "0022_absent_hulk",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1781234472488,
+      "tag": "0023_thin_ikaris",
+      "breakpoints": true
     }
   ]
 }
