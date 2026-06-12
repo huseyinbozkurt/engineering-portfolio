@@ -49,3 +49,15 @@ terraform plan
 The plan should keep the HTTPS listener and 443 security group rule, update the
 port 80 listener to redirect to HTTPS, and avoid destroying the working ALB
 listener setup.
+
+## Remote State
+
+This environment uses an S3 backend configured by `backend.dev.hcl`. Bootstrap
+the state bucket and lock table from `../../bootstrap`, then migrate local state:
+
+```bash
+cd /Users/huseyin/Documents/engineering-portfolio/infra/environments/dev
+terraform init -backend-config=backend.dev.hcl -migrate-state
+```
+
+GitHub Actions uses the same backend config when deploying from `main`.

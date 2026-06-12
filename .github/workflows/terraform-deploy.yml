@@ -1,0 +1,51 @@
+name: Terraform Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'ca-central-1' }}
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  TF_VAR_acm_certificate_arn: ${{ secrets.TF_VAR_ACM_CERTIFICATE_ARN }}
+  TF_VAR_alb_https_ssl_policy: ${{ vars.TF_VAR_ALB_HTTPS_SSL_POLICY }}
+  TF_WORKING_DIR: infra/environments/dev
+
+jobs:
+  terraform:
+    name: Terraform
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_GITHUB_ACTIONS_ROLE_ARN || secrets.AWS_GITHUB_ACTIONS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform fmt
+        run: terraform -chdir="${TF_WORKING_DIR}" fmt -check
+
+      - name: Terraform init
+        run: terraform -chdir="${TF_WORKING_DIR}" init -backend-config=backend.dev.hcl
+
+      - name: Terraform validate
+        run: terraform -chdir="${TF_WORKING_DIR}" validate
+
+      - name: Terraform plan
+        run: terraform -chdir="${TF_WORKING_DIR}" plan -out=tfplan
+
+      - name: Terraform apply
+        run: terraform -chdir="${TF_WORKING_DIR}" apply -auto-approve tfplan
