@@ -3,17 +3,38 @@ import { notFound } from "next/navigation";
 
 import { getAdminContentIndex, getExperienceById } from "@portfolio/db/queries";
 
-import { deleteExperienceAction, patchExperienceAction } from "@/app/actions";
+import {
+  archiveExperienceAction,
+  deleteExperienceAction,
+  patchExperienceAction,
+  publishExperienceAction,
+  runExperienceAiReviewAction,
+  setExperienceStatusAction,
+  unpublishExperienceAction,
+} from "@/app/actions";
 import { DeleteForm } from "@/components/delete-form";
 import { DetailHeader } from "@/components/detail/detail-header";
 import { MetaSidebar } from "@/components/detail/meta-sidebar";
 import { SectionCard } from "@/components/detail/section-card";
 import { SectionEditForm } from "@/components/detail/section-edit-form";
 import { SettingsModal } from "@/components/detail/settings-modal";
+import { AiReviewPanel } from "@/components/editorial/ai-review-panel";
+import { WorkflowActions } from "@/components/editorial/workflow-actions";
 import { Checkbox, CheckboxGroup, Field, SeoFields, TextArea } from "@/components/form-controls";
 import { RichTextField } from "@/components/forms/rich-text-field";
+import { LlmTaskAutoStarter } from "@/components/llm-task-auto-starter";
 import { ModalPanel } from "@/components/modal-panel";
+import { TasksAutoRefresh } from "@/components/tasks-auto-refresh";
+import { toAiReviewDetails } from "@/lib/ai-review-details";
 import { siblingLinks } from "@/lib/detail-nav";
+import {
+  experienceCompanyLabel,
+  experienceRoleLabel,
+  experienceTitleLabel,
+  formatExperienceDateRange,
+} from "@/lib/experience-display";
+import { formatDate } from "@/lib/format";
+import { getLlmConnectionStatuses } from "@/lib/llm-config";
 import { publicHrefs } from "@/lib/public-site";
 
 export const dynamic = "force-dynamic";
@@ -24,9 +45,10 @@ interface EditPageProps {
 
 export default async function EditExperiencePage({ params }: EditPageProps) {
   const { id } = await params;
-  const [experience, content] = await Promise.all([
+  const [experience, content, llmStatuses] = await Promise.all([
     getExperienceById(id),
     getAdminContentIndex(),
+    getLlmConnectionStatuses(),
   ]);
 
   if (!experience) {
@@ -35,7 +57,7 @@ export default async function EditExperiencePage({ params }: EditPageProps) {
 
   const siblings = siblingLinks(content.experiences, experience.id, (item) => ({
     href: `/content/experiences/${item.id}`,
-    label: `${item.role} at ${item.company}`,
+    label: experienceTitleLabel(item),
   }));
 
   const lensName = new Map(content.lenses.map((lens) => [lens.id, lens.name]));
@@ -47,13 +69,22 @@ export default async function EditExperiencePage({ params }: EditPageProps) {
   const principleOptions = content.principles.map((p) => ({ id: p.id, label: p.title }));
   const skillOptions = content.skills.map((s) => ({ id: s.id, label: s.name, category: s.category }));
   const tagOptions = content.tags.map((t) => ({ id: t.id, label: t.name, category: t.category }));
+  const hasActiveAiReview = ["queued", "processing"].includes(experience.aiReviewStatus);
+  const usableLlmCount = llmStatuses.filter(
+    (status) => status.status === "online" && Boolean(status.model),
+  ).length;
+  const aiReviewDisabledReason =
+    llmStatuses.length === 0
+      ? "No LLM provider is configured. Configure a reachable provider before running AI review."
+      : usableLlmCount === 0
+        ? "No LLM connection is online with a configured model. Check provider configuration before running AI review."
+        : null;
 
-  const dateRange = [
+  const dateRange = formatExperienceDateRange(
     experience.startDate,
-    experience.endDate ?? (experience.isCurrent ? "Present" : null),
-  ]
-    .filter(Boolean)
-    .join(" – ");
+    experience.endDate,
+    experience.isCurrent,
+  );
 
   const metaGroups = [
     {
@@ -160,8 +191,8 @@ export default async function EditExperiencePage({ params }: EditPageProps) {
         id={experience.id}
         fields={["role", "company", "location", "startDate", "endDate", "isCurrent"]}
       >
-        <Field label="Role" name="role" required defaultValue={experience.role} />
-        <Field label="Company" name="company" required defaultValue={experience.company} />
+        <Field label="Role" name="role" defaultValue={experience.role} />
+        <Field label="Company" name="company" defaultValue={experience.company} />
         <Field
           label="Location"
           name="location"
@@ -188,16 +219,29 @@ export default async function EditExperiencePage({ params }: EditPageProps) {
 
   return (
     <main className="mx-auto max-w-6xl px-5 py-8 lg:px-8">
+      <LlmTaskAutoStarter enabled={experience.aiReviewStatus === "queued"} />
+      <TasksAutoRefresh enabled={hasActiveAiReview} />
       <DetailHeader
         backHref="/content/experiences"
         backLabel="All experience"
         eyebrow="Experience"
-        title={experience.role}
+        title={experienceRoleLabel(experience)}
         prev={siblings.prev}
         next={siblings.next}
         id={experience.id}
         status={experience.status}
-        statusAction={patchExperienceAction}
+        statusAction={setExperienceStatusAction}
+        actions={
+          <WorkflowActions
+            id={experience.id}
+            status={experience.status}
+            editPath={`/content/experiences/${experience.id}`}
+            previewPath={`/content/experiences/${experience.id}/preview`}
+            publishAction={publishExperienceAction}
+            unpublishAction={unpublishExperienceAction}
+            archiveAction={archiveExperienceAction}
+          />
+        }
         publicHref={
           experience.status === "published"
             ? publicHrefs.experience(experience.slug || experience.id)
@@ -206,10 +250,11 @@ export default async function EditExperiencePage({ params }: EditPageProps) {
         settings={settings}
         headerEdit={headerEdit}
         subtitle={
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="text-base text-ink/90">{experience.company}</span>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            <span className="text-base text-ink/90">{experienceCompanyLabel(experience)}</span>
             {dateRange ? <span className="text-warning-200">{dateRange}</span> : null}
             {experience.location ? <span>{experience.location}</span> : null}
+            <span className="text-muted/70">Updated {formatDate(experience.updatedAt)}</span>
           </div>
         }
       />
@@ -253,6 +298,19 @@ export default async function EditExperiencePage({ params }: EditPageProps) {
         </div>
 
         <aside className="grid h-fit content-start gap-6">
+          <AiReviewPanel
+            id={experience.id}
+            redirectTo={`/content/experiences/${experience.id}`}
+            action={runExperienceAiReviewAction}
+            status={experience.aiReviewStatus}
+            qualityScore={experience.contentQualityScore}
+            summary={experience.aiSummary}
+            details={toAiReviewDetails(experience.aiSuggestions)}
+            reviewedAt={experience.lastAiReviewAt}
+            error={experience.aiReviewError}
+            canRunReview={usableLlmCount > 0}
+            disabledReason={aiReviewDisabledReason}
+          />
           <SectionCard
             title="Awards & Recognition"
             id={experience.id}

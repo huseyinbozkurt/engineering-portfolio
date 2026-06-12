@@ -1,5 +1,7 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -44,6 +46,15 @@ import {
   upsertContactProfile,
   upsertHomepageSettings,
 } from "@portfolio/db/admin";
+import {
+  setContentAiReviewQueued,
+  type AiReviewContentType,
+} from "@portfolio/db/content-ai-review";
+import { setExperienceAiReviewQueued } from "@portfolio/db/experience-ai-review";
+import {
+  createLlmTask,
+  getActiveLlmTaskForTarget,
+} from "@portfolio/db/llm-tasks";
 import { clearContactResume, setContactResume } from "@portfolio/db/resume";
 import type {
   CreateCaseStudyInput,
@@ -59,6 +70,7 @@ import {
   bulkSkillsSchema,
   bulkTagsSchema,
   contactProfileSchema,
+  contentStatusSchema,
   createCaseStudySchema,
   createDecisionPatternSchema,
   createExperienceSchema,
@@ -87,6 +99,29 @@ import {
   updateTagSchema,
   validateResumeFile,
 } from "@portfolio/validators";
+import {
+  getAdminContentIndex,
+  getAllCaseStudies,
+  getAllProjects,
+  getCaseStudyById,
+  getExperienceById,
+  getExperienceListRecords,
+  getProjectById,
+} from "@portfolio/db/queries";
+import { selectStaleReviewTargets } from "@portfolio/db/ai-review-freshness";
+import { describeBulkEnqueue } from "@portfolio/db/llm-task-scheduling";
+import { logLlmTaskEvent } from "@portfolio/db/llm-task-log";
+import {
+  buildContentAiReviewPrompt,
+  buildExperienceAiReviewPrompt,
+  caseStudyAiReviewTaskType,
+  experienceAiReviewTaskType,
+  hasOnlineLlmConnection,
+  projectAiReviewTaskType,
+  type ContentAiReviewInput,
+  type ExperienceAiReviewInput,
+} from "@portfolio/llm";
+import { startQueuedLlmTaskProcessing } from "@portfolio/llm/task-runner";
 import type { z } from "zod";
 
 function text(formData: FormData, key: string): string {
@@ -208,6 +243,537 @@ function parseBulkTagRows(value: string) {
   });
 }
 
+function safeRedirectTarget(value: string, fallback: string): string {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+    return fallback;
+  }
+
+  return value;
+}
+
+function experienceEditPath(id: string): string {
+  return `/content/experiences/${id}`;
+}
+
+function refreshExperience(id: string): void {
+  revalidatePath("/");
+  revalidatePath("/experience");
+  revalidatePath("/content/experiences");
+  revalidatePath(experienceEditPath(id));
+  revalidatePath(`/content/experiences/${id}/preview`);
+  revalidatePath("/tasks");
+}
+
+function parseDraftExperience(): CreateExperienceInput {
+  return createExperienceSchema.parse({
+    slug: "",
+    company: "",
+    role: "",
+    location: "",
+    startDate: "",
+    endDate: "",
+    isCurrent: false,
+    summary: "",
+    details: "",
+    awards: "",
+    status: "draft",
+    seoTitle: "",
+    seoDescription: "",
+    ogImage: "",
+    lensIds: [],
+    principleIds: [],
+    skillIds: [],
+    tagIds: [],
+    position: "",
+  });
+}
+
+function missingExperiencePublishFields(experience: {
+  company: string;
+  role: string;
+  startDate: string | null;
+  summary: string;
+}): string[] {
+  const missing: string[] = [];
+
+  if (!experience.role.trim()) {
+    missing.push("role/title");
+  }
+  if (!experience.company.trim()) {
+    missing.push("company");
+  }
+  if (!experience.startDate) {
+    missing.push("start date");
+  }
+  if (!experience.summary.trim()) {
+    missing.push("summary");
+  }
+
+  return missing;
+}
+
+function humanList(items: string[]): string {
+  if (items.length <= 1) {
+    return items[0] ?? "";
+  }
+
+  if (items.length === 2) {
+    return `${items[0]} and ${items[1]}`;
+  }
+
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
+
+async function publishExperienceRecord(id: string): Promise<{ ok: true } | { ok: false; message: string }> {
+  const experience = await getExperienceById(id);
+
+  if (!experience) {
+    return { ok: false, message: "Experience not found." };
+  }
+
+  const missing = missingExperiencePublishFields(experience);
+
+  if (missing.length > 0) {
+    return {
+      ok: false,
+      message: `Cannot publish yet. Add ${humanList(missing)} before publishing.`,
+    };
+  }
+
+  await patchExperience({ id, set: { status: "published" } });
+  return { ok: true };
+}
+
+type QueueExperienceAiReviewResult = "queued" | "skipped" | "missing";
+
+async function queueExperienceAiReview(id: string): Promise<QueueExperienceAiReviewResult> {
+  const experience = await getExperienceById(id);
+
+  if (!experience) {
+    return "missing";
+  }
+
+  if (experience.aiReviewStatus === "queued" || experience.aiReviewStatus === "processing") {
+    return "skipped";
+  }
+
+  const activeTask = await getActiveLlmTaskForTarget(experienceAiReviewTaskType, id);
+  if (activeTask) {
+    logLlmTaskEvent("skipped", {
+      id: activeTask.id,
+      taskType: experienceAiReviewTaskType,
+      targetType: "experience",
+      targetId: id,
+      status: activeTask.status,
+      detail: "duplicate_active",
+    });
+    return "skipped";
+  }
+
+  const prompt = buildExperienceAiReviewPrompt(toExperienceAiReviewInput(experience));
+  const title = experienceAiReviewTaskTitle(experience);
+
+  try {
+    await createLlmTask({
+      taskType: experienceAiReviewTaskType,
+      targetType: "experience",
+      targetId: id,
+      title: `AI review: ${title}`,
+      status: "pending",
+      promptSystem: prompt.system,
+      promptUser: prompt.user,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message.includes("llm_tasks_active_experience_ai_review_idx")) {
+      return "skipped";
+    }
+
+    throw error;
+  }
+
+  await setExperienceAiReviewQueued(id);
+  return "queued";
+}
+
+function toExperienceAiReviewInput(experience: {
+  id: string;
+  status: string;
+  slug: string | null;
+  company: string;
+  role: string;
+  location: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  isCurrent: boolean;
+  summary: string;
+  details: string;
+  awards: string;
+}): ExperienceAiReviewInput {
+  return {
+    id: experience.id,
+    status: experience.status,
+    slug: experience.slug,
+    company: experience.company,
+    role: experience.role,
+    location: experience.location,
+    startDate: experience.startDate,
+    endDate: experience.endDate,
+    isCurrent: experience.isCurrent,
+    summary: experience.summary,
+    details: experience.details,
+    awards: experience.awards,
+  };
+}
+
+function experienceAiReviewTaskTitle(experience: { role: string; company: string; id: string }): string {
+  const role = experience.role.trim();
+  const company = experience.company.trim();
+
+  if (role && company) {
+    return `${role} at ${company}`;
+  }
+
+  return role || company || `Untitled draft ${experience.id.slice(0, 8)}`;
+}
+
+function draftSlug(prefix: string): string {
+  return `${prefix}-draft-${randomUUID()}`;
+}
+
+type EditorialContentType = AiReviewContentType;
+
+function contentEditPath(contentType: EditorialContentType, id: string): string {
+  if (contentType === "experience") {
+    return experienceEditPath(id);
+  }
+
+  if (contentType === "project") {
+    return `/content/projects/${id}`;
+  }
+
+  return `/content/case-studies/${id}`;
+}
+
+function contentListPath(contentType: EditorialContentType): string {
+  if (contentType === "experience") {
+    return "/content/experiences";
+  }
+
+  if (contentType === "project") {
+    return "/content/projects";
+  }
+
+  return "/content/case-studies";
+}
+
+function contentLabel(contentType: EditorialContentType): string {
+  if (contentType === "experience") return "Experience";
+  if (contentType === "project") return "Project";
+  return "Case study";
+}
+
+function refreshContent(contentType: EditorialContentType, id: string): void {
+  const listPath = contentListPath(contentType);
+  const editPath = contentEditPath(contentType, id);
+
+  revalidatePath("/");
+  revalidatePath(listPath);
+  revalidatePath(editPath);
+  revalidatePath(`${editPath}/preview`);
+  revalidatePath("/tasks");
+
+  if (contentType === "project") {
+    revalidatePath("/projects");
+  } else if (contentType === "case_study") {
+    revalidatePath("/case-studies");
+  }
+}
+
+function parseDraftProject(): CreateProjectInput {
+  return createProjectSchema.parse({
+    slug: draftSlug("project"),
+    name: "",
+    description: "",
+    details: "",
+    architecture: "",
+    developmentTechStack: "",
+    qaTechStack: "",
+    aiIntegrationTechStack: "",
+    deploymentTechStack: "",
+    status: "draft",
+    url: "",
+    githubUrl: "",
+    seoTitle: "",
+    seoDescription: "",
+    ogImage: "",
+    experienceId: "",
+    lensIds: [],
+    principleIds: [],
+    skillIds: [],
+    tagIds: [],
+    position: "",
+    startDate: "",
+    endDate: "",
+  });
+}
+
+function parseDraftCaseStudy(): CreateCaseStudyInput {
+  return createCaseStudySchema.parse({
+    slug: draftSlug("case-study"),
+    title: "",
+    excerpt: "",
+    status: "draft",
+    seoTitle: "",
+    seoDescription: "",
+    ogImage: "",
+    context: "",
+    problem: "",
+    constraints: "",
+    action: "",
+    tradeoffs: "",
+    outcome: "",
+    learning: "",
+    lensIds: [],
+    principleIds: [],
+    experienceIds: [],
+    projectIds: [],
+    skillIds: [],
+    tagIds: [],
+    position: "",
+  });
+}
+
+function missingProjectPublishFields(project: {
+  name: string;
+  description: string;
+}): string[] {
+  const missing: string[] = [];
+
+  if (!project.name.trim()) missing.push("name");
+  if (!project.description.trim()) missing.push("description");
+
+  return missing;
+}
+
+function missingCaseStudyPublishFields(caseStudy: {
+  title: string;
+  excerpt: string;
+  problem: string;
+  action: string;
+  outcome: string;
+}): string[] {
+  const missing: string[] = [];
+
+  if (!caseStudy.title.trim()) missing.push("title");
+  if (!caseStudy.excerpt.trim()) missing.push("excerpt");
+  if (!caseStudy.problem.trim()) missing.push("problem");
+  if (!caseStudy.action.trim()) missing.push("what I did");
+  if (!caseStudy.outcome.trim()) missing.push("outcome");
+
+  return missing;
+}
+
+async function publishProjectRecord(id: string): Promise<{ ok: true } | { ok: false; message: string }> {
+  const project = await getProjectById(id);
+
+  if (!project) {
+    return { ok: false, message: "Project not found." };
+  }
+
+  const missing = missingProjectPublishFields(project);
+
+  if (missing.length > 0) {
+    return {
+      ok: false,
+      message: `Cannot publish yet. Add ${humanList(missing)} before publishing.`,
+    };
+  }
+
+  await patchProject({ id, set: { status: "published" } });
+  return { ok: true };
+}
+
+async function publishCaseStudyRecord(id: string): Promise<{ ok: true } | { ok: false; message: string }> {
+  const caseStudy = await getCaseStudyById(id);
+
+  if (!caseStudy) {
+    return { ok: false, message: "Case study not found." };
+  }
+
+  const missing = missingCaseStudyPublishFields(caseStudy);
+
+  if (missing.length > 0) {
+    return {
+      ok: false,
+      message: `Cannot publish yet. Add ${humanList(missing)} before publishing.`,
+    };
+  }
+
+  await patchCaseStudy({ id, set: { status: "published" } });
+  return { ok: true };
+}
+
+function contentAiReviewTaskType(contentType: EditorialContentType): string {
+  if (contentType === "experience") return experienceAiReviewTaskType;
+  if (contentType === "project") return projectAiReviewTaskType;
+  return caseStudyAiReviewTaskType;
+}
+
+type QueueContentAiReviewResult = "queued" | "skipped" | "missing";
+
+async function queueContentAiReview(
+  contentType: EditorialContentType,
+  id: string,
+): Promise<QueueContentAiReviewResult> {
+  const input = await getContentAiReviewInput(contentType, id);
+
+  if (!input) {
+    return "missing";
+  }
+
+  if (input.aiReviewStatus === "queued" || input.aiReviewStatus === "processing") {
+    return "skipped";
+  }
+
+  const taskType = contentAiReviewTaskType(contentType);
+  const activeTask = await getActiveLlmTaskForTarget(taskType, id);
+  if (activeTask) {
+    logLlmTaskEvent("skipped", {
+      id: activeTask.id,
+      taskType,
+      targetType: contentType,
+      targetId: id,
+      status: activeTask.status,
+      detail: "duplicate_active",
+    });
+    return "skipped";
+  }
+
+  const prompt =
+    contentType === "experience"
+      ? buildExperienceAiReviewPrompt(input.promptInput as ExperienceAiReviewInput)
+      : buildContentAiReviewPrompt(input.promptInput as ContentAiReviewInput);
+
+  try {
+    await createLlmTask({
+      taskType,
+      targetType: contentType,
+      targetId: id,
+      title: `AI review: ${input.title}`,
+      status: "pending",
+      promptSystem: prompt.system,
+      promptUser: prompt.user,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (
+      message.includes("llm_tasks_active_experience_ai_review_idx") ||
+      message.includes("llm_tasks_active_project_ai_review_idx") ||
+      message.includes("llm_tasks_active_case_study_ai_review_idx")
+    ) {
+      return "skipped";
+    }
+
+    throw error;
+  }
+
+  await setContentAiReviewQueued(contentType, id);
+  return "queued";
+}
+
+async function getContentAiReviewInput(
+  contentType: EditorialContentType,
+  id: string,
+): Promise<{
+  aiReviewStatus: string;
+  title: string;
+  promptInput: ExperienceAiReviewInput | ContentAiReviewInput;
+} | null> {
+  if (contentType === "experience") {
+    const experience = await getExperienceById(id);
+    if (!experience) return null;
+
+    return {
+      aiReviewStatus: experience.aiReviewStatus,
+      title: experienceAiReviewTaskTitle(experience),
+      promptInput: toExperienceAiReviewInput(experience),
+    };
+  }
+
+  if (contentType === "project") {
+    const project = await getProjectById(id);
+    if (!project) return null;
+
+    return {
+      aiReviewStatus: project.aiReviewStatus,
+      title: project.name.trim() || `Untitled draft ${project.id.slice(0, 8)}`,
+      promptInput: {
+        entityType: "project",
+        id: project.id,
+        status: project.status,
+        slug: project.slug,
+        title: project.name,
+        fields: {
+          name: project.name,
+          description: project.description,
+          details: project.details,
+          architecture: project.architecture,
+          developmentTechStack: project.developmentTechStack,
+          qaTechStack: project.qaTechStack,
+          aiIntegrationTechStack: project.aiIntegrationTechStack,
+          deploymentTechStack: project.deploymentTechStack,
+          startDate: project.startDate,
+          endDate: project.endDate,
+          url: project.url,
+          githubUrl: project.githubUrl,
+        },
+        relations: {
+          experienceId: project.experienceId,
+          lensIds: project.lensIds,
+          principleIds: project.principleIds,
+          skillIds: project.skillIds,
+          tagIds: project.tagIds,
+        },
+      },
+    };
+  }
+
+  const caseStudy = await getCaseStudyById(id);
+  if (!caseStudy) return null;
+
+  return {
+    aiReviewStatus: caseStudy.aiReviewStatus,
+    title: caseStudy.title.trim() || `Untitled draft ${caseStudy.id.slice(0, 8)}`,
+    promptInput: {
+      entityType: "case_study",
+      id: caseStudy.id,
+      status: caseStudy.status,
+      slug: caseStudy.slug,
+      title: caseStudy.title,
+      fields: {
+        title: caseStudy.title,
+        excerpt: caseStudy.excerpt,
+        context: caseStudy.context,
+        problem: caseStudy.problem,
+        constraints: caseStudy.constraints,
+        action: caseStudy.action,
+        tradeoffs: caseStudy.tradeoffs,
+        outcome: caseStudy.outcome,
+        learning: caseStudy.learning,
+      },
+      relations: {
+        lensIds: caseStudy.lensIds,
+        principleIds: caseStudy.principleIds,
+        experienceIds: caseStudy.experienceIds,
+        projectIds: caseStudy.projectIds,
+        skillIds: caseStudy.skillIds,
+        tagIds: caseStudy.tagIds,
+      },
+    },
+  };
+}
+
 export async function createLensAction(formData: FormData): Promise<void> {
   await createLens(
     createLensSchema.parse({
@@ -289,6 +855,620 @@ export async function createExperienceAction(formData: FormData): Promise<void> 
   await setFlash("Experience created");
   refresh("/content/experiences");
   redirect("/content/experiences");
+}
+
+export async function createExperienceDraftAction(_formData: FormData): Promise<void> {
+  const id = await createExperience(parseDraftExperience());
+
+  await setFlash("Draft created");
+  refreshExperience(id);
+  redirect(experienceEditPath(id));
+}
+
+export async function duplicateExperienceAction(formData: FormData): Promise<void> {
+  const { id } = idInputSchema.parse({ id: text(formData, "id") });
+  const source = await getExperienceById(id);
+
+  if (!source) {
+    await setFlash("Experience not found.", "error");
+    redirect("/content/experiences");
+  }
+
+  const duplicateId = await createExperience(
+    createExperienceSchema.parse({
+      slug: "",
+      company: source.company,
+      role: source.role,
+      location: source.location ?? "",
+      startDate: source.startDate ?? "",
+      endDate: source.endDate ?? "",
+      isCurrent: source.isCurrent,
+      summary: source.summary,
+      details: source.details,
+      awards: source.awards,
+      status: "draft",
+      seoTitle: source.seoTitle ?? "",
+      seoDescription: source.seoDescription ?? "",
+      ogImage: source.ogImage ?? "",
+      lensIds: source.lensIds,
+      principleIds: source.principleIds,
+      skillIds: source.skillIds,
+      tagIds: source.tagIds,
+      position: source.position,
+    }),
+  );
+
+  await setFlash("Draft duplicate created");
+  refreshExperience(duplicateId);
+  redirect(experienceEditPath(duplicateId));
+}
+
+export async function publishExperienceAction(formData: FormData): Promise<void> {
+  const { id } = idInputSchema.parse({ id: text(formData, "id") });
+  const fallback = experienceEditPath(id);
+  const redirectTo = safeRedirectTarget(text(formData, "redirectTo"), fallback);
+  const result = await publishExperienceRecord(id);
+
+  if (!result.ok) {
+    await setFlash(result.message, "error");
+    redirect(fallback);
+  }
+
+  await setFlash("Experience published");
+  refreshExperience(id);
+  redirect(redirectTo);
+}
+
+export async function unpublishExperienceAction(formData: FormData): Promise<void> {
+  const { id } = idInputSchema.parse({ id: text(formData, "id") });
+  const redirectTo = safeRedirectTarget(text(formData, "redirectTo"), experienceEditPath(id));
+
+  await patchExperience({ id, set: { status: "draft" } });
+  await setFlash("Experience moved back to draft");
+  refreshExperience(id);
+  redirect(redirectTo);
+}
+
+export async function archiveExperienceAction(formData: FormData): Promise<void> {
+  const { id } = idInputSchema.parse({ id: text(formData, "id") });
+  const redirectTo = safeRedirectTarget(text(formData, "redirectTo"), experienceEditPath(id));
+
+  await patchExperience({ id, set: { status: "archived" } });
+  await setFlash("Experience archived");
+  refreshExperience(id);
+  redirect(redirectTo);
+}
+
+export async function setExperienceStatusAction(formData: FormData): Promise<void> {
+  const { id } = idInputSchema.parse({ id: text(formData, "id") });
+  const nextStatus = contentStatusSchema.parse(status(formData));
+  const redirectTo = safeRedirectTarget(text(formData, "redirectTo"), experienceEditPath(id));
+
+  if (nextStatus === "published") {
+    const result = await publishExperienceRecord(id);
+
+    if (!result.ok) {
+      await setFlash(result.message, "error");
+      redirect(experienceEditPath(id));
+    }
+
+    await setFlash("Experience published");
+    refreshExperience(id);
+    redirect(redirectTo);
+  }
+
+  await patchExperience({ id, set: { status: nextStatus } });
+  await setFlash(nextStatus === "archived" ? "Experience archived" : "Experience saved as draft");
+  refreshExperience(id);
+  redirect(redirectTo);
+}
+
+export async function runExperienceAiReviewAction(formData: FormData): Promise<void> {
+  const { id } = idInputSchema.parse({ id: text(formData, "id") });
+  const redirectTo = safeRedirectTarget(text(formData, "redirectTo"), experienceEditPath(id));
+
+  if (!(await hasOnlineLlmConnection())) {
+    await setFlash(
+      "No online LLM connection is available. Configure a reachable provider before running AI review.",
+      "error",
+    );
+    refreshExperience(id);
+    redirect(redirectTo);
+  }
+
+  const result = await queueExperienceAiReview(id);
+
+  if (result === "missing") {
+    await setFlash("Experience not found.", "error");
+  } else if (result === "skipped") {
+    await setFlash("AI review is already queued or processing for this experience.", "info");
+  } else {
+    await setFlash("AI review queued");
+    startQueuedLlmTaskProcessing();
+  }
+
+  refreshExperience(id);
+  redirect(redirectTo);
+}
+
+export async function runAllExperienceAiReviewsAction(_formData: FormData): Promise<void> {
+  if (!(await hasOnlineLlmConnection())) {
+    await setFlash(
+      "No online LLM connection is available. Configure a reachable provider before running AI review.",
+      "error",
+    );
+    revalidatePath("/content/experiences");
+    redirect("/content/experiences");
+  }
+
+  const experiences = await getExperienceListRecords();
+  let queued = 0;
+  let skipped = 0;
+
+  for (const experience of experiences) {
+    const result = await queueExperienceAiReview(experience.id);
+    if (result === "queued") {
+      queued += 1;
+    } else {
+      skipped += 1;
+    }
+  }
+
+  if (queued === 0) {
+    await setFlash(
+      skipped > 0
+        ? "No new AI reviews were queued because every experience is already active."
+        : "No experiences are available to review.",
+      "info",
+    );
+  } else {
+    startQueuedLlmTaskProcessing();
+    await setFlash(
+      skipped > 0
+        ? `Queued AI review for ${queued} experience${queued === 1 ? "" : "s"}; skipped ${skipped} active review${skipped === 1 ? "" : "s"}.`
+        : `Queued AI review for ${queued} experience${queued === 1 ? "" : "s"}.`,
+    );
+  }
+
+  revalidatePath("/content/experiences");
+  revalidatePath("/tasks");
+  redirect("/content/experiences");
+}
+
+function isReviewContentType(value: string): value is AiReviewContentType {
+  return value === "experience" || value === "project" || value === "case_study";
+}
+
+/**
+ * Overview "Update Review" — enqueue an AI review for one record (any content
+ * type). Duplicate-active tasks are skipped by `queueContentAiReview`.
+ */
+export async function updateRecordAiReviewAction(formData: FormData): Promise<void> {
+  const id = text(formData, "id");
+  const contentType = text(formData, "contentType");
+
+  if (!isReviewContentType(contentType) || !id) {
+    await setFlash("Invalid AI review request.", "error");
+    redirect("/");
+  }
+
+  if (!(await hasOnlineLlmConnection())) {
+    await setFlash(
+      "No online LLM connection is available. Configure a reachable provider before running AI review.",
+      "error",
+    );
+    redirect("/");
+  }
+
+  const result = await queueContentAiReview(contentType, id);
+
+  if (result === "missing") {
+    await setFlash(`${contentLabel(contentType)} not found.`, "error");
+  } else if (result === "skipped") {
+    await setFlash("AI review is already queued or processing for this record.", "info");
+  } else {
+    startQueuedLlmTaskProcessing();
+    await setFlash("AI review queued");
+  }
+
+  refreshContent(contentType, id);
+  redirect("/");
+}
+
+/**
+ * Overview "Update All AI Reviews" — enqueue reviews for every record that is
+ * stale, never reviewed, or failed. Records already queued/processing are
+ * skipped. The worker processes them one at a time.
+ */
+export async function updateAllStaleAiReviewsAction(_formData: FormData): Promise<void> {
+  if (!(await hasOnlineLlmConnection())) {
+    await setFlash(
+      "No online LLM connection is available. Configure a reachable provider before running AI review.",
+      "error",
+    );
+    redirect("/");
+  }
+
+  const content = await getAdminContentIndex();
+  const targets = selectStaleReviewTargets([
+    ...content.experiences.map((record) => toReviewFreshnessRecord("experience", record)),
+    ...content.projects.map((record) => toReviewFreshnessRecord("project", record)),
+    ...content.caseStudies.map((record) => toReviewFreshnessRecord("case_study", record)),
+  ]);
+
+  let queued = 0;
+  let skipped = 0;
+
+  for (const target of targets) {
+    const result = await queueContentAiReview(target.contentType, target.id);
+    if (result === "queued") {
+      queued += 1;
+    } else {
+      skipped += 1;
+    }
+  }
+
+  logLlmTaskEvent("bulk_queued", { detail: `queued=${queued} skipped=${skipped}` });
+
+  if (queued > 0) {
+    startQueuedLlmTaskProcessing();
+  }
+
+  await setFlash(describeBulkEnqueue({ queued, skipped }), queued > 0 ? "success" : "info");
+  revalidatePath("/");
+  revalidatePath("/content/experiences");
+  revalidatePath("/content/projects");
+  revalidatePath("/content/case-studies");
+  revalidatePath("/tasks");
+  redirect("/");
+}
+
+function toReviewFreshnessRecord(
+  contentType: AiReviewContentType,
+  record: { id: string; aiReviewStatus: string; lastAiReviewAt: Date | null; updatedAt: Date },
+): {
+  id: string;
+  contentType: AiReviewContentType;
+  aiReviewStatus: string;
+  lastAiReviewAt: Date | null;
+  updatedAt: Date;
+} {
+  return {
+    id: record.id,
+    contentType,
+    aiReviewStatus: record.aiReviewStatus,
+    lastAiReviewAt: record.lastAiReviewAt,
+    updatedAt: record.updatedAt,
+  };
+}
+
+export async function createProjectDraftAction(_formData: FormData): Promise<void> {
+  const id = await createProject(parseDraftProject());
+
+  await setFlash("Draft created");
+  refreshContent("project", id);
+  redirect(contentEditPath("project", id));
+}
+
+export async function createCaseStudyDraftAction(_formData: FormData): Promise<void> {
+  const id = await createCaseStudy(parseDraftCaseStudy());
+
+  await setFlash("Draft created");
+  refreshContent("case_study", id);
+  redirect(contentEditPath("case_study", id));
+}
+
+export async function duplicateProjectAction(formData: FormData): Promise<void> {
+  const { id } = idInputSchema.parse({ id: text(formData, "id") });
+  const source = await getProjectById(id);
+
+  if (!source) {
+    await setFlash("Project not found.", "error");
+    redirect(contentListPath("project"));
+  }
+
+  const duplicateId = await createProject(
+    createProjectSchema.parse({
+      slug: draftSlug("project"),
+      name: source.name,
+      description: source.description,
+      details: source.details,
+      architecture: source.architecture,
+      developmentTechStack: source.developmentTechStack,
+      qaTechStack: source.qaTechStack,
+      aiIntegrationTechStack: source.aiIntegrationTechStack,
+      deploymentTechStack: source.deploymentTechStack,
+      status: "draft",
+      url: source.url ?? "",
+      githubUrl: source.githubUrl ?? "",
+      seoTitle: source.seoTitle ?? "",
+      seoDescription: source.seoDescription ?? "",
+      ogImage: source.ogImage ?? "",
+      experienceId: source.experienceId ?? "",
+      lensIds: source.lensIds,
+      principleIds: source.principleIds,
+      skillIds: source.skillIds,
+      tagIds: source.tagIds,
+      position: source.position,
+      startDate: source.startDate ?? "",
+      endDate: source.endDate ?? "",
+    }),
+  );
+
+  await setFlash("Draft duplicate created");
+  refreshContent("project", duplicateId);
+  redirect(contentEditPath("project", duplicateId));
+}
+
+export async function duplicateCaseStudyAction(formData: FormData): Promise<void> {
+  const { id } = idInputSchema.parse({ id: text(formData, "id") });
+  const source = await getCaseStudyById(id);
+
+  if (!source) {
+    await setFlash("Case study not found.", "error");
+    redirect(contentListPath("case_study"));
+  }
+
+  const duplicateId = await createCaseStudy(
+    createCaseStudySchema.parse({
+      slug: draftSlug("case-study"),
+      title: source.title,
+      excerpt: source.excerpt,
+      status: "draft",
+      seoTitle: source.seoTitle ?? "",
+      seoDescription: source.seoDescription ?? "",
+      ogImage: source.ogImage ?? "",
+      context: source.context,
+      problem: source.problem,
+      constraints: source.constraints,
+      action: source.action,
+      tradeoffs: source.tradeoffs,
+      outcome: source.outcome,
+      learning: source.learning,
+      lensIds: source.lensIds,
+      principleIds: source.principleIds,
+      experienceIds: source.experienceIds,
+      projectIds: source.projectIds,
+      skillIds: source.skillIds,
+      tagIds: source.tagIds,
+      position: source.position,
+    }),
+  );
+
+  await setFlash("Draft duplicate created");
+  refreshContent("case_study", duplicateId);
+  redirect(contentEditPath("case_study", duplicateId));
+}
+
+export async function publishProjectAction(formData: FormData): Promise<void> {
+  const { id } = idInputSchema.parse({ id: text(formData, "id") });
+  const fallback = contentEditPath("project", id);
+  const redirectTo = safeRedirectTarget(text(formData, "redirectTo"), fallback);
+  const result = await publishProjectRecord(id);
+
+  if (!result.ok) {
+    await setFlash(result.message, "error");
+    redirect(fallback);
+  }
+
+  await setFlash("Project published");
+  refreshContent("project", id);
+  redirect(redirectTo);
+}
+
+export async function publishCaseStudyAction(formData: FormData): Promise<void> {
+  const { id } = idInputSchema.parse({ id: text(formData, "id") });
+  const fallback = contentEditPath("case_study", id);
+  const redirectTo = safeRedirectTarget(text(formData, "redirectTo"), fallback);
+  const result = await publishCaseStudyRecord(id);
+
+  if (!result.ok) {
+    await setFlash(result.message, "error");
+    redirect(fallback);
+  }
+
+  await setFlash("Case study published");
+  refreshContent("case_study", id);
+  redirect(redirectTo);
+}
+
+export async function unpublishProjectAction(formData: FormData): Promise<void> {
+  const { id } = idInputSchema.parse({ id: text(formData, "id") });
+  const redirectTo = safeRedirectTarget(text(formData, "redirectTo"), contentEditPath("project", id));
+
+  await patchProject({ id, set: { status: "draft" } });
+  await setFlash("Project moved back to draft");
+  refreshContent("project", id);
+  redirect(redirectTo);
+}
+
+export async function unpublishCaseStudyAction(formData: FormData): Promise<void> {
+  const { id } = idInputSchema.parse({ id: text(formData, "id") });
+  const redirectTo = safeRedirectTarget(
+    text(formData, "redirectTo"),
+    contentEditPath("case_study", id),
+  );
+
+  await patchCaseStudy({ id, set: { status: "draft" } });
+  await setFlash("Case study moved back to draft");
+  refreshContent("case_study", id);
+  redirect(redirectTo);
+}
+
+export async function archiveProjectAction(formData: FormData): Promise<void> {
+  const { id } = idInputSchema.parse({ id: text(formData, "id") });
+  const redirectTo = safeRedirectTarget(text(formData, "redirectTo"), contentEditPath("project", id));
+
+  await patchProject({ id, set: { status: "archived" } });
+  await setFlash("Project archived");
+  refreshContent("project", id);
+  redirect(redirectTo);
+}
+
+export async function archiveCaseStudyAction(formData: FormData): Promise<void> {
+  const { id } = idInputSchema.parse({ id: text(formData, "id") });
+  const redirectTo = safeRedirectTarget(
+    text(formData, "redirectTo"),
+    contentEditPath("case_study", id),
+  );
+
+  await patchCaseStudy({ id, set: { status: "archived" } });
+  await setFlash("Case study archived");
+  refreshContent("case_study", id);
+  redirect(redirectTo);
+}
+
+export async function setProjectStatusAction(formData: FormData): Promise<void> {
+  const { id } = idInputSchema.parse({ id: text(formData, "id") });
+  const nextStatus = contentStatusSchema.parse(status(formData));
+  const redirectTo = safeRedirectTarget(text(formData, "redirectTo"), contentEditPath("project", id));
+
+  if (nextStatus === "published") {
+    const result = await publishProjectRecord(id);
+
+    if (!result.ok) {
+      await setFlash(result.message, "error");
+      redirect(contentEditPath("project", id));
+    }
+
+    await setFlash("Project published");
+    refreshContent("project", id);
+    redirect(redirectTo);
+  }
+
+  await patchProject({ id, set: { status: nextStatus } });
+  await setFlash(nextStatus === "archived" ? "Project archived" : "Project saved as draft");
+  refreshContent("project", id);
+  redirect(redirectTo);
+}
+
+export async function setCaseStudyStatusAction(formData: FormData): Promise<void> {
+  const { id } = idInputSchema.parse({ id: text(formData, "id") });
+  const nextStatus = contentStatusSchema.parse(status(formData));
+  const redirectTo = safeRedirectTarget(
+    text(formData, "redirectTo"),
+    contentEditPath("case_study", id),
+  );
+
+  if (nextStatus === "published") {
+    const result = await publishCaseStudyRecord(id);
+
+    if (!result.ok) {
+      await setFlash(result.message, "error");
+      redirect(contentEditPath("case_study", id));
+    }
+
+    await setFlash("Case study published");
+    refreshContent("case_study", id);
+    redirect(redirectTo);
+  }
+
+  await patchCaseStudy({ id, set: { status: nextStatus } });
+  await setFlash(nextStatus === "archived" ? "Case study archived" : "Case study saved as draft");
+  refreshContent("case_study", id);
+  redirect(redirectTo);
+}
+
+async function runSingleContentAiReview(
+  contentType: EditorialContentType,
+  formData: FormData,
+): Promise<void> {
+  const { id } = idInputSchema.parse({ id: text(formData, "id") });
+  const redirectTo = safeRedirectTarget(text(formData, "redirectTo"), contentEditPath(contentType, id));
+
+  if (!(await hasOnlineLlmConnection())) {
+    await setFlash(
+      "No online LLM connection is available. Configure a reachable provider before running AI review.",
+      "error",
+    );
+    refreshContent(contentType, id);
+    redirect(redirectTo);
+  }
+
+  const result = await queueContentAiReview(contentType, id);
+
+  if (result === "missing") {
+    await setFlash(`${contentLabel(contentType)} not found.`, "error");
+  } else if (result === "skipped") {
+    await setFlash(
+      `AI review is already queued or processing for this ${contentLabel(contentType).toLowerCase()}.`,
+      "info",
+    );
+  } else {
+    await setFlash("AI review queued");
+    startQueuedLlmTaskProcessing();
+  }
+
+  refreshContent(contentType, id);
+  redirect(redirectTo);
+}
+
+async function runAllContentAiReviews(
+  contentType: Extract<EditorialContentType, "project" | "case_study">,
+): Promise<void> {
+  const listPath = contentListPath(contentType);
+
+  if (!(await hasOnlineLlmConnection())) {
+    await setFlash(
+      "No online LLM connection is available. Configure a reachable provider before running AI review.",
+      "error",
+    );
+    revalidatePath(listPath);
+    redirect(listPath);
+  }
+
+  const records =
+    contentType === "project" ? await getAllProjects() : await getAllCaseStudies();
+  let queued = 0;
+  let skipped = 0;
+
+  for (const record of records) {
+    const result = await queueContentAiReview(contentType, record.id);
+    if (result === "queued") {
+      queued += 1;
+    } else {
+      skipped += 1;
+    }
+  }
+
+  const singularLabel = contentType === "project" ? "project" : "case study";
+  const pluralLabel = contentType === "project" ? "projects" : "case studies";
+
+  if (queued === 0) {
+    await setFlash(
+      skipped > 0
+        ? `No new AI reviews were queued because every ${singularLabel} is already active.`
+        : `No ${pluralLabel} are available to review.`,
+      "info",
+    );
+  } else {
+    startQueuedLlmTaskProcessing();
+    await setFlash(
+      skipped > 0
+        ? `Queued AI review for ${queued} ${queued === 1 ? singularLabel : pluralLabel}; skipped ${skipped} active review${skipped === 1 ? "" : "s"}.`
+        : `Queued AI review for ${queued} ${queued === 1 ? singularLabel : pluralLabel}.`,
+    );
+  }
+
+  revalidatePath(listPath);
+  revalidatePath("/tasks");
+  redirect(listPath);
+}
+
+export async function runProjectAiReviewAction(formData: FormData): Promise<void> {
+  await runSingleContentAiReview("project", formData);
+}
+
+export async function runCaseStudyAiReviewAction(formData: FormData): Promise<void> {
+  await runSingleContentAiReview("case_study", formData);
+}
+
+export async function runAllProjectAiReviewsAction(_formData: FormData): Promise<void> {
+  await runAllContentAiReviews("project");
+}
+
+export async function runAllCaseStudyAiReviewsAction(_formData: FormData): Promise<void> {
+  await runAllContentAiReviews("case_study");
 }
 
 export async function createProjectAction(formData: FormData): Promise<void> {
@@ -712,6 +1892,7 @@ async function applyPatch(
   revalidatePath("/");
   revalidatePath(options.listPath);
   revalidatePath(`${options.listPath}/${id}`);
+  revalidatePath(`${options.listPath}/${id}/preview`);
 }
 
 export async function patchLensAction(formData: FormData): Promise<void> {

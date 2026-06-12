@@ -3,7 +3,15 @@ import { notFound } from "next/navigation";
 
 import { getAdminContentIndex, getProjectById } from "@portfolio/db/queries";
 
-import { deleteProjectAction, patchProjectAction } from "@/app/actions";
+import {
+  archiveProjectAction,
+  deleteProjectAction,
+  patchProjectAction,
+  publishProjectAction,
+  runProjectAiReviewAction,
+  setProjectStatusAction,
+  unpublishProjectAction,
+} from "@/app/actions";
 import { DeleteForm } from "@/components/delete-form";
 import { DetailHeader } from "@/components/detail/detail-header";
 import { MetaSidebar } from "@/components/detail/meta-sidebar";
@@ -11,10 +19,18 @@ import { RichTextView } from "@/components/detail/rich-text-view";
 import { SectionCard } from "@/components/detail/section-card";
 import { SectionEditForm } from "@/components/detail/section-edit-form";
 import { SettingsModal } from "@/components/detail/settings-modal";
+import { AiReviewPanel } from "@/components/editorial/ai-review-panel";
+import { WorkflowActions } from "@/components/editorial/workflow-actions";
 import { CheckboxGroup, Field, SelectField, SeoFields } from "@/components/form-controls";
 import { RichTextField } from "@/components/forms/rich-text-field";
+import { LlmTaskAutoStarter } from "@/components/llm-task-auto-starter";
 import { ModalPanel } from "@/components/modal-panel";
+import { TasksAutoRefresh } from "@/components/tasks-auto-refresh";
+import { toAiReviewDetails } from "@/lib/ai-review-details";
 import { siblingLinks } from "@/lib/detail-nav";
+import { formatProjectDateRange, projectTitleLabel } from "@/lib/editorial-display";
+import { formatDate } from "@/lib/format";
+import { getLlmConnectionStatuses } from "@/lib/llm-config";
 import { publicHrefs } from "@/lib/public-site";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +41,11 @@ interface EditPageProps {
 
 export default async function EditProjectPage({ params }: EditPageProps) {
   const { id } = await params;
-  const [project, content] = await Promise.all([getProjectById(id), getAdminContentIndex()]);
+  const [project, content, llmStatuses] = await Promise.all([
+    getProjectById(id),
+    getAdminContentIndex(),
+    getLlmConnectionStatuses(),
+  ]);
 
   if (!project) {
     notFound();
@@ -40,7 +60,7 @@ export default async function EditProjectPage({ params }: EditPageProps) {
   const positionOptions = [
     { label: "— No related position —", value: "" },
     ...content.experiences.map((item) => ({
-      label: `${item.role} at ${item.company}`,
+      label: `${item.role || "Untitled role"} at ${item.company || "Company not set"}`,
       value: item.id,
     })),
   ];
@@ -48,10 +68,20 @@ export default async function EditProjectPage({ params }: EditPageProps) {
   const principleOptions = content.principles.map((p) => ({ id: p.id, label: p.title }));
   const skillOptions = content.skills.map((s) => ({ id: s.id, label: s.name, category: s.category }));
   const tagOptions = content.tags.map((t) => ({ id: t.id, label: t.name, category: t.category }));
+  const hasActiveAiReview = ["queued", "processing"].includes(project.aiReviewStatus);
+  const usableLlmCount = llmStatuses.filter(
+    (status) => status.status === "online" && Boolean(status.model),
+  ).length;
+  const aiReviewDisabledReason =
+    llmStatuses.length === 0
+      ? "No LLM provider is configured. Configure a reachable provider before running AI review."
+      : usableLlmCount === 0
+        ? "No LLM connection is online with a configured model. Check provider configuration before running AI review."
+        : null;
 
   const siblings = siblingLinks(content.projects, project.id, (item) => ({
     href: `/content/projects/${item.id}`,
-    label: item.name,
+    label: projectTitleLabel(item),
   }));
 
   const stackBoxes = [
@@ -65,6 +95,8 @@ export default async function EditProjectPage({ params }: EditPageProps) {
 
   // Shown in the header only when at least one date is set.
   const projectDateRange = formatProjectDateRange(project.startDate, project.endDate);
+  const editPath = `/content/projects/${project.id}`;
+  const previewPath = `/content/projects/${project.id}/preview`;
 
   const metaGroups = [
     {
@@ -195,7 +227,7 @@ export default async function EditProjectPage({ params }: EditPageProps) {
         id={project.id}
         fields={["name", "url", "githubUrl"]}
       >
-        <Field label="Name" name="name" required defaultValue={project.name} />
+        <Field label="Name" name="name" defaultValue={project.name} />
         <Field label="URL" name="url" type="url" defaultValue={project.url ?? undefined} />
         <Field
           label="GitHub URL"
@@ -209,16 +241,29 @@ export default async function EditProjectPage({ params }: EditPageProps) {
 
   return (
     <main className="mx-auto max-w-6xl px-5 py-8 lg:px-8">
+      <LlmTaskAutoStarter enabled={project.aiReviewStatus === "queued"} />
+      <TasksAutoRefresh enabled={hasActiveAiReview} />
       <DetailHeader
         backHref="/content/projects"
         backLabel="All projects"
         prev={siblings.prev}
         next={siblings.next}
         eyebrow="Project"
-        title={project.name}
+        title={projectTitleLabel(project)}
         id={project.id}
         status={project.status}
-        statusAction={patchProjectAction}
+        statusAction={setProjectStatusAction}
+        actions={
+          <WorkflowActions
+            id={project.id}
+            status={project.status}
+            editPath={editPath}
+            previewPath={previewPath}
+            publishAction={publishProjectAction}
+            unpublishAction={unpublishProjectAction}
+            archiveAction={archiveProjectAction}
+          />
+        }
         publicHref={project.status === "published" ? publicHrefs.project(project.slug) : null}
         settings={settings}
         headerEdit={headerEdit}
@@ -236,8 +281,11 @@ export default async function EditProjectPage({ params }: EditPageProps) {
                   </span>
                 </span>
               ) : null}
+              <span className="text-muted/70">Updated {formatDate(project.updatedAt)}</span>
             </span>
-          ) : null
+          ) : (
+            <span className="text-sm text-muted/70">Updated {formatDate(project.updatedAt)}</span>
+          )
         }
       >
         {project.url || project.githubUrl ? (
@@ -374,7 +422,22 @@ export default async function EditProjectPage({ params }: EditPageProps) {
           />
         </div>
 
-        <MetaSidebar groups={metaGroups} />
+        <aside className="grid h-fit content-start gap-6">
+          <AiReviewPanel
+            id={project.id}
+            redirectTo={editPath}
+            action={runProjectAiReviewAction}
+            status={project.aiReviewStatus}
+            qualityScore={project.contentQualityScore}
+            summary={project.aiSummary}
+            details={toAiReviewDetails(project.aiSuggestions)}
+            reviewedAt={project.lastAiReviewAt}
+            error={project.aiReviewError}
+            canRunReview={usableLlmCount > 0}
+            disabledReason={aiReviewDisabledReason}
+          />
+          <MetaSidebar groups={metaGroups} />
+        </aside>
       </div>
 
       <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-danger-400/20 bg-danger-500/[0.04] p-5">
@@ -383,26 +446,4 @@ export default async function EditProjectPage({ params }: EditPageProps) {
       </div>
     </main>
   );
-}
-
-function formatProjectDateRange(startDate: string | null, endDate: string | null): string {
-  const format = (value: string | null): string | null => {
-    if (!value) {
-      return null;
-    }
-    const date = new Date(`${value}T00:00:00Z`);
-    if (Number.isNaN(date.getTime())) {
-      return null;
-    }
-    return date.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
-  };
-
-  const start = format(startDate);
-  const end = format(endDate);
-
-  if (start && end) {
-    return `${start} – ${end}`;
-  }
-
-  return start ?? end ?? "";
 }

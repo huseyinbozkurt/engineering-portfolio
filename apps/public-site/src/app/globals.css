@@ -87,3 +87,41 @@ a {
 .rich-text ol {
   padding-left: 1.25rem;
 }
+
+/* =========================================================================
+   Rich-text overflow safety — applies to all rendered markdown / CMS content
+   so unusual content (wide tables, long code, big images, unbroken tokens)
+   can never stretch a layout or force horizontal scroll. Pairs with the
+   `.break-anywhere` utility and the `@/components/ui` preview primitives.
+   ========================================================================= */
+.rich-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.rich-text > * {
+  min-width: 0;
+}
+.rich-text :where(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+}
+.rich-text :where(pre) {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.rich-text :where(code) {
+  overflow-wrap: anywhere;
+}
+.rich-text :where(table) {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Force-wrap unbroken long tokens (URLs, UUIDs, stack traces, generated text). */
+.break-anywhere {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}

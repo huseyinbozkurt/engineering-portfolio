@@ -3,6 +3,13 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type FocusEvent, type ReactElement, type SVGProps } from "react";
 
+import { ClampedText } from "@/components/ui";
+import {
+  PREVIEW_BODY_LINES,
+  PREVIEW_SUBTITLE_LINES,
+  PREVIEW_TITLE_LINES,
+} from "@/lib/content-density";
+
 export interface InteractiveTimelineItem {
   id: string;
   kind: "experience" | "project";
@@ -219,11 +226,21 @@ export function InteractiveTimeline({ items }: { items: InteractiveTimelineItem[
                       {item.dateRange}
                     </span>
                   ) : null}
-                  <span className="mt-3 block text-sm font-semibold text-ink transition group-hover:text-violet-100">
+                  <ClampedText
+                    as="span"
+                    lines={PREVIEW_TITLE_LINES}
+                    className="mt-3 block text-sm font-semibold text-ink transition group-hover:text-violet-100"
+                  >
                     {item.name}
-                  </span>
+                  </ClampedText>
                   {item.role ? (
-                    <span className="mt-1 block text-sm leading-5 text-muted">{item.role}</span>
+                    <ClampedText
+                      as="span"
+                      lines={PREVIEW_SUBTITLE_LINES}
+                      className="mt-1 block text-sm leading-5 text-muted"
+                    >
+                      {item.role}
+                    </ClampedText>
                   ) : null}
                 </span>
               </button>
@@ -264,10 +281,18 @@ function TimelineOverview({
       {item.dateRange ? (
         <p className="text-xs font-semibold text-violet-200">{item.dateRange}</p>
       ) : null}
-      <h3 className="mt-3 text-base font-semibold text-ink">{item.name}</h3>
-      {item.role ? <p className="mt-1 text-sm leading-5 text-muted">{item.role}</p> : null}
+      <ClampedText as="h3" lines={PREVIEW_TITLE_LINES} className="mt-3 text-base font-semibold text-ink">
+        {item.name}
+      </ClampedText>
+      {item.role ? (
+        <ClampedText lines={PREVIEW_SUBTITLE_LINES} className="mt-1 text-sm leading-5 text-muted">
+          {item.role}
+        </ClampedText>
+      ) : null}
       {item.summary ? (
-        <p className="mt-4 text-sm leading-6 text-muted">{item.summary}</p>
+        <ClampedText lines={PREVIEW_BODY_LINES} className="mt-4 text-sm leading-6 text-muted">
+          {item.summary}
+        </ClampedText>
       ) : null}
       {item.tags.length > 0 ? (
         <ul className="mt-4 flex flex-wrap gap-2">

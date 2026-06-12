@@ -12,7 +12,7 @@ import type {
   tags,
 } from "@portfolio/db/schema";
 
-export type { AiSuggestion, ContentStatus } from "@portfolio/db/schema";
+export type { AiReviewStatus, AiSuggestion, ContentStatus } from "@portfolio/db/schema";
 
 export type Lens = InferSelectModel<typeof lenses>;
 export type Principle = InferSelectModel<typeof principles>;

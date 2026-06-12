@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useMemo, useState, type ComponentType } from "react";
 
 import { EmptyPanel } from "@/components/empty-panel";
+import { StatusBadge } from "@/components/status-badge";
+import { ClampedText } from "@/components/ui";
+import { PREVIEW_EXCERPT_LINES } from "@/lib/content-density";
 
 /** Read-only AI-assist metadata surfaced per record (populated by a future pipeline). */
 export interface ContentAiMeta {
@@ -41,17 +44,6 @@ interface ContentListProps<TGroup = unknown> {
    */
   groupActionComponent?: ComponentType<{ groupName: string; data: TGroup }>;
   groupActionData?: Record<string, TGroup>;
-}
-
-function statusBadgeClass(status: string): string {
-  switch (status) {
-    case "published":
-      return "ui-badge ui-badge-success";
-    case "archived":
-      return "ui-badge ui-badge-warning";
-    default:
-      return "ui-badge ui-badge-neutral";
-  }
 }
 
 function formatReviewDate(value: Date): string {
@@ -279,9 +271,7 @@ function ContentRow({ item, columns }: { item: ContentListItem; columns: TableCo
       )}
       {columns.hasStatus ? (
         <div>
-          {item.status ? (
-            <span className={`${statusBadgeClass(item.status)} capitalize`}>{item.status}</span>
-          ) : null}
+          {item.status ? <StatusBadge status={item.status} /> : null}
         </div>
       ) : null}
       {columns.hasAction ? (
@@ -320,7 +310,9 @@ function ContentRow({ item, columns }: { item: ContentListItem; columns: TableCo
           </div>
           <div>
             <dt className="font-medium text-ink/80">AI summary</dt>
-            <dd className="mt-1 leading-5">{item.ai.aiSummary ?? "No AI summary generated yet."}</dd>
+            <ClampedText as="dd" lines={PREVIEW_EXCERPT_LINES} className="mt-1 leading-5">
+              {item.ai.aiSummary ?? "No AI summary generated yet."}
+            </ClampedText>
           </div>
         </dl>
       ) : null}

@@ -54,10 +54,19 @@ export const aiGeneratedStoryStatusEnum = pgEnum("ai_generated_story_status", [
 
 export type AiGeneratedStoryStatus = (typeof aiGeneratedStoryStatusEnum.enumValues)[number];
 
+export const aiReviewStatusEnum = pgEnum("ai_review_status", [
+  "idle",
+  "queued",
+  "processing",
+  "completed",
+  "failed",
+]);
+
+export type AiReviewStatus = (typeof aiReviewStatusEnum.enumValues)[number];
+
 /**
- * Forward-looking shape for AI-generated content review suggestions. Stored as
- * jsonb so the structure can evolve without a migration. No LLM writes these
- * yet; the column exists so the admin can surface results read-only later.
+ * Shape for AI-generated content review suggestions. Stored as jsonb so the
+ * structure can evolve without a migration as more content types get reviews.
  */
 export interface AiSuggestion {
   field: string;
@@ -88,12 +97,14 @@ const seo = {
   ogImage: text("og_image"),
 };
 
-/** AI-assist metadata. Populated by a future review pipeline; null for now. */
+/** AI-assist metadata populated by content review tasks; null until reviewed. */
 const aiMetadata = {
   contentQualityScore: integer("content_quality_score"),
   lastAiReviewAt: timestamp("last_ai_review_at", { withTimezone: true }),
   aiSummary: text("ai_summary"),
   aiSuggestions: jsonb("ai_suggestions").$type<AiSuggestion[]>(),
+  aiReviewStatus: aiReviewStatusEnum("ai_review_status").notNull().default("idle"),
+  aiReviewError: text("ai_review_error"),
 };
 
 export const lenses = pgTable(
@@ -426,6 +437,8 @@ export const llmTasks = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     taskType: varchar("task_type", { length: 80 }).notNull(),
+    targetType: varchar("target_type", { length: 80 }),
+    targetId: uuid("target_id"),
     title: varchar("title", { length: 180 }).notNull(),
     status: llmTaskStatusEnum("status").notNull().default("pending"),
     providerName: varchar("provider_name", { length: 180 }),
@@ -440,16 +453,34 @@ export const llmTasks = pgTable(
     startedAt: timestamp("started_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     durationMs: integer("duration_ms"),
+    /** Incremented each time the task is claimed; surfaced in worker logs. */
+    attempts: integer("attempts").notNull().default(0),
     ...timestamps,
   },
   (table) => [
     index("llm_tasks_created_at_idx").on(table.createdAt),
     index("llm_tasks_status_idx").on(table.status),
     index("llm_tasks_task_type_idx").on(table.taskType),
+    index("llm_tasks_target_idx").on(table.targetType, table.targetId),
     uniqueIndex("llm_tasks_active_ai_insights_idx")
       .on(table.taskType)
       .where(
         sql`${table.taskType} = 'ai_insights' and ${table.status} in ('pending', 'running')`,
+      ),
+    uniqueIndex("llm_tasks_active_experience_ai_review_idx")
+      .on(table.targetId)
+      .where(
+        sql`${table.taskType} = 'experience_ai_review' and ${table.status} in ('pending', 'running')`,
+      ),
+    uniqueIndex("llm_tasks_active_project_ai_review_idx")
+      .on(table.targetId)
+      .where(
+        sql`${table.taskType} = 'project_ai_review' and ${table.status} in ('pending', 'running')`,
+      ),
+    uniqueIndex("llm_tasks_active_case_study_ai_review_idx")
+      .on(table.targetId)
+      .where(
+        sql`${table.taskType} = 'case_study_ai_review' and ${table.status} in ('pending', 'running')`,
       ),
   ],
 );
@@ -529,6 +560,23 @@ export const aiInsightRuns = pgTable(
       .on(table.status)
       .where(sql`${table.status} in ('pending', 'running')`),
   ]
+);
+
+export const aiReviewQualitySnapshots = pgTable(
+  "ai_review_quality_snapshots",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    contentType: varchar("content_type", { length: 40 }).notNull(),
+    contentId: uuid("content_id").notNull(),
+    contentTitle: varchar("content_title", { length: 220 }).notNull(),
+    qualityScore: integer("quality_score").notNull(),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }).defaultNow().notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index("ai_review_quality_snapshots_content_idx").on(table.contentType, table.contentId),
+    index("ai_review_quality_snapshots_reviewed_at_idx").on(table.reviewedAt),
+  ],
 );
 
 // Story content types live in @portfolio/validators (shared with the LLM

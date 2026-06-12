@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { getLlmTask, type LlmTaskRecord } from "@portfolio/db/llm-tasks";
 
+import { LlmTaskAutoStarter } from "@/components/llm-task-auto-starter";
 import { PageTitle } from "@/components/page-title";
 import { TasksAutoRefresh } from "@/components/tasks-auto-refresh";
 
@@ -22,6 +23,7 @@ export default async function LlmTaskDetailPage({ params }: LlmTaskDetailPagePro
 
   return (
     <main className="px-5 py-8 lg:px-8">
+      <LlmTaskAutoStarter enabled={task.status === "pending"} />
       <TasksAutoRefresh enabled={task.status === "running"} />
       <Link href="/tasks" className="text-sm text-muted transition hover:text-ink">
         Back to LLM tasks
@@ -80,7 +82,10 @@ function TaskTimeline({ task }: { task: LlmTaskRecord }) {
     { label: "Task created", done: true },
     { label: "Provider selected", done: Boolean(task.providerName) },
     { label: "Raw response captured", done: Boolean(task.rawResponse) },
-    { label: task.status === "failed" ? "Failed" : "Parsed", done: task.status !== "running" },
+    {
+      label: task.status === "failed" ? "Failed" : "Parsed",
+      done: task.status === "succeeded" || task.status === "failed",
+    },
   ];
 
   return (

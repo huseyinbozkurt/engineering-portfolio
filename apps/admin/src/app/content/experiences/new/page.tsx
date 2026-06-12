@@ -1,34 +1,23 @@
-import { getAdminContentIndex } from "@portfolio/db/queries";
+import { Plus } from "lucide-react";
 
-import { createExperienceAction } from "@/app/actions";
-import { ExperienceForm } from "@/components/forms/experience-form";
+import { createExperienceDraftAction } from "@/app/actions";
+import { PageTitle } from "@/components/page-title";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewExperiencePage() {
-  const content = await getAdminContentIndex();
-
+export default function NewExperiencePage() {
   return (
-    <main className="min-w-0">
-      <ExperienceForm
-        action={createExperienceAction}
-        title="New experience"
-        submitLabel="Create experience"
-        lensOptions={content.lenses.map((lens) => ({ id: lens.id, label: lens.name }))}
-        principleOptions={content.principles.map((principle) => ({
-          id: principle.id,
-          label: principle.title,
-        }))}
-        skillOptions={content.skills.map((skill) => ({
-          id: skill.id,
-          label: skill.name,
-          category: skill.category,
-        }))}
-        tagOptions={content.tags.map((tag) => ({
-          id: tag.id,
-          label: tag.name,
-          category: tag.category,
-        }))}
+    <main className="px-5 py-8 lg:px-8">
+      <PageTitle
+        title="New Experience"
+        description="Create a draft first, then edit, preview, and publish it."
+        actions={
+          <form action={createExperienceDraftAction}>
+            <button type="submit" className="ui-btn-primary">
+              <Plus className="size-4" aria-hidden /> Create Draft
+            </button>
+          </form>
+        }
       />
     </main>
   );

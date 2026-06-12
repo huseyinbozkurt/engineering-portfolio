@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { Breadcrumbs } from "@/components/nav/breadcrumbs";
 import type { FormAction } from "@/components/forms/types";
+import { StatusBadge } from "@/components/status-badge";
 
 import { PrevNextNav, type SiblingLink } from "./prev-next-nav";
 import { StatusControl } from "./status-control";
@@ -21,6 +22,8 @@ interface DetailHeaderProps {
   publicHref?: string | null;
   /** The gear/settings modal node. */
   settings: ReactNode;
+  /** Optional primary workflow actions shown before the status switch. */
+  actions?: ReactNode;
   /** Optional edit affordance for header-level viewable fields (title, links…). */
   headerEdit?: ReactNode;
   /** Sibling records for previous / next navigation within the content type. */
@@ -39,6 +42,7 @@ export function DetailHeader({
   subtitle,
   publicHref,
   settings,
+  actions,
   headerEdit,
   prev,
   next,
@@ -58,12 +62,14 @@ export function DetailHeader({
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <h1 className="ui-page-title">{title}</h1>
+            <StatusBadge status={status} />
             {headerEdit}
           </div>
           {subtitle ? <div className="mt-2 text-sm text-muted">{subtitle}</div> : null}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {actions}
           <StatusControl action={statusAction} id={id} status={status} />
           {publicHref ? (
             <a

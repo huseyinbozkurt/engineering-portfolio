@@ -108,8 +108,8 @@ export const createDecisionPatternSchema = z.object({
 
 export const createExperienceSchema = z.object({
   slug: nullableSlugSchema,
-  company: z.string().trim().min(1).max(180),
-  role: z.string().trim().min(1).max(180),
+  company: z.string().trim().max(180).default(""),
+  role: z.string().trim().max(180).default(""),
   location: nullableTextSchema,
   startDate: nullableDateSchema,
   endDate: nullableDateSchema,
@@ -129,7 +129,7 @@ export const createExperienceSchema = z.object({
 
 export const createProjectSchema = z.object({
   slug: slugSchema,
-  name: z.string().trim().min(1).max(180),
+  name: z.string().trim().max(180).default(""),
   description: richTextSchema,
   details: richTextSchema,
   architecture: richTextSchema,
@@ -153,7 +153,7 @@ export const createProjectSchema = z.object({
 
 export const createCaseStudySchema = z.object({
   slug: slugSchema,
-  title: titleSchema,
+  title: z.string().trim().max(220).default(""),
   excerpt: summarySchema,
   status: contentStatusSchema.default("draft"),
   ...seoFields,
@@ -278,6 +278,18 @@ export const bulkSkillsSchema = z.object({
 export const bulkTagsSchema = z.object({
   items: z.array(createTagSchema).min(1, "Add at least one tag."),
 });
+
+export const experienceAiReviewOutputSchema = z
+  .object({
+    qualityScore: z.number().int().min(0).max(100),
+    summary: z.string().trim().min(1).max(1000),
+    strengths: z.array(z.string().trim().min(1).max(300)).max(8),
+    issues: z.array(z.string().trim().min(1).max(300)).max(8),
+    suggestions: z.array(z.string().trim().min(1).max(300)).max(8),
+  })
+  .strict();
+
+export type ExperienceAiReviewOutput = z.infer<typeof experienceAiReviewOutputSchema>;
 
 export type CreateLensInput = z.infer<typeof createLensSchema>;
 export type CreatePrincipleInput = z.infer<typeof createPrincipleSchema>;

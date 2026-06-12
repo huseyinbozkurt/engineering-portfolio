@@ -3,6 +3,8 @@ import Link from "next/link";
 import type { CaseStudyRecord } from "@portfolio/db/queries";
 
 import { RichText } from "@/components/rich-text";
+import { ClampedText, FadeOverflow } from "@/components/ui";
+import { PREVIEW_EXCERPT_LINES, PREVIEW_SECTION_MAX_H } from "@/lib/content-density";
 
 interface CaseStoryPart {
   label: string;
@@ -26,7 +28,9 @@ export function CaseStoryCard({ caseStudy }: { caseStudy: CaseStudyRecord }) {
         </Link>
       </h3>
       {caseStudy.excerpt ? (
-        <p className="mt-3 text-sm leading-6 text-muted">{caseStudy.excerpt}</p>
+        <ClampedText lines={PREVIEW_EXCERPT_LINES} className="mt-3 text-sm leading-6 text-muted">
+          {caseStudy.excerpt}
+        </ClampedText>
       ) : null}
       {parts.length > 0 ? (
         <ol className="mt-5 grid gap-4 md:grid-cols-3">
@@ -40,9 +44,12 @@ export function CaseStoryCard({ caseStudy }: { caseStudy: CaseStudyRecord }) {
                   {part.label}
                 </p>
               </div>
-              <div className="mt-3 [&_.rich-text]:gap-2 [&_.rich-text]:text-sm [&_.rich-text]:leading-6">
+              <FadeOverflow
+                maxHeight={PREVIEW_SECTION_MAX_H}
+                className="mt-3 [&_.rich-text]:gap-2 [&_.rich-text]:text-sm [&_.rich-text]:leading-6"
+              >
                 <RichText value={part.value} />
-              </div>
+              </FadeOverflow>
             </li>
           ))}
         </ol>

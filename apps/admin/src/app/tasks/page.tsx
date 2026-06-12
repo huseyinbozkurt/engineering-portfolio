@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getLlmTasks, type LlmTaskRecord } from "@portfolio/db/llm-tasks";
 
 import { EmptyPanel } from "@/components/empty-panel";
+import { LlmTaskAutoStarter } from "@/components/llm-task-auto-starter";
 import { PageTitle } from "@/components/page-title";
 import { TasksAutoRefresh } from "@/components/tasks-auto-refresh";
 
@@ -10,12 +11,14 @@ export const dynamic = "force-dynamic";
 
 export default async function LlmTasksPage() {
   const { tasks, error } = await readTasks();
+  const pendingCount = tasks.filter((task) => task.status === "pending").length;
   const runningCount = tasks.filter((task) => task.status === "running").length;
   const failedCount = tasks.filter((task) => task.status === "failed").length;
   const succeededCount = tasks.filter((task) => task.status === "succeeded").length;
 
   return (
     <main className="px-5 py-8 lg:px-8">
+      <LlmTaskAutoStarter enabled={pendingCount > 0} />
       <TasksAutoRefresh enabled={runningCount > 0} />
       <PageTitle
         title="LLM Tasks"
@@ -30,11 +33,12 @@ export default async function LlmTasksPage() {
       ) : tasks.length === 0 ? (
         <EmptyPanel
           title="No LLM tasks yet"
-          description="Run AI Insights to create the first task trace. Empty portfolio data will not call the LLM or create a task."
+          description="Run a task-backed AI workflow to create the first trace. Empty portfolio data will not call the LLM or create a task."
         />
       ) : (
         <div className="grid gap-5">
-          <section className="grid gap-4 md:grid-cols-3">
+          <section className="grid gap-4 md:grid-cols-4">
+            <MetricCard label="Pending" value={pendingCount} tone="default" />
             <MetricCard label="Running" value={runningCount} tone="violet" />
             <MetricCard label="Succeeded" value={succeededCount} tone="default" />
             <MetricCard label="Failed" value={failedCount} tone="rose" />

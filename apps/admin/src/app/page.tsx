@@ -13,13 +13,22 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-import { getAdminContentIndex, getContactSubmissions, hasDatabaseUrl } from "@portfolio/db";
+import {
+  getAdminContentIndex,
+  getAiReviewQualitySnapshots,
+  getContactSubmissions,
+  hasDatabaseUrl,
+} from "@portfolio/db";
 import { getAiGeneratedStories } from "@portfolio/db/ai-stories";
 
+import { AiReviewInsightsDashboard } from "@/components/ai-review-insights-dashboard";
+import { AiReviewUpdates } from "@/components/ai-review-updates";
 import { CreateWithAiModal } from "@/components/create-with-ai-modal";
 import { EmptyPanel } from "@/components/empty-panel";
 import { LlmStatusPanel } from "@/components/llm-status-panel";
 import { PageTitle } from "@/components/page-title";
+import { buildAiReviewInsights } from "@/lib/ai-review-insights";
+import { buildAiReviewUpdates } from "@/lib/ai-review-updates";
 import { getLlmConnectionStatuses } from "@/lib/llm-config";
 import { adminNavItems } from "@/lib/admin-nav";
 
@@ -46,11 +55,12 @@ const SEGMENT_COLORS = [
 ];
 
 export default async function AdminHomePage() {
-  const [content, contactSubmissions, llmStatuses, aiStories] = await Promise.all([
+  const [content, contactSubmissions, llmStatuses, aiStories, aiReviewSnapshots] = await Promise.all([
     getAdminContentIndex(),
     getContactSubmissions(),
     getLlmConnectionStatuses(),
     readAiStories(),
+    getAiReviewQualitySnapshots(30),
   ]);
   const onlineLlmCount = llmStatuses.filter((status) => status.status === "online").length;
   const createWithAiDisabledReason =
@@ -73,6 +83,11 @@ export default async function AdminHomePage() {
   const distribution = metrics.filter((metric) => metric.value > 0);
   const topAreas = [...metrics].filter((m) => m.value > 0).sort((a, b) => b.value - a.value).slice(0, 6);
   const maxValue = Math.max(1, ...topAreas.map((metric) => metric.value));
+  const aiReviewInsights = buildAiReviewInsights({
+    content,
+    snapshots: aiReviewSnapshots,
+  });
+  const aiReviewUpdates = buildAiReviewUpdates(content);
 
   return (
     <main className="px-5 py-8 lg:px-8">
@@ -120,6 +135,10 @@ export default async function AdminHomePage() {
           );
         })}
       </section>
+
+      <AiReviewUpdates model={aiReviewUpdates} />
+
+      <AiReviewInsightsDashboard insights={aiReviewInsights} />
 
       <section className="mt-6 grid gap-4 lg:grid-cols-2">
         <div className="ui-card p-6 shadow-card">

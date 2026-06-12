@@ -11,6 +11,8 @@ import {
 import { ConfirmedForm } from "@/components/confirmed-form";
 import { Field, TextArea } from "@/components/form-controls";
 import { ModalPanel } from "@/components/modal-panel";
+import { ClampedText } from "@/components/ui";
+import { PREVIEW_EXCERPT_LINES, PREVIEW_TITLE_LINES } from "@/lib/content-density";
 
 interface AiStoryPartCardProps {
   storyId: string;
@@ -46,8 +48,16 @@ export function AiStoryPartCard({ storyId, part, disabled }: AiStoryPartCardProp
               </span>
             ) : null}
           </div>
-          <h2 className="mt-2 text-lg font-semibold text-ink">{part.title}</h2>
-          <p className="mt-1 text-sm leading-6 text-muted">{part.summary || "No summary."}</p>
+          <ClampedText
+            as="h2"
+            lines={PREVIEW_TITLE_LINES}
+            className="mt-2 text-lg font-semibold text-ink"
+          >
+            {part.title}
+          </ClampedText>
+          <ClampedText lines={PREVIEW_EXCERPT_LINES} className="mt-1 text-sm leading-6 text-muted">
+            {part.summary || "No summary."}
+          </ClampedText>
         </div>
 
         <div className="flex items-center gap-2">

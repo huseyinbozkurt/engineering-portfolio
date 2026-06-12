@@ -3,17 +3,33 @@ import { notFound } from "next/navigation";
 
 import { getAdminContentIndex, getCaseStudyById } from "@portfolio/db/queries";
 
-import { deleteCaseStudyAction, patchCaseStudyAction } from "@/app/actions";
+import {
+  archiveCaseStudyAction,
+  deleteCaseStudyAction,
+  patchCaseStudyAction,
+  publishCaseStudyAction,
+  runCaseStudyAiReviewAction,
+  setCaseStudyStatusAction,
+  unpublishCaseStudyAction,
+} from "@/app/actions";
 import { DeleteForm } from "@/components/delete-form";
 import { DetailHeader } from "@/components/detail/detail-header";
 import { MetaSidebar } from "@/components/detail/meta-sidebar";
 import { SectionCard } from "@/components/detail/section-card";
 import { SectionEditForm } from "@/components/detail/section-edit-form";
 import { SettingsModal } from "@/components/detail/settings-modal";
+import { AiReviewPanel } from "@/components/editorial/ai-review-panel";
+import { WorkflowActions } from "@/components/editorial/workflow-actions";
 import { CheckboxGroup, Field, SeoFields } from "@/components/form-controls";
 import { RichTextField } from "@/components/forms/rich-text-field";
+import { LlmTaskAutoStarter } from "@/components/llm-task-auto-starter";
 import { ModalPanel } from "@/components/modal-panel";
+import { TasksAutoRefresh } from "@/components/tasks-auto-refresh";
+import { toAiReviewDetails } from "@/lib/ai-review-details";
 import { siblingLinks } from "@/lib/detail-nav";
+import { caseStudyTitleLabel } from "@/lib/editorial-display";
+import { formatDate } from "@/lib/format";
+import { getLlmConnectionStatuses } from "@/lib/llm-config";
 import { publicHrefs } from "@/lib/public-site";
 
 export const dynamic = "force-dynamic";
@@ -55,7 +71,11 @@ const NARRATIVE_SECTIONS: Array<{
 
 export default async function EditCaseStudyPage({ params }: EditPageProps) {
   const { id } = await params;
-  const [caseStudy, content] = await Promise.all([getCaseStudyById(id), getAdminContentIndex()]);
+  const [caseStudy, content, llmStatuses] = await Promise.all([
+    getCaseStudyById(id),
+    getAdminContentIndex(),
+    getLlmConnectionStatuses(),
+  ]);
 
   if (!caseStudy) {
     notFound();
@@ -64,9 +84,12 @@ export default async function EditCaseStudyPage({ params }: EditPageProps) {
   const lensName = new Map(content.lenses.map((l) => [l.id, l.name]));
   const principleName = new Map(content.principles.map((p) => [p.id, p.title]));
   const experienceName = new Map(
-    content.experiences.map((e) => [e.id, `${e.role} at ${e.company}`]),
+    content.experiences.map((e) => [
+      e.id,
+      `${e.role || "Untitled role"} at ${e.company || "Company not set"}`,
+    ]),
   );
-  const projectName = new Map(content.projects.map((p) => [p.id, p.name]));
+  const projectName = new Map(content.projects.map((p) => [p.id, p.name || "Untitled Project"]));
   const skillName = new Map(content.skills.map((s) => [s.id, s.name]));
   const tagName = new Map(content.tags.map((t) => [t.id, t.name]));
 
@@ -74,16 +97,31 @@ export default async function EditCaseStudyPage({ params }: EditPageProps) {
   const principleOptions = content.principles.map((p) => ({ id: p.id, label: p.title }));
   const experienceOptions = content.experiences.map((e) => ({
     id: e.id,
-    label: `${e.role} at ${e.company}`,
+    label: `${e.role || "Untitled role"} at ${e.company || "Company not set"}`,
   }));
-  const projectOptions = content.projects.map((p) => ({ id: p.id, label: p.name }));
+  const projectOptions = content.projects.map((p) => ({
+    id: p.id,
+    label: p.name || "Untitled Project",
+  }));
   const skillOptions = content.skills.map((s) => ({ id: s.id, label: s.name, category: s.category }));
   const tagOptions = content.tags.map((t) => ({ id: t.id, label: t.name, category: t.category }));
+  const hasActiveAiReview = ["queued", "processing"].includes(caseStudy.aiReviewStatus);
+  const usableLlmCount = llmStatuses.filter(
+    (status) => status.status === "online" && Boolean(status.model),
+  ).length;
+  const aiReviewDisabledReason =
+    llmStatuses.length === 0
+      ? "No LLM provider is configured. Configure a reachable provider before running AI review."
+      : usableLlmCount === 0
+        ? "No LLM connection is online with a configured model. Check provider configuration before running AI review."
+        : null;
 
   const siblings = siblingLinks(content.caseStudies, caseStudy.id, (item) => ({
     href: `/content/case-studies/${item.id}`,
-    label: item.title,
+    label: caseStudyTitleLabel(item),
   }));
+  const editPath = `/content/case-studies/${caseStudy.id}`;
+  const previewPath = `/content/case-studies/${caseStudy.id}/preview`;
 
   const toItems = (ids: string[], lookup: Map<string, string>) =>
     ids.flatMap((rid) => (lookup.has(rid) ? [{ id: rid, label: lookup.get(rid)! }] : []));
@@ -182,26 +220,40 @@ export default async function EditCaseStudyPage({ params }: EditPageProps) {
       }
     >
       <SectionEditForm action={patchCaseStudyAction} id={caseStudy.id} fields="title">
-        <Field label="Title" name="title" required defaultValue={caseStudy.title} />
+        <Field label="Title" name="title" defaultValue={caseStudy.title} />
       </SectionEditForm>
     </ModalPanel>
   );
 
   return (
     <main className="mx-auto max-w-6xl px-5 py-8 lg:px-8">
+      <LlmTaskAutoStarter enabled={caseStudy.aiReviewStatus === "queued"} />
+      <TasksAutoRefresh enabled={hasActiveAiReview} />
       <DetailHeader
         backHref="/content/case-studies"
         backLabel="All case studies"
         prev={siblings.prev}
         next={siblings.next}
         eyebrow="Case study"
-        title={caseStudy.title}
+        title={caseStudyTitleLabel(caseStudy)}
         id={caseStudy.id}
         status={caseStudy.status}
-        statusAction={patchCaseStudyAction}
+        statusAction={setCaseStudyStatusAction}
+        actions={
+          <WorkflowActions
+            id={caseStudy.id}
+            status={caseStudy.status}
+            editPath={editPath}
+            previewPath={previewPath}
+            publishAction={publishCaseStudyAction}
+            unpublishAction={unpublishCaseStudyAction}
+            archiveAction={archiveCaseStudyAction}
+          />
+        }
         publicHref={caseStudy.status === "published" ? publicHrefs.caseStudy(caseStudy.slug) : null}
         settings={settings}
         headerEdit={headerEdit}
+        subtitle={<span className="text-sm text-muted/70">Updated {formatDate(caseStudy.updatedAt)}</span>}
       />
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
@@ -228,7 +280,22 @@ export default async function EditCaseStudyPage({ params }: EditPageProps) {
           ))}
         </div>
 
-        <MetaSidebar groups={metaGroups} />
+        <aside className="grid h-fit content-start gap-6">
+          <AiReviewPanel
+            id={caseStudy.id}
+            redirectTo={editPath}
+            action={runCaseStudyAiReviewAction}
+            status={caseStudy.aiReviewStatus}
+            qualityScore={caseStudy.contentQualityScore}
+            summary={caseStudy.aiSummary}
+            details={toAiReviewDetails(caseStudy.aiSuggestions)}
+            reviewedAt={caseStudy.lastAiReviewAt}
+            error={caseStudy.aiReviewError}
+            canRunReview={usableLlmCount > 0}
+            disabledReason={aiReviewDisabledReason}
+          />
+          <MetaSidebar groups={metaGroups} />
+        </aside>
       </div>
 
       <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-danger-400/20 bg-danger-500/[0.04] p-5">

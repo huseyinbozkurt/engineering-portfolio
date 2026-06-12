@@ -1,5 +1,8 @@
 import Link from "next/link";
 
+import { ClampedText } from "@/components/ui";
+import { PREVIEW_EXCERPT_LINES, PREVIEW_TITLE_LINES } from "@/lib/content-density";
+
 interface ContentCardProps {
   title: string;
   description: string;
@@ -15,9 +18,18 @@ export function ContentCard({ title, description, href, meta }: ContentCardProps
           {meta}
         </p>
       ) : null}
-      <h3 className="text-lg font-semibold text-ink">{title}</h3>
+      <ClampedText
+        as="h3"
+        lines={PREVIEW_TITLE_LINES}
+        title={title}
+        className="text-lg font-semibold text-ink"
+      >
+        {title}
+      </ClampedText>
       {description ? (
-        <p className="mt-3 text-sm leading-6 text-muted">{description}</p>
+        <ClampedText lines={PREVIEW_EXCERPT_LINES} className="mt-3 text-sm leading-6 text-muted">
+          {description}
+        </ClampedText>
       ) : null}
     </article>
   );

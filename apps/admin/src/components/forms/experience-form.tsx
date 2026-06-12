@@ -51,8 +51,8 @@ export function ExperienceForm({
 
           <FormSection title="Role" description="Company, role, and publish state.">
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Company" name="company" required defaultValue={defaults?.company} />
-              <Field label="Role" name="role" required defaultValue={defaults?.role} />
+              <Field label="Company" name="company" defaultValue={defaults?.company} />
+              <Field label="Role" name="role" defaultValue={defaults?.role} />
               <Field
                 label="Slug"
                 name="slug"

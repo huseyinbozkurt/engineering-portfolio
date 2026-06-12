@@ -148,6 +148,9 @@ importers:
 
   packages/llm:
     dependencies:
+      '@portfolio/db':
+        specifier: workspace:*
+        version: link:../db
       '@portfolio/validators':
         specifier: workspace:*
         version: link:../validators
