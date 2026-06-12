@@ -3,9 +3,23 @@ import type {
   ProjectSignals,
 } from "@portfolio/validators";
 
-export const projectVisibilityOptions = [
+export const portfolioVisibilityOptions = [
   { label: "Public", value: "public" },
   { label: "Private", value: "private" },
+] as const;
+
+export const sourceAvailabilityOptions = [
+  { label: "Open source", value: "open-source" },
+  { label: "Closed source", value: "closed-source" },
+  { label: "Not applicable", value: "not-applicable" },
+] as const;
+
+export const releaseStatusOptions = [
+  { label: "Released", value: "released" },
+  { label: "In development", value: "in-development" },
+  { label: "Prototype", value: "prototype" },
+  { label: "Internal only", value: "internal-only" },
+  { label: "Sunset", value: "sunset" },
 ] as const;
 
 export const projectTypeOptions = [
@@ -81,10 +95,9 @@ export const evidenceVisibilityOptions = [
   { label: "Private", value: "private" },
 ] as const;
 
-export const repositoryVisibilityOptions = [
-  { label: "Public", value: "public" },
-  { label: "Private", value: "private" },
-  { label: "Unavailable", value: "unavailable" },
+export const evidenceSourceOptions = [
+  { label: "Uploaded asset", value: "upload" },
+  { label: "External URL", value: "external-url" },
 ] as const;
 
 export const signalStrengthOptions = [

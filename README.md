@@ -174,8 +174,9 @@ are no JSON blobs for entity relationships.
 | `published` | Public content that can be rendered by the public site. |
 | `archived` | Retained content that is hidden from the public site. |
 
-The public site only reads `published` records. The admin app can read and edit
-all statuses.
+The public site only reads `published` records. For projects,
+`portfolio_visibility` also controls whether a published project appears on the
+public portfolio. The admin app can read and edit all statuses.
 
 ### Shared Column Groups
 
@@ -186,7 +187,7 @@ expanded columns are listed in each table below as well.
 
 | Column | Type | Nullable | Default | Notes |
 | --- | --- | --- | --- | --- |
-| `status` | `content_status` | No | `'draft'` | Drives public visibility. |
+| `status` | `content_status` | No | `'draft'` | Editorial publishing workflow. |
 | `published_at` | `timestamp with time zone` | Yes | none | Set when content is published. |
 | `archived_at` | `timestamp with time zone` | Yes | none | Set when content is archived. |
 
@@ -364,8 +365,13 @@ Represents engineering projects and their primary URLs.
 | `slug` | `varchar(120)` | No | none | Unique public URL slug. |
 | `name` | `varchar(180)` | No | none | Project name. |
 | `description` | `text` | No | `''` | Public description. |
-| `url` | `text` | Yes | none | Optional live URL. |
-| `github_url` | `text` | Yes | none | Optional source URL. |
+| `url` | `text` | Yes | none | Optional project URL; public rendering requires `release_status = 'released'`. |
+| `github_url` | `text` | Yes | none | Legacy source URL; public rendering requires `source_availability = 'open-source'`. |
+| `portfolio_visibility` | `varchar(20)` | No | `'public'` | Controls whether a published project appears on the public portfolio. |
+| `source_availability` | `varchar(30)` | No | `'closed-source'` | Describes whether source code is public. `repository_url` requires `open-source`. |
+| `release_status` | `varchar(30)` | No | `'in-development'` | Describes whether the product/project is publicly released. `url` and `demo_url` require `released`. |
+| `repository_url` | `text` | Yes | none | Public source URL, only for open-source projects. |
+| `demo_url` | `text` | Yes | none | Public demo URL, only for released projects. |
 | `status` | `content_status` | No | `'draft'` | Workflow status. |
 | `published_at` | `timestamp with time zone` | Yes | none | Published timestamp. |
 | `archived_at` | `timestamp with time zone` | Yes | none | Archived timestamp. |

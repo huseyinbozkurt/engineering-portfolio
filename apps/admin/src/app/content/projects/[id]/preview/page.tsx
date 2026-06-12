@@ -90,7 +90,13 @@ export default async function ProjectPreviewPage({ params }: PreviewPageProps) {
     skills.length > 0 ||
     principles.length > 0 ||
     tags.length > 0;
-  const hasLinks = Boolean(project.url || project.githubUrl);
+  const releasedProjectHref =
+    project.releaseStatus === "released" ? project.demoUrl ?? project.url : null;
+  const openSourceHref =
+    project.sourceAvailability === "open-source"
+      ? project.repositoryUrl ?? project.githubUrl
+      : null;
+  const hasLinks = Boolean(releasedProjectHref || openSourceHref);
 
   return (
     <main className="px-5 py-8 lg:px-8">
@@ -130,14 +136,19 @@ export default async function ProjectPreviewPage({ params }: PreviewPageProps) {
           ) : null}
           {hasLinks ? (
             <div className="mt-6 flex flex-wrap gap-3">
-              {project.url ? (
-                <a href={project.url} target="_blank" rel="noreferrer" className="ui-btn-primary">
+              {releasedProjectHref ? (
+                <a
+                  href={releasedProjectHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="ui-btn-primary"
+                >
                   Visit project
                 </a>
               ) : null}
-              {project.githubUrl ? (
+              {openSourceHref ? (
                 <a
-                  href={project.githubUrl}
+                  href={openSourceHref}
                   target="_blank"
                   rel="noreferrer"
                   className="ui-btn-secondary"

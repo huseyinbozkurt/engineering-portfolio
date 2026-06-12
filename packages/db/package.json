@@ -17,6 +17,7 @@
     "./content-ai-review": "./src/content-ai-review.ts",
     "./experience-ai-review": "./src/experience-ai-review.ts",
     "./llm-tasks": "./src/llm-tasks.ts",
+    "./project-evidence-assets": "./src/project-evidence-assets.ts",
     "./queries": "./src/queries.ts",
     "./resume": "./src/resume.ts",
     "./schema": "./src/schema.ts",

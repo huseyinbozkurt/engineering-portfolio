@@ -289,7 +289,7 @@ export async function getPublishedProjects(): Promise<ProjectRecord[]> {
     db
       .select()
       .from(projects)
-      .where(and(eq(projects.status, "published"), eq(projects.visibility, "public")))
+      .where(and(eq(projects.status, "published"), eq(projects.portfolioVisibility, "public")))
       .orderBy(desc(projects.featured), asc(projects.position), asc(projects.name)),
   );
 }
@@ -614,7 +614,7 @@ export async function getCaseStudyBySlug(
           and(
             eq(caseStudyProjects.caseStudyId, caseStudy.id),
             eq(projects.status, "published"),
-            eq(projects.visibility, "public"),
+            eq(projects.portfolioVisibility, "public"),
           ),
         )
         .orderBy(asc(projects.position), asc(projects.name)),
@@ -714,7 +714,7 @@ export async function getExperienceBySlug(
               eq(caseStudyExperiences.experienceId, experience.id),
               eq(caseStudies.status, "published"),
               eq(projects.status, "published"),
-              eq(projects.visibility, "public"),
+              eq(projects.portfolioVisibility, "public"),
             ),
           )
           .orderBy(asc(projects.position), asc(projects.name)),
@@ -726,7 +726,7 @@ export async function getExperienceBySlug(
             and(
               eq(projects.experienceId, experience.id),
               eq(projects.status, "published"),
-              eq(projects.visibility, "public"),
+              eq(projects.portfolioVisibility, "public"),
             ),
           )
           .orderBy(asc(projects.position), asc(projects.name)),
@@ -770,7 +770,7 @@ export async function getProjectBySlug(slug: string): Promise<ProjectDetailRecor
         and(
           eq(projects.slug, slug),
           eq(projects.status, "published"),
-          eq(projects.visibility, "public"),
+          eq(projects.portfolioVisibility, "public"),
         ),
       )
       .limit(1);
@@ -895,7 +895,7 @@ export async function getLensBySlug(slug: string): Promise<LensDetailRecord | nu
             eq(caseStudyLenses.lensId, lens.id),
             eq(caseStudies.status, "published"),
             eq(projects.status, "published"),
-            eq(projects.visibility, "public"),
+            eq(projects.portfolioVisibility, "public"),
           ),
         )
         .orderBy(asc(projects.position), asc(projects.name)),

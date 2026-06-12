@@ -19,6 +19,7 @@ import {
   projectRoleLabels,
   projectStatusLabels,
   projectTypeLabels,
+  releaseStatusLabels,
 } from "@/lib/project-display";
 import { type RecognitionItem } from "@/lib/portfolio-content";
 import { formatDateRange } from "@/lib/format";
@@ -392,6 +393,7 @@ export function ProjectCard({ project, meta }: { project: ProjectRecord; meta: s
     project.featured ? "Featured" : null,
     projectTypeLabels[project.projectType],
     projectStatusLabels[project.projectStatus],
+    releaseStatusLabels[project.releaseStatus],
     projectRoleLabels[project.projectRole],
   ].filter((chip): chip is string => Boolean(chip));
 

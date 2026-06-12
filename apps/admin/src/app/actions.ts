@@ -55,6 +55,10 @@ import {
   createLlmTask,
   getActiveLlmTaskForTarget,
 } from "@portfolio/db/llm-tasks";
+import {
+  deleteUnreferencedProjectEvidenceAssets,
+  setProjectEvidenceAsset,
+} from "@portfolio/db/project-evidence-assets";
 import { clearContactResume, setContactResume } from "@portfolio/db/resume";
 import type {
   CreateCaseStudyInput,
@@ -65,6 +69,7 @@ import type {
   CreateProjectInput,
   CreateSkillInput,
   CreateTagInput,
+  ProjectEvidence,
 } from "@portfolio/validators";
 import {
   bulkSkillsSchema,
@@ -89,6 +94,7 @@ import {
   patchProjectSchema,
   patchSkillSchema,
   patchTagSchema,
+  projectEvidenceTypeSchema,
   updateCaseStudySchema,
   updateDecisionPatternSchema,
   updateExperienceSchema,
@@ -97,6 +103,7 @@ import {
   updateProjectSchema,
   updateSkillSchema,
   updateTagSchema,
+  validateProjectEvidenceAssetFile,
   validateResumeFile,
 } from "@portfolio/validators";
 import {
@@ -163,6 +170,12 @@ function slugify(value: string): string {
     .replace(/-{2,}/g, "-");
 
   return slug || "item";
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
 }
 
 function bulkLines(value: string): string[] {
@@ -520,10 +533,11 @@ function parseDraftProject(): CreateProjectInput {
 
 type ProjectModelExtensionValues = Pick<
   CreateProjectInput,
-  | "visibility"
+  | "portfolioVisibility"
   | "featured"
   | "projectType"
   | "projectStatus"
+  | "releaseStatus"
   | "projectRole"
   | "confidentiality"
   | "ownership"
@@ -541,18 +555,18 @@ type ProjectModelExtensionValues = Pick<
   | "evidence"
   | "engineeringSignals"
   | "projectSignals"
-  | "repositoryVisibility"
+  | "sourceAvailability"
   | "repositoryUrl"
-  | "demoAvailable"
   | "demoUrl"
 >;
 
 function projectModelExtensionValues(project: ProjectModelExtensionValues): ProjectModelExtensionValues {
   return {
-    visibility: project.visibility,
+    portfolioVisibility: project.portfolioVisibility,
     featured: project.featured,
     projectType: project.projectType,
     projectStatus: project.projectStatus,
+    releaseStatus: project.releaseStatus,
     projectRole: project.projectRole,
     confidentiality: project.confidentiality,
     ownership: project.ownership,
@@ -570,9 +584,8 @@ function projectModelExtensionValues(project: ProjectModelExtensionValues): Proj
     evidence: project.evidence,
     engineeringSignals: project.engineeringSignals,
     projectSignals: project.projectSignals,
-    repositoryVisibility: project.repositoryVisibility,
+    sourceAvailability: project.sourceAvailability,
     repositoryUrl: project.repositoryUrl,
-    demoAvailable: project.demoAvailable,
     demoUrl: project.demoUrl,
   };
 }
@@ -1926,6 +1939,17 @@ async function applyPatch(
       set: Record<string, unknown>;
       relations: Record<string, string[]>;
     }) => Promise<void>;
+    prepareRawScalars?: (args: {
+      id: string;
+      rawScalars: Record<string, unknown>;
+      formData: FormData;
+      declared: Set<string>;
+    }) => Promise<Record<string, unknown>>;
+    afterRun?: (args: {
+      id: string;
+      set: Record<string, unknown>;
+      relations: Record<string, string[]>;
+    }) => Promise<void>;
   },
 ): Promise<void> {
   const id = text(formData, "id");
@@ -1941,7 +1965,10 @@ async function applyPatch(
     }
   }
 
-  const parsed = options.schema.parse({ id, ...rawScalars }) as Record<string, unknown>;
+  const preparedRawScalars = options.prepareRawScalars
+    ? await options.prepareRawScalars({ id, rawScalars, formData, declared })
+    : rawScalars;
+  const parsed = options.schema.parse({ id, ...preparedRawScalars }) as Record<string, unknown>;
 
   const set: Record<string, unknown> = {};
   for (const key of options.scalarKeys) {
@@ -1960,6 +1987,7 @@ async function applyPatch(
   }
 
   await options.run({ id, set, relations });
+  await options.afterRun?.({ id, set, relations });
 
   revalidatePath("/");
   revalidatePath(options.listPath);
@@ -1973,6 +2001,87 @@ function parseJsonFormField(value: string, key: string): unknown {
   } catch {
     throw new Error(`Invalid JSON payload for ${key}.`);
   }
+}
+
+function evidenceAssetUploadFieldName(token: string): string {
+  return `evidenceAsset:${token}`;
+}
+
+async function prepareProjectEvidenceUploads(
+  projectId: string,
+  rawEvidence: unknown,
+  formData: FormData,
+): Promise<unknown> {
+  if (!Array.isArray(rawEvidence)) {
+    return rawEvidence;
+  }
+
+  const nextEvidence: unknown[] = [];
+
+  for (const [index, item] of rawEvidence.entries()) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      nextEvidence.push(item);
+      continue;
+    }
+
+    const evidence = { ...(item as Record<string, unknown>) };
+    const uploadToken =
+      typeof evidence.uploadToken === "string" && evidence.uploadToken.trim()
+        ? evidence.uploadToken
+        : String(index);
+    const file = formData.get(evidenceAssetUploadFieldName(uploadToken));
+
+    if (!(file instanceof File) || file.size === 0) {
+      nextEvidence.push(evidence);
+      continue;
+    }
+
+    const evidenceType = projectEvidenceTypeSchema.parse(evidence.type);
+    const validation = validateProjectEvidenceAssetFile(
+      { name: file.name, type: file.type, size: file.size },
+      evidenceType,
+    );
+
+    if (!validation.ok) {
+      throw new Error(validation.reason);
+    }
+
+    const asset = await setProjectEvidenceAsset({
+      projectId,
+      fileName: file.name,
+      mimeType: file.type,
+      sizeBytes: file.size,
+      data: Buffer.from(await file.arrayBuffer()),
+    });
+
+    nextEvidence.push({
+      ...evidence,
+      source: "upload",
+      url: undefined,
+      assetKey: asset.assetKey,
+      assetUrl: asset.assetUrl,
+      assetMimeType: asset.assetMimeType,
+      assetSizeBytes: asset.assetSizeBytes,
+    });
+  }
+
+  return nextEvidence;
+}
+
+async function cleanupProjectEvidenceAssets(projectId: string, evidence: unknown): Promise<void> {
+  if (!Array.isArray(evidence)) {
+    return;
+  }
+
+  const retainedAssetKeys = evidence
+    .map((item) =>
+      item && typeof item === "object" && !Array.isArray(item)
+        ? (item as Partial<ProjectEvidence>).assetKey
+        : undefined,
+    )
+    .filter((assetKey): assetKey is string => Boolean(assetKey && isUuid(assetKey)));
+
+  await deleteUnreferencedProjectEvidenceAssets(projectId, retainedAssetKeys);
 }
 
 export async function patchLensAction(formData: FormData): Promise<void> {
@@ -2076,10 +2185,11 @@ export async function patchProjectAction(formData: FormData): Promise<void> {
       "qaTechStack",
       "aiIntegrationTechStack",
       "deploymentTechStack",
-      "visibility",
+      "portfolioVisibility",
       "featured",
       "projectType",
       "projectStatus",
+      "releaseStatus",
       "projectRole",
       "confidentiality",
       "ownership",
@@ -2097,9 +2207,8 @@ export async function patchProjectAction(formData: FormData): Promise<void> {
       "evidence",
       "engineeringSignals",
       "projectSignals",
-      "repositoryVisibility",
+      "sourceAvailability",
       "repositoryUrl",
-      "demoAvailable",
       "demoUrl",
       "status",
       "url",
@@ -2126,8 +2235,23 @@ export async function patchProjectAction(formData: FormData): Promise<void> {
     ],
     relationKeys: ["lensIds", "principleIds", "skillIds", "tagIds"],
     listPath: "/content/projects",
+    prepareRawScalars: async ({ id, rawScalars, formData, declared }) => {
+      if (!declared.has("evidence")) {
+        return rawScalars;
+      }
+
+      return {
+        ...rawScalars,
+        evidence: await prepareProjectEvidenceUploads(id, rawScalars.evidence, formData),
+      };
+    },
     run: ({ id, set, relations }) =>
       patchProject({ id, set: set as Partial<CreateProjectInput>, relations }),
+    afterRun: async ({ id, set }) => {
+      if (set.evidence !== undefined) {
+        await cleanupProjectEvidenceAssets(id, set.evidence);
+      }
+    },
   });
 }
 

@@ -19,6 +19,14 @@ export const projectStatusLabels: Record<ProjectRecord["projectStatus"], string>
   sunset: "Sunset",
 };
 
+export const releaseStatusLabels: Record<ProjectRecord["releaseStatus"], string> = {
+  released: "Released",
+  "in-development": "In Development",
+  prototype: "Prototype",
+  "internal-only": "Internal Only",
+  sunset: "Sunset",
+};
+
 export const projectRoleLabels: Record<ProjectRecord["projectRole"], string> = {
   "solo-builder": "Solo Builder",
   "technical-lead": "Technical Lead",
@@ -105,11 +113,7 @@ export function getSafeProjectLinks(
 ): { demoHref: string | null; repositoryHref: string | null } {
   const includeRepository = options.includeRepository ?? project.confidentiality !== "nda";
   const demoHref =
-    project.demoAvailable && project.demoUrl
-      ? project.demoUrl
-      : !project.demoUrl && project.url
-        ? project.url
-        : null;
+    project.releaseStatus === "released" ? project.demoUrl ?? project.url ?? null : null;
   const repositoryHref = getSafeRepositoryHref(project, includeRepository);
 
   return { demoHref, repositoryHref };
@@ -164,11 +168,11 @@ export function getProjectTechTags(project: ProjectRecord, limit = 5): string[] 
 }
 
 function getSafeRepositoryHref(project: ProjectRecord, includeRepository: boolean): string | null {
-  if (!includeRepository || project.repositoryVisibility === "private") {
+  if (!includeRepository || project.sourceAvailability !== "open-source") {
     return null;
   }
 
-  if (project.repositoryVisibility === "public" && project.repositoryUrl) {
+  if (project.repositoryUrl) {
     return project.repositoryUrl;
   }
 

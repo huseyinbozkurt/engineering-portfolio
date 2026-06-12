@@ -1,6 +1,7 @@
 import { relations, sql } from "drizzle-orm";
 import type {
   AiGeneratedStoryPayload,
+  PortfolioVisibility,
   ProjectConfidentiality,
   ProjectContribution,
   ProjectDecision,
@@ -10,14 +11,15 @@ import type {
   ProjectOutcome,
   ProjectOwnership,
   ProjectRole,
+  ReleaseStatus,
   ProjectSignals,
   ProjectStatus,
   ProjectType,
-  ProjectVisibility,
-  RepositoryVisibility,
+  SourceAvailability,
 } from "@portfolio/validators";
 import {
   boolean,
+  check,
   customType,
   date,
   index,
@@ -97,7 +99,8 @@ export interface HomepageMetric {
 
 /**
  * Editorial workflow columns shared by every content-like entity. `status`
- * drives public visibility (only "published" is shown publicly); the two
+ * drives the publishing workflow (only "published" can be shown publicly);
+ * project portfolio visibility is modeled separately on projects. The two
  * timestamps record when a record entered the published/archived state.
  */
 const workflow = {
@@ -232,8 +235,8 @@ export const projects = pgTable("projects",{
     deploymentTechStack: text("deployment_tech_stack").notNull().default(""),
     url: text("url"),
     githubUrl: text("github_url"),
-    visibility: varchar("visibility", { length: 20 })
-      .$type<ProjectVisibility>()
+    portfolioVisibility: varchar("portfolio_visibility", { length: 20 })
+      .$type<PortfolioVisibility>()
       .notNull()
       .default("public"),
     featured: boolean("featured").notNull().default(false),
@@ -296,12 +299,15 @@ export const projects = pgTable("projects",{
       .default(
         sql`'{"complexity":3,"ambiguity":3,"ownership":3,"crossFunctionality":3,"operationalResponsibility":3,"innovation":3}'::jsonb`,
       ),
-    repositoryVisibility: varchar("repository_visibility", { length: 20 })
-      .$type<RepositoryVisibility>()
+    sourceAvailability: varchar("source_availability", { length: 30 })
+      .$type<SourceAvailability>()
       .notNull()
-      .default("unavailable"),
+      .default("closed-source"),
     repositoryUrl: text("repository_url"),
-    demoAvailable: boolean("demo_available").notNull().default(false),
+    releaseStatus: varchar("release_status", { length: 30 })
+      .$type<ReleaseStatus>()
+      .notNull()
+      .default("in-development"),
     demoUrl: text("demo_url"),
     startDate: date("start_date", { mode: "string" }),
     endDate: date("end_date", { mode: "string" }),
@@ -322,6 +328,18 @@ export const projects = pgTable("projects",{
     index("projects_position_idx").on(table.position),
     index("projects_experience_idx").on(table.experienceId),
     index("projects_date_idx").on(table.startDate, table.endDate),
+    check(
+      "projects_repository_url_source_availability_chk",
+      sql`${table.sourceAvailability} = 'open-source' OR ${table.repositoryUrl} IS NULL OR btrim(${table.repositoryUrl}) = ''`,
+    ),
+    check(
+      "projects_demo_url_release_status_chk",
+      sql`${table.releaseStatus} = 'released' OR ${table.demoUrl} IS NULL OR btrim(${table.demoUrl}) = ''`,
+    ),
+    check(
+      "projects_url_release_status_chk",
+      sql`${table.releaseStatus} = 'released' OR ${table.url} IS NULL OR btrim(${table.url}) = ''`,
+    ),
   ],
 );
 
@@ -339,6 +357,25 @@ export const projectLinks = pgTable(
   },
   (table) => [
     index("project_links_project_idx").on(table.projectId),
+  ],
+);
+
+export const projectEvidenceAssets = pgTable(
+  "project_evidence_assets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    fileName: varchar("file_name", { length: 255 }).notNull(),
+    mimeType: varchar("mime_type", { length: 120 }).notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    data: bytea("data").notNull(),
+    uploadedAt: timestamp("uploaded_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("project_evidence_assets_project_idx").on(table.projectId),
+    index("project_evidence_assets_uploaded_at_idx").on(table.uploadedAt),
   ],
 );
 
@@ -960,12 +997,20 @@ export const experienceRelations = relations(experiences, ({ many }) => ({
 }));
 
 export const projectRelations = relations(projects, ({ many }) => ({
+  evidenceAssets: many(projectEvidenceAssets),
   caseStudies: many(caseStudyProjects),
   lenses: many(projectLenses),
   links: many(projectLinks),
   principles: many(projectPrinciples),
   skills: many(projectSkills),
   tags: many(projectTags),
+}));
+
+export const projectEvidenceAssetRelations = relations(projectEvidenceAssets, ({ one }) => ({
+  project: one(projects, {
+    fields: [projectEvidenceAssets.projectId],
+    references: [projects.id],
+  }),
 }));
 
 export const caseStudyRelations = relations(caseStudies, ({ many }) => ({

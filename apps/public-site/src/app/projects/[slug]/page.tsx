@@ -25,6 +25,7 @@ import {
   projectRoleLabels,
   projectStatusLabels,
   projectTypeLabels,
+  releaseStatusLabels,
 } from "@/lib/project-display";
 import { experienceHref, projectHref } from "@/lib/paths";
 import { siteConfig } from "@/lib/site";
@@ -189,6 +190,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
           <div className="mt-7 flex flex-wrap gap-2">
             <StatusPill label={projectTypeLabels[project.projectType]} />
             <StatusPill label={projectStatusLabels[project.projectStatus]} />
+            <StatusPill label={releaseStatusLabels[project.releaseStatus]} />
             <StatusPill label={projectRoleLabels[project.projectRole]} />
             <StatusPill label={projectOwnershipLabels[project.ownership]} />
             {project.featured ? <StatusPill label="Featured" /> : null}
@@ -545,22 +547,38 @@ function EvidenceSection({ items }: { items: ProjectRecord["evidence"] }) {
       <SectionTitle title="Proof / Evidence" />
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         {items.map((item, index) => {
+          const source = getEvidenceSource(item);
+          const assetUrl = getEvidenceAssetUrl(item);
+          const isImage = item.assetMimeType?.toLowerCase().startsWith("image/") ?? false;
+          const isVideo = item.assetMimeType?.toLowerCase().startsWith("video/") ?? false;
           const content = (
-            <article className="h-full rounded-lg border border-line bg-white/[0.03] p-4 transition hover:border-sky-300/35">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">
-                {evidenceTypeLabels[item.type]}
-              </p>
-              <h3 className="mt-3 text-base font-semibold text-ink">{item.title}</h3>
-              {item.description ? (
-                <p className="mt-2 text-sm leading-6 text-muted">{item.description}</p>
+            <article className="h-full overflow-hidden rounded-lg border border-line bg-white/[0.03] transition hover:border-sky-300/35">
+              {source === "upload" && assetUrl && isImage ? (
+                <img src={assetUrl} alt={item.title} className="h-52 w-full object-cover" />
               ) : null}
-              {item.url ? (
-                <p className="mt-4 text-sm font-semibold text-sky-300">Open evidence ↗</p>
+              {source === "upload" && assetUrl && isVideo ? (
+                <video
+                  src={assetUrl}
+                  controls
+                  className="h-52 w-full bg-black object-contain"
+                />
               ) : null}
+              <div className="p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">
+                  {evidenceTypeLabels[item.type]}
+                </p>
+                <h3 className="mt-3 text-base font-semibold text-ink">{item.title}</h3>
+                {item.description ? (
+                  <p className="mt-2 text-sm leading-6 text-muted">{item.description}</p>
+                ) : null}
+                {source === "external-url" && item.url ? (
+                  <p className="mt-4 text-sm font-semibold text-sky-300">Open evidence ↗</p>
+                ) : null}
+              </div>
             </article>
           );
 
-          return item.url ? (
+          return source === "external-url" && item.url ? (
             <a key={`${item.title}-${index}`} href={item.url} target="_blank" rel="noreferrer">
               {content}
             </a>
@@ -571,6 +589,14 @@ function EvidenceSection({ items }: { items: ProjectRecord["evidence"] }) {
       </div>
     </section>
   );
+}
+
+function getEvidenceSource(item: ProjectRecord["evidence"][number]): "upload" | "external-url" {
+  return item.source ?? (item.assetUrl || item.assetKey ? "upload" : "external-url");
+}
+
+function getEvidenceAssetUrl(item: ProjectRecord["evidence"][number]): string | undefined {
+  return item.assetUrl ?? (item.assetKey ? `/projects/assets/${item.assetKey}` : undefined);
 }
 
 function ArchitectureSection({

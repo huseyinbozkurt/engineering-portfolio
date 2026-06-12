@@ -17,6 +17,11 @@ import type { NextConfig } from "next";
 loadEnvConfig(join(process.cwd(), "..", ".."), process.env.NODE_ENV !== "production", console, true);
 
 const nextConfig: NextConfig = {
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "55mb",
+    },
+  },
   reactStrictMode: true,
   transpilePackages: ["@portfolio/db", "@portfolio/types", "@portfolio/validators"],
 };

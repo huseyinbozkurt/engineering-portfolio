@@ -88,6 +88,11 @@ export default async function ProjectsPage() {
             project.aiIntegrationTechStack,
             project.deploymentTechStack,
           ].flatMap(splitAdminListItems);
+          const hasReleasedLink =
+            project.releaseStatus === "released" && Boolean(project.demoUrl || project.url);
+          const hasOpenSourceLink =
+            project.sourceAvailability === "open-source" &&
+            Boolean(project.repositoryUrl || project.githubUrl);
           const relationMetadata = [
             ...(project.experienceId && experienceNames.has(project.experienceId)
               ? [`Built during ${experienceNames.get(project.experienceId)}`]
@@ -100,8 +105,8 @@ export default async function ProjectsPage() {
               const label = principleNames.get(id);
               return label ? [label] : [];
             }),
-            ...(project.url ? ["Live link"] : []),
-            ...(project.githubUrl ? ["Source link"] : []),
+            ...(hasReleasedLink ? ["Released link"] : []),
+            ...(hasOpenSourceLink ? ["Open source"] : []),
           ];
 
           return {

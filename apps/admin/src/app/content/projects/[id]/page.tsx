@@ -48,20 +48,22 @@ import { getLlmConnectionStatuses } from "@/lib/llm-config";
 import {
   contributionCategoryOptions,
   engineeringSignalLabels,
+  evidenceSourceOptions,
   evidenceTypeOptions,
   normalizeEngineeringSignals,
   normalizeProjectSignals,
   optionLabel,
   outcomeTypeOptions,
+  portfolioVisibilityOptions,
   projectConfidentialityOptions,
   projectLifecycleOptions,
   projectOwnershipOptions,
   projectRoleOptions,
   projectSignalLabels,
   projectTypeOptions,
-  projectVisibilityOptions,
-  repositoryVisibilityOptions,
+  releaseStatusOptions,
   signalStrengthOptions,
+  sourceAvailabilityOptions,
 } from "@/lib/project-model";
 import { publicHrefs } from "@/lib/public-site";
 
@@ -133,10 +135,16 @@ export default async function EditProjectPage({ params }: EditPageProps) {
     project.tradeOffs.length === 0 &&
     project.whatILearned.length === 0;
   const repositoryDemoEmpty =
-    project.repositoryVisibility === "unavailable" &&
+    project.sourceAvailability === "closed-source" &&
+    project.releaseStatus === "in-development" &&
     !project.repositoryUrl &&
-    !project.demoAvailable &&
     !project.demoUrl;
+  const releasedProjectHref =
+    project.releaseStatus === "released" ? project.demoUrl ?? project.url : null;
+  const openSourceHref =
+    project.sourceAvailability === "open-source"
+      ? project.repositoryUrl ?? project.githubUrl
+      : null;
 
   // Shown in the header only when at least one date is set.
   const projectDateRange = formatProjectDateRange(project.startDate, project.endDate);
@@ -257,7 +265,7 @@ export default async function EditProjectPage({ params }: EditPageProps) {
   const headerEdit = (
     <ModalPanel
       title="Edit project header"
-      description="Name and links shown at the top of the project page."
+      description="Name shown at the top of the project page."
       triggerLabel="Edit header"
       size="md"
       triggerClassName="ui-btn-ghost"
@@ -270,16 +278,9 @@ export default async function EditProjectPage({ params }: EditPageProps) {
       <SectionEditForm
         action={patchProjectAction}
         id={project.id}
-        fields={["name", "url", "githubUrl"]}
+        fields="name"
       >
         <Field label="Name" name="name" defaultValue={project.name} />
-        <Field label="URL" name="url" type="url" defaultValue={project.url ?? undefined} />
-        <Field
-          label="GitHub URL"
-          name="githubUrl"
-          type="url"
-          defaultValue={project.githubUrl ?? undefined}
-        />
       </SectionEditForm>
     </ModalPanel>
   );
@@ -309,7 +310,11 @@ export default async function EditProjectPage({ params }: EditPageProps) {
             archiveAction={archiveProjectAction}
           />
         }
-        publicHref={project.status === "published" ? publicHrefs.project(project.slug) : null}
+        publicHref={
+          project.status === "published" && project.portfolioVisibility === "public"
+            ? publicHrefs.project(project.slug)
+            : null
+        }
         settings={settings}
         headerEdit={headerEdit}
         subtitle={
@@ -333,16 +338,21 @@ export default async function EditProjectPage({ params }: EditPageProps) {
           )
         }
       >
-        {project.url || project.githubUrl ? (
+        {releasedProjectHref || openSourceHref ? (
           <div className="flex flex-wrap gap-3">
-            {project.url ? (
-              <a href={project.url} target="_blank" rel="noreferrer" className="ui-btn-primary">
+            {releasedProjectHref ? (
+              <a
+                href={releasedProjectHref}
+                target="_blank"
+                rel="noreferrer"
+                className="ui-btn-primary"
+              >
                 Visit project ↗
               </a>
             ) : null}
-            {project.githubUrl ? (
+            {openSourceHref ? (
               <a
-                href={project.githubUrl}
+                href={openSourceHref}
                 target="_blank"
                 rel="noreferrer"
                 className="ui-btn-secondary"
@@ -404,7 +414,7 @@ export default async function EditProjectPage({ params }: EditPageProps) {
             id={project.id}
             action={patchProjectAction}
             fields={[
-              "visibility",
+              "portfolioVisibility",
               "featured",
               "projectType",
               "projectStatus",
@@ -417,7 +427,9 @@ export default async function EditProjectPage({ params }: EditPageProps) {
             isEmpty={false}
             addLabel="Edit classification"
             modalDescription="Classify the project separately from its editorial draft/published status."
-            eyebrow="Editorial status controls publishing. Project lifecycle status describes the work itself."
+            eyebrow={
+              "Editorial status controls workflow. Portfolio visibility controls whether a published project appears publicly."
+            }
             preview={<ClassificationPreview project={project} />}
             formFields={
               <>
@@ -428,16 +440,17 @@ export default async function EditProjectPage({ params }: EditPageProps) {
                     completed, in maintenance, or similar.
                   </p>
                   <p className="mt-2">
-                    Visibility controls admin/public presentation. Confidentiality describes how much
-                    sensitive detail the project can safely disclose.
+                    Portfolio visibility controls whether a published project appears on the public
+                    portfolio. Confidentiality describes how much sensitive detail the project can
+                    safely disclose.
                   </p>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <SelectField
-                    label="Visibility"
-                    name="visibility"
-                    options={[...projectVisibilityOptions]}
-                    defaultValue={project.visibility}
+                    label="Portfolio visibility"
+                    name="portfolioVisibility"
+                    options={[...portfolioVisibilityOptions]}
+                    defaultValue={project.portfolioVisibility}
                   />
                   <Checkbox label="Featured" name="featured" defaultChecked={project.featured} />
                   <SelectField
@@ -710,30 +723,32 @@ export default async function EditProjectPage({ params }: EditPageProps) {
             modalSize="xl"
           />
           <SectionCard
-            title="Repository & Demo"
+            title="Source & Release"
             id={project.id}
             action={patchProjectAction}
             fields={[
-              "repositoryVisibility",
+              "sourceAvailability",
               "repositoryUrl",
-              "demoAvailable",
+              "releaseStatus",
               "demoUrl",
               "url",
               "githubUrl",
             ]}
             isEmpty={repositoryDemoEmpty && !project.url && !project.githubUrl}
-            addLabel="Add repository or demo"
-            modalDescription="Use repository/demo as the preferred fields. Legacy URL and GitHub URL remain for compatibility."
+            addLabel="Add source or release"
+            modalDescription={
+              "Source availability controls repository links. Release status controls demo and project links."
+            }
             preview={<RepositoryDemoPreview project={project} />}
             formFields={
               <>
                 <div className="grid gap-4 md:grid-cols-2">
                   <SelectField
-                    label="Repository visibility"
-                    name="repositoryVisibility"
-                    options={[...repositoryVisibilityOptions]}
-                    defaultValue={project.repositoryVisibility}
-                    hint="Use unavailable when source access should not be represented."
+                    label="Source availability"
+                    name="sourceAvailability"
+                    options={[...sourceAvailabilityOptions]}
+                    defaultValue={project.sourceAvailability}
+                    hint="Repository URLs are public only when source availability is open source."
                   />
                   <Field
                     label="Repository URL"
@@ -741,10 +756,12 @@ export default async function EditProjectPage({ params }: EditPageProps) {
                     type="url"
                     defaultValue={project.repositoryUrl ?? undefined}
                   />
-                  <Checkbox
-                    label="Demo available"
-                    name="demoAvailable"
-                    defaultChecked={project.demoAvailable}
+                  <SelectField
+                    label="Release status"
+                    name="releaseStatus"
+                    options={[...releaseStatusOptions]}
+                    defaultValue={project.releaseStatus}
+                    hint="Demo and project URLs are public only when release status is released."
                   />
                   <Field
                     label="Demo URL"
@@ -755,18 +772,20 @@ export default async function EditProjectPage({ params }: EditPageProps) {
                 </div>
                 <div className="grid gap-4 rounded-xl border border-line bg-white/[0.02] p-4 md:grid-cols-2">
                   <Field
-                    label="Legacy URL"
+                    label="Project URL"
                     name="url"
                     type="url"
                     defaultValue={project.url ?? undefined}
-                    hint="Compatibility field. Keep saving it until public pages move to demoUrl."
+                    hint={
+                      "Compatibility field for the project URL. Release status still controls public rendering."
+                    }
                   />
                   <Field
                     label="Legacy GitHub URL"
                     name="githubUrl"
                     type="url"
                     defaultValue={project.githubUrl ?? undefined}
-                    hint="Compatibility field. Keep saving it until public pages move to repositoryUrl."
+                    hint="Compatibility field. Source availability still controls public rendering."
                   />
                 </div>
               </>
@@ -905,7 +924,10 @@ function ClassificationPreview({ project }: { project: ProjectEditRecord }) {
   return (
     <DefinitionGrid
       items={[
-        ["Visibility", optionLabel(projectVisibilityOptions, project.visibility)],
+        [
+          "Portfolio visibility",
+          optionLabel(portfolioVisibilityOptions, project.portfolioVisibility),
+        ],
         ["Featured", project.featured ? "Yes" : "No"],
         ["Type", optionLabel(projectTypeOptions, project.projectType)],
         ["Lifecycle", optionLabel(projectLifecycleOptions, project.projectStatus)],
@@ -1069,20 +1091,74 @@ function ProjectSignalsPreview({
 function EvidencePreview({ items }: { items: ProjectEditRecord["evidence"] }) {
   return (
     <ul className="grid gap-3">
-      {items.map((item, index) => (
-        <li key={`${item.title}-${index}`} className="rounded-xl border border-line bg-white/[0.02] p-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="ui-chip">{optionLabel(evidenceTypeOptions, item.type)}</span>
-            <span className="ui-chip">{item.visibility}</span>
-          </div>
-          <h3 className="mt-3 font-semibold text-ink">{item.title}</h3>
-          {item.description ? (
-            <p className="mt-2 text-sm leading-6 text-muted">{item.description}</p>
-          ) : null}
-          {item.url ? <ExternalLinkValue href={item.url} label={item.url} /> : null}
-        </li>
-      ))}
+      {items.map((item, index) => {
+        const source = getAdminEvidenceSource(item);
+
+        return (
+          <li key={`${item.title}-${index}`} className="rounded-xl border border-line bg-white/[0.02] p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="ui-chip">{optionLabel(evidenceTypeOptions, item.type)}</span>
+              <span className="ui-chip">{optionLabel(evidenceSourceOptions, source)}</span>
+              <span className="ui-chip">{item.visibility}</span>
+            </div>
+            <h3 className="mt-3 font-semibold text-ink">{item.title}</h3>
+            {item.description ? (
+              <p className="mt-2 text-sm leading-6 text-muted">{item.description}</p>
+            ) : null}
+            {source === "external-url" && item.url ? (
+              <ExternalLinkValue href={item.url} label={item.url} />
+            ) : null}
+            {source === "upload" ? <EvidenceAssetSummary item={item} /> : null}
+          </li>
+        );
+      })}
     </ul>
+  );
+}
+
+function getAdminEvidenceSource(
+  item: ProjectEditRecord["evidence"][number],
+): "upload" | "external-url" {
+  return item.source ?? (item.assetUrl || item.assetKey ? "upload" : "external-url");
+}
+
+function EvidenceAssetSummary({ item }: { item: ProjectEditRecord["evidence"][number] }) {
+  const isImage = item.assetMimeType?.toLowerCase().startsWith("image/") ?? false;
+  const isVideo = item.assetMimeType?.toLowerCase().startsWith("video/") ?? false;
+  const previewUrl = item.assetKey
+    ? `/api/project-evidence-assets/${item.assetKey}`
+    : item.assetUrl;
+
+  return (
+    <div className="mt-4 grid gap-3">
+      {previewUrl && isImage ? (
+        <img
+          src={previewUrl}
+          alt=""
+          className="max-h-64 w-full rounded-lg border border-line object-contain"
+        />
+      ) : null}
+      {previewUrl && isVideo ? (
+        <video
+          src={previewUrl}
+          controls
+          className="max-h-72 w-full rounded-lg border border-line"
+        />
+      ) : null}
+      <DefinitionGrid
+        items={[
+          ["Asset URL", item.assetUrl ?? "Not set"],
+          ["Asset key", item.assetKey ?? "Not set"],
+          ["MIME type", item.assetMimeType ?? "Not set"],
+          [
+            "Size",
+            typeof item.assetSizeBytes === "number"
+              ? `${item.assetSizeBytes.toLocaleString()} bytes`
+              : "Not set",
+          ],
+        ]}
+      />
+    </div>
   );
 }
 
@@ -1092,11 +1168,11 @@ function RepositoryDemoPreview({ project }: { project: ProjectEditRecord }) {
       <DefinitionGrid
         items={[
           [
-            "Repository visibility",
-            optionLabel(repositoryVisibilityOptions, project.repositoryVisibility),
+            "Source availability",
+            optionLabel(sourceAvailabilityOptions, project.sourceAvailability),
           ],
           ["Repository URL", project.repositoryUrl ? project.repositoryUrl : "Not set"],
-          ["Demo available", project.demoAvailable ? "Yes" : "No"],
+          ["Release status", optionLabel(releaseStatusOptions, project.releaseStatus)],
           ["Demo URL", project.demoUrl ? project.demoUrl : "Not set"],
         ]}
       />

@@ -132,7 +132,19 @@ export const createExperienceSchema = z.object({
   position: z.coerce.number().int().default(0),
 });
 
-export const projectVisibilitySchema = z.enum(["public", "private"]);
+export const portfolioVisibilitySchema = z.enum(["public", "private"]);
+export const sourceAvailabilitySchema = z.enum([
+  "open-source",
+  "closed-source",
+  "not-applicable",
+]);
+export const releaseStatusSchema = z.enum([
+  "released",
+  "in-development",
+  "prototype",
+  "internal-only",
+  "sunset",
+]);
 export const projectTypeSchema = z.enum([
   "product",
   "internal-tool",
@@ -189,11 +201,131 @@ export const projectEvidenceTypeSchema = z.enum([
   "presentation",
   "other",
 ]);
+export const projectEvidenceSourceSchema = z.enum(["upload", "external-url"]);
 export const projectEvidenceVisibilitySchema = z.enum(["public", "private"]);
 export const projectSignalStrengthSchema = z.enum(["none", "basic", "strong"]);
-export const repositoryVisibilitySchema = z.enum(["public", "private", "unavailable"]);
 
 const projectStringListSchema = z.array(z.string().trim().min(1).max(1000)).default([]);
+
+const evidenceImageTypes = new Set(["architecture-diagram", "screenshot"]);
+const evidenceUploadTypes = new Set(["architecture-diagram", "screenshot", "demo-video", "other"]);
+export const PROJECT_EVIDENCE_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
+export const PROJECT_EVIDENCE_VIDEO_MAX_BYTES = 50 * 1024 * 1024;
+
+export interface ProjectEvidenceAssetFileCandidate {
+  name: string;
+  type: string;
+  size: number;
+}
+
+export type ProjectEvidenceAssetValidation = { ok: true } | { ok: false; reason: string };
+
+export function validateProjectEvidenceAssetFile(
+  file: ProjectEvidenceAssetFileCandidate,
+  evidenceType: z.infer<typeof projectEvidenceTypeSchema>,
+): ProjectEvidenceAssetValidation {
+  if (!evidenceUploadTypes.has(evidenceType)) {
+    return {
+      ok: false,
+      reason:
+        "Uploads are available for screenshots, architecture diagrams, demo videos, and other media evidence.",
+    };
+  }
+
+  if (!file.name.trim() || file.name.length > 255) {
+    return { ok: false, reason: "The file needs a name shorter than 255 characters." };
+  }
+
+  if (file.size <= 0) {
+    return { ok: false, reason: "The selected file is empty." };
+  }
+
+  const mimeType = file.type.toLowerCase();
+  const isImage = mimeType.startsWith("image/");
+  const isVideo = mimeType.startsWith("video/");
+
+  if (!isImage && !isVideo) {
+    return { ok: false, reason: "Only image or video files are accepted." };
+  }
+
+  if (evidenceImageTypes.has(evidenceType) && !isImage) {
+    return { ok: false, reason: "Screenshots and architecture diagrams require an image file." };
+  }
+
+  if (evidenceType === "demo-video" && !isVideo) {
+    return { ok: false, reason: "Demo videos require a video file." };
+  }
+
+  if (isImage && file.size > PROJECT_EVIDENCE_IMAGE_MAX_BYTES) {
+    return { ok: false, reason: "Image evidence files must be 8 MB or smaller." };
+  }
+
+  if (isVideo && file.size > PROJECT_EVIDENCE_VIDEO_MAX_BYTES) {
+    return { ok: false, reason: "Video evidence files must be 50 MB or smaller." };
+  }
+
+  return { ok: true };
+}
+
+const projectEvidenceAssetUrlSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(2048)
+  .refine((value) => {
+    if (value.startsWith("/")) {
+      return true;
+    }
+
+    try {
+      new URL(value);
+      return true;
+    } catch {
+      return false;
+    }
+  }, "Enter a valid URL or absolute path.");
+
+function hasNonEmptyString(value: string | null | undefined): boolean {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function validateProjectAvailabilityRules(
+  value: {
+    sourceAvailability?: z.infer<typeof sourceAvailabilitySchema> | undefined;
+    releaseStatus?: z.infer<typeof releaseStatusSchema> | undefined;
+    repositoryUrl?: string | null | undefined;
+    demoUrl?: string | null | undefined;
+    url?: string | null | undefined;
+  },
+  context: z.RefinementCtx,
+): void {
+  if (
+    hasNonEmptyString(value.repositoryUrl) &&
+    value.sourceAvailability !== "open-source"
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Repository URL can only be set when source availability is open-source.",
+      path: ["repositoryUrl"],
+    });
+  }
+
+  if (hasNonEmptyString(value.demoUrl) && value.releaseStatus !== "released") {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Demo URL can only be set when release status is released.",
+      path: ["demoUrl"],
+    });
+  }
+
+  if (hasNonEmptyString(value.url) && value.releaseStatus !== "released") {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Project URL can only be set when release status is released.",
+      path: ["url"],
+    });
+  }
+}
 
 export const projectContributionSchema = z.object({
   category: projectContributionCategorySchema,
@@ -218,13 +350,132 @@ export const projectMetricSchema = z.object({
   value: z.string().trim().min(1).max(160),
 });
 
-export const projectEvidenceSchema = z.object({
-  type: projectEvidenceTypeSchema,
-  title: z.string().trim().min(1).max(220),
-  description: z.string().trim().max(2000).optional(),
-  url: z.string().trim().url().optional(),
-  visibility: projectEvidenceVisibilitySchema.default("public"),
-});
+export const projectEvidenceSchema = z.preprocess(
+  (value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return value;
+    }
+
+    const item = value as Record<string, unknown>;
+    return {
+      ...item,
+      source:
+        item.source ??
+        (typeof item.assetUrl === "string" || typeof item.assetKey === "string"
+          ? "upload"
+          : "external-url"),
+    };
+  },
+  z
+    .object({
+      type: projectEvidenceTypeSchema,
+      title: z.string().trim().min(1).max(220),
+      description: z.string().trim().max(2000).optional(),
+      source: projectEvidenceSourceSchema.default("external-url"),
+      url: z.string().trim().url().optional(),
+      assetUrl: projectEvidenceAssetUrlSchema.optional(),
+      assetKey: z.string().trim().min(1).max(1024).optional(),
+      assetMimeType: z.string().trim().max(120).optional(),
+      assetSizeBytes: z.coerce
+        .number()
+        .int()
+        .positive()
+        .max(PROJECT_EVIDENCE_VIDEO_MAX_BYTES)
+        .optional(),
+      visibility: projectEvidenceVisibilitySchema.default("public"),
+    })
+    .superRefine((value, context) => {
+      if (value.source === "external-url" && !value.url) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "URL is required for external evidence.",
+          path: ["url"],
+        });
+      }
+
+      if (value.source === "upload" && !value.assetUrl && !value.assetKey) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Uploaded evidence requires an asset URL or asset key.",
+          path: ["assetUrl"],
+        });
+      }
+
+      if (value.source !== "upload") {
+        return;
+      }
+
+      if (!evidenceUploadTypes.has(value.type)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "Uploads are available for screenshots, architecture diagrams, demo videos, and other media evidence.",
+          path: ["type"],
+        });
+      }
+
+      if (!value.assetMimeType) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Uploaded evidence requires an image or video MIME type.",
+          path: ["assetMimeType"],
+        });
+        return;
+      }
+
+      const mimeType = value.assetMimeType.toLowerCase();
+      const isImage = mimeType.startsWith("image/");
+      const isVideo = mimeType.startsWith("video/");
+
+      if (!isImage && !isVideo) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Uploaded evidence assets must be images or videos.",
+          path: ["assetMimeType"],
+        });
+      }
+
+      if (evidenceImageTypes.has(value.type) && !isImage) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Screenshots and architecture diagrams require an image asset.",
+          path: ["assetMimeType"],
+        });
+      }
+
+      if (value.type === "demo-video" && !isVideo) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Demo videos require a video asset.",
+          path: ["assetMimeType"],
+        });
+      }
+
+      if (
+        isImage &&
+        value.assetSizeBytes &&
+        value.assetSizeBytes > PROJECT_EVIDENCE_IMAGE_MAX_BYTES
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Image evidence assets must be 8 MB or smaller.",
+          path: ["assetSizeBytes"],
+        });
+      }
+
+      if (
+        isVideo &&
+        value.assetSizeBytes &&
+        value.assetSizeBytes > PROJECT_EVIDENCE_VIDEO_MAX_BYTES
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Video evidence assets must be 50 MB or smaller.",
+          path: ["assetSizeBytes"],
+        });
+      }
+    }),
+);
 
 export const defaultProjectEngineeringSignals = {
   testing: "none",
@@ -270,7 +521,7 @@ export const projectSignalsSchema = z
   })
   .default(defaultProjectSignals);
 
-export const createProjectSchema = z.object({
+const createProjectBaseSchema = z.object({
   slug: slugSchema,
   name: z.string().trim().max(180).default(""),
   description: richTextSchema,
@@ -280,7 +531,7 @@ export const createProjectSchema = z.object({
   qaTechStack: richTextSchema,
   aiIntegrationTechStack: richTextSchema,
   deploymentTechStack: richTextSchema,
-  visibility: projectVisibilitySchema.default("public"),
+  portfolioVisibility: portfolioVisibilitySchema.default("public"),
   featured: z.coerce.boolean().default(false),
   projectType: projectTypeSchema.default("product"),
   projectStatus: projectStatusSchema.default("completed"),
@@ -301,9 +552,9 @@ export const createProjectSchema = z.object({
   evidence: z.array(projectEvidenceSchema).default([]),
   engineeringSignals: projectEngineeringSignalsSchema,
   projectSignals: projectSignalsSchema,
-  repositoryVisibility: repositoryVisibilitySchema.default("unavailable"),
+  sourceAvailability: sourceAvailabilitySchema.default("closed-source"),
   repositoryUrl: nullableUrlSchema,
-  demoAvailable: z.coerce.boolean().default(false),
+  releaseStatus: releaseStatusSchema.default("in-development"),
   demoUrl: nullableUrlSchema,
   status: contentStatusSchema.default("draft"),
   url: nullableUrlSchema,
@@ -318,6 +569,10 @@ export const createProjectSchema = z.object({
   tagIds: relationIdsSchema,
   position: z.coerce.number().int().default(0),
 });
+
+export const createProjectSchema = createProjectBaseSchema.superRefine(
+  validateProjectAvailabilityRules,
+);
 
 export const createCaseStudySchema = z.object({
   slug: slugSchema,
@@ -463,7 +718,9 @@ export type CreateLensInput = z.infer<typeof createLensSchema>;
 export type CreatePrincipleInput = z.infer<typeof createPrincipleSchema>;
 export type CreateDecisionPatternInput = z.infer<typeof createDecisionPatternSchema>;
 export type CreateExperienceInput = z.infer<typeof createExperienceSchema>;
-export type ProjectVisibility = z.infer<typeof projectVisibilitySchema>;
+export type PortfolioVisibility = z.infer<typeof portfolioVisibilitySchema>;
+export type SourceAvailability = z.infer<typeof sourceAvailabilitySchema>;
+export type ReleaseStatus = z.infer<typeof releaseStatusSchema>;
 export type ProjectType = z.infer<typeof projectTypeSchema>;
 export type ProjectStatus = z.infer<typeof projectStatusSchema>;
 export type ProjectRole = z.infer<typeof projectRoleSchema>;
@@ -476,7 +733,6 @@ export type ProjectMetric = z.infer<typeof projectMetricSchema>;
 export type ProjectEvidence = z.infer<typeof projectEvidenceSchema>;
 export type ProjectEngineeringSignals = z.infer<typeof projectEngineeringSignalsSchema>;
 export type ProjectSignals = z.infer<typeof projectSignalsSchema>;
-export type RepositoryVisibility = z.infer<typeof repositoryVisibilitySchema>;
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 export type CreateCaseStudyInput = z.infer<typeof createCaseStudySchema>;
 export type CreateSkillInput = z.infer<typeof createSkillSchema>;
@@ -496,7 +752,9 @@ export const updateLensSchema = createLensSchema.extend({ id: uuidSchema });
 export const updatePrincipleSchema = createPrincipleSchema.extend({ id: uuidSchema });
 export const updateDecisionPatternSchema = createDecisionPatternSchema.extend({ id: uuidSchema });
 export const updateExperienceSchema = createExperienceSchema.extend({ id: uuidSchema });
-export const updateProjectSchema = createProjectSchema.extend({ id: uuidSchema });
+export const updateProjectSchema = createProjectBaseSchema
+  .extend({ id: uuidSchema })
+  .superRefine(validateProjectAvailabilityRules);
 export const updateCaseStudySchema = createCaseStudySchema.extend({ id: uuidSchema });
 export const updateSkillSchema = createSkillSchema.extend({ id: uuidSchema });
 export const updateTagSchema = createTagSchema.extend({ id: uuidSchema });
@@ -521,7 +779,10 @@ export const patchDecisionPatternSchema = createDecisionPatternSchema
   .partial()
   .extend({ id: uuidSchema });
 export const patchExperienceSchema = createExperienceSchema.partial().extend({ id: uuidSchema });
-export const patchProjectSchema = createProjectSchema.partial().extend({ id: uuidSchema });
+export const patchProjectSchema = createProjectBaseSchema
+  .partial()
+  .extend({ id: uuidSchema })
+  .superRefine(validateProjectAvailabilityRules);
 export const patchCaseStudySchema = createCaseStudySchema.partial().extend({ id: uuidSchema });
 export const patchSkillSchema = createSkillSchema.partial().extend({ id: uuidSchema });
 export const patchTagSchema = createTagSchema.partial().extend({ id: uuidSchema });

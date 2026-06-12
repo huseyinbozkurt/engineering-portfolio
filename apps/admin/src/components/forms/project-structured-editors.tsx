@@ -18,6 +18,7 @@ import {
   defaultEngineeringSignals,
   defaultProjectSignals,
   engineeringSignalLabels,
+  evidenceSourceOptions,
   evidenceTypeOptions,
   evidenceVisibilityOptions,
   normalizeEngineeringSignals,
@@ -41,9 +42,18 @@ interface ContributionRow extends BaseRow, ProjectContribution {}
 interface DecisionRow extends BaseRow, ProjectDecision {}
 interface OutcomeRow extends BaseRow, ProjectOutcome {}
 interface MetricRow extends BaseRow, ProjectMetric {}
-interface EvidenceRow extends BaseRow, ProjectEvidence {
+interface EvidenceRow
+  extends BaseRow,
+    Omit<
+      ProjectEvidence,
+      "description" | "url" | "assetUrl" | "assetKey" | "assetMimeType" | "assetSizeBytes"
+    > {
   description: string;
   url: string;
+  assetUrl: string;
+  assetKey: string;
+  assetMimeType: string;
+  assetSizeBytes: string;
 }
 
 function useCounter() {
@@ -119,6 +129,61 @@ function EmptyRows({ label }: { label: string }) {
       {label}
     </p>
   );
+}
+
+function isImageMimeType(value: string): boolean {
+  return value.toLowerCase().startsWith("image/");
+}
+
+function isVideoMimeType(value: string): boolean {
+  return value.toLowerCase().startsWith("video/");
+}
+
+function formatBytes(value: string): string | null {
+  const bytes = Number(value);
+
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return null;
+  }
+
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
+
+  if (bytes >= 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${bytes} B`;
+}
+
+function canUploadEvidenceType(type: ProjectEvidence["type"]): boolean {
+  return (
+    type === "architecture-diagram" ||
+    type === "screenshot" ||
+    type === "demo-video" ||
+    type === "other"
+  );
+}
+
+function evidenceUploadAccept(type: ProjectEvidence["type"]): string {
+  if (type === "demo-video") {
+    return "video/*";
+  }
+
+  if (type === "architecture-diagram" || type === "screenshot") {
+    return "image/*";
+  }
+
+  if (type === "other") {
+    return "image/*,video/*";
+  }
+
+  return "";
+}
+
+function adminEvidenceAssetUrl(row: EvidenceRow): string {
+  return row.assetKey ? `/api/project-evidence-assets/${row.assetKey}` : row.assetUrl;
 }
 
 export function ProjectStringListEditor({
@@ -609,25 +674,58 @@ export function ProjectEvidenceEditor({
 }) {
   const nextId = useCounter();
   const [rows, setRows] = useState<EvidenceRow[]>(() =>
-    defaultItems.map((item) => ({
-      id: nextId(),
-      ...item,
-      description: item.description ?? "",
-      url: item.url ?? "",
-    })),
+    defaultItems.map((item) => {
+      const source = item.source ?? (item.assetUrl || item.assetKey ? "upload" : "external-url");
+
+      return {
+        id: nextId(),
+        type: item.type,
+        title: item.title,
+        source,
+        visibility: item.visibility,
+        description: item.description ?? "",
+        url: item.url ?? "",
+        assetUrl: item.assetUrl ?? "",
+        assetKey: item.assetKey ?? "",
+        assetMimeType: item.assetMimeType ?? "",
+        assetSizeBytes:
+          typeof item.assetSizeBytes === "number" ? String(item.assetSizeBytes) : "",
+      };
+    }),
   );
   const payload = rows
     .filter((row) => row.title.trim())
-    .map((row) => ({
-      type: row.type,
-      title: row.title.trim(),
-      ...(row.description.trim() ? { description: row.description.trim() } : {}),
-      ...(row.url.trim() ? { url: row.url.trim() } : {}),
-      visibility: row.visibility,
-    }));
+    .map((row) => {
+      const assetSizeBytes = Number(row.assetSizeBytes);
+      const base = {
+        type: row.type,
+        title: row.title.trim(),
+        source: row.source,
+        uploadToken: String(row.id),
+        ...(row.description.trim() ? { description: row.description.trim() } : {}),
+        visibility: row.visibility,
+      };
+
+      if (row.source === "external-url") {
+        return {
+          ...base,
+          ...(row.url.trim() ? { url: row.url.trim() } : {}),
+        };
+      }
+
+      return {
+        ...base,
+        ...(row.assetUrl.trim() ? { assetUrl: row.assetUrl.trim() } : {}),
+        ...(row.assetKey.trim() ? { assetKey: row.assetKey.trim() } : {}),
+        ...(row.assetMimeType.trim() ? { assetMimeType: row.assetMimeType.trim() } : {}),
+        ...(Number.isFinite(assetSizeBytes) && assetSizeBytes > 0 ? { assetSizeBytes } : {}),
+      };
+    });
   const hidden = useHiddenJson(name, payload);
   const patch = (id: number, value: Partial<EvidenceRow>) =>
     setRows((prev) => prev.map((row) => (row.id === id ? { ...row, ...value } : row)));
+  const clearAsset = (id: number) =>
+    patch(id, { assetUrl: "", assetKey: "", assetMimeType: "", assetSizeBytes: "" });
 
   return (
     <div className="grid gap-3">
@@ -654,6 +752,24 @@ export function ProjectEvidenceEditor({
                     </select>
                   </label>
                   <label className="ui-field">
+                    <span className="ui-label">Source</span>
+                    <select
+                      className="ui-select"
+                      value={row.source}
+                      onChange={(event) =>
+                        patch(row.id, {
+                          source: event.target.value as ProjectEvidence["source"],
+                        })
+                      }
+                    >
+                      {evidenceSourceOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="ui-field">
                     <span className="ui-label">Visibility</span>
                     <select
                       className="ui-select"
@@ -672,7 +788,7 @@ export function ProjectEvidenceEditor({
                     </select>
                   </label>
                   <input
-                    className="ui-input sm:col-span-2"
+                    className="ui-input"
                     value={row.title}
                     maxLength={220}
                     placeholder="Evidence title"
@@ -688,14 +804,74 @@ export function ProjectEvidenceEditor({
                     aria-label="Evidence description"
                     onChange={(event) => patch(row.id, { description: event.target.value })}
                   />
-                  <input
-                    className="ui-input sm:col-span-2"
-                    type="url"
-                    value={row.url}
-                    placeholder="https://..."
-                    aria-label="Evidence URL"
-                    onChange={(event) => patch(row.id, { url: event.target.value })}
-                  />
+                  {row.source === "external-url" ? (
+                    <input
+                      className="ui-input sm:col-span-2"
+                      type="url"
+                      value={row.url}
+                      placeholder="https://..."
+                      aria-label="Evidence URL"
+                      onChange={(event) => patch(row.id, { url: event.target.value })}
+                    />
+                  ) : (
+                    <div className="grid gap-3 sm:col-span-2">
+                      <label className="ui-field">
+                        <span className="ui-label">Upload asset</span>
+                        <input
+                          type="file"
+                          name={`evidenceAsset:${row.id}`}
+                          accept={evidenceUploadAccept(row.type)}
+                          disabled={!canUploadEvidenceType(row.type)}
+                          className="w-full cursor-pointer rounded-xl border border-line bg-white/[0.03] px-3.5 py-2.5 text-sm text-muted file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-accent-500 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-accent-400 disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                        <span className="ui-hint">
+                          {canUploadEvidenceType(row.type)
+                            ? "Images up to 8 MB; videos up to 50 MB. Saving stores the file and replaces any existing asset on this row."
+                            : "This evidence type uses external URLs."}
+                        </span>
+                      </label>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <input
+                          className="ui-input"
+                          type="url"
+                          value={row.assetUrl}
+                          placeholder="Asset URL"
+                          aria-label="Evidence asset URL"
+                          onChange={(event) => patch(row.id, { assetUrl: event.target.value })}
+                        />
+                        <input
+                          className="ui-input"
+                          value={row.assetKey}
+                          maxLength={1024}
+                          placeholder="Asset key"
+                          aria-label="Evidence asset key"
+                          onChange={(event) => patch(row.id, { assetKey: event.target.value })}
+                        />
+                        <input
+                          className="ui-input"
+                          value={row.assetMimeType}
+                          maxLength={120}
+                          placeholder={row.type === "demo-video" ? "video/mp4" : "image/png"}
+                          aria-label="Evidence asset MIME type"
+                          onChange={(event) =>
+                            patch(row.id, { assetMimeType: event.target.value })
+                          }
+                        />
+                        <input
+                          className="ui-input"
+                          type="number"
+                          min={1}
+                          value={row.assetSizeBytes}
+                          placeholder="Size in bytes"
+                          aria-label="Evidence asset size in bytes"
+                          onChange={(event) =>
+                            patch(row.id, { assetSizeBytes: event.target.value })
+                          }
+                        />
+                      </div>
+                      <EvidenceAssetPreview row={row} onRemove={() => clearAsset(row.id)} />
+                    </div>
+                  )}
                 </div>
                 <RowControls
                   index={index}
@@ -721,8 +897,13 @@ export function ProjectEvidenceEditor({
                 id: nextId(),
                 type: "documentation",
                 title: "",
+                source: "external-url",
                 description: "",
                 url: "",
+                assetUrl: "",
+                assetKey: "",
+                assetMimeType: "",
+                assetSizeBytes: "",
                 visibility: "public",
               },
             ])
@@ -732,6 +913,55 @@ export function ProjectEvidenceEditor({
         </button>
       </div>
       {hidden}
+    </div>
+  );
+}
+
+function EvidenceAssetPreview({
+  row,
+  onRemove,
+}: {
+  row: EvidenceRow;
+  onRemove: () => void;
+}) {
+  const sizeLabel = formatBytes(row.assetSizeBytes);
+  const hasAsset = row.assetUrl.trim() || row.assetKey.trim();
+  const previewUrl = adminEvidenceAssetUrl(row);
+
+  if (!hasAsset) {
+    return (
+      <div className="rounded-xl border border-dashed border-line bg-white/[0.015] p-4 text-sm text-muted">
+        No uploaded asset metadata set.
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-3 rounded-xl border border-line bg-white/[0.02] p-3">
+      {previewUrl && isImageMimeType(row.assetMimeType) ? (
+        <img
+          src={previewUrl}
+          alt=""
+          className="max-h-56 w-full rounded-lg border border-line object-contain"
+        />
+      ) : null}
+      {previewUrl && isVideoMimeType(row.assetMimeType) ? (
+        <video
+          src={previewUrl}
+          controls
+          className="max-h-64 w-full rounded-lg border border-line"
+        />
+      ) : null}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0 text-xs leading-5 text-muted">
+          {row.assetKey ? <p className="truncate">Key: {row.assetKey}</p> : null}
+          {row.assetMimeType ? <p>MIME: {row.assetMimeType}</p> : null}
+          {sizeLabel ? <p>Size: {sizeLabel}</p> : null}
+        </div>
+        <button type="button" className="ui-btn-ghost" onClick={onRemove}>
+          Remove asset
+        </button>
+      </div>
     </div>
   );
 }
