@@ -6,6 +6,9 @@ interface FieldProps {
   type?: "text" | "number" | "url" | "date" | "email";
   defaultValue?: string | undefined;
   hint?: string | undefined;
+  min?: number | string | undefined;
+  max?: number | string | undefined;
+  step?: number | string | undefined;
 }
 
 interface TextAreaProps {
@@ -56,6 +59,9 @@ export function Field({
   type = "text",
   defaultValue,
   hint,
+  min,
+  max,
+  step,
 }: FieldProps) {
   return (
     <label className="ui-field">
@@ -67,6 +73,9 @@ export function Field({
         required={required}
         type={type}
         defaultValue={defaultValue}
+        min={min}
+        max={max}
+        step={step}
       />
       {hint ? <span className="ui-hint">{hint}</span> : null}
     </label>

@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { ReactNode } from "react";
 
 import { getCaseStudyBySlug } from "@portfolio/db/queries";
 
 import { RichText } from "@/components/rich-text";
 import { SectionHeader } from "@/components/portfolio-ui";
 import { StatusPill } from "@/components/status-pill";
+import { MetaLink, MetaPanel } from "@/components/meta-panel-link";
 import { getComingSoonFallback } from "@/lib/coming-soon-gate";
 import { experienceHref, projectHref } from "@/lib/paths";
 import { siteConfig } from "@/lib/site";
+
 
 interface CaseStudyPageProps {
   params: Promise<{
@@ -134,7 +135,8 @@ export default async function CaseStudyPage({ params }: CaseStudyPageProps) {
           ) : null}
 
           {hasSidebar ? (
-            <aside className="grid content-start gap-5">
+            <aside className="grid content-start gap-6 mt-4 lg:mt-4">
+              <SectionHeader title="" />
               <MetaPanel title="Related Experience">
                 {detail.experiences.map((experience) => (
                   <MetaLink
@@ -195,30 +197,4 @@ function CaseStudySectionCard({
   );
 }
 
-function MetaPanel({ title, children }: { title: string; children: ReactNode }) {
-  const hasChildren = Array.isArray(children) ? children.length > 0 : Boolean(children);
 
-  if (!hasChildren) {
-    return null;
-  }
-
-  return (
-    <section className="glass-panel rounded-lg p-4">
-      <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-300">
-        {title}
-      </h2>
-      <div className="mt-4 flex flex-wrap gap-2">{children}</div>
-    </section>
-  );
-}
-
-function MetaLink({ href, label }: { href: string; label: string }) {
-  return (
-    <Link
-      href={href}
-      className="rounded-lg border border-white/10 bg-white/[0.045] px-3 py-1.5 text-xs text-muted transition hover:border-violet-300/50 hover:text-ink"
-    >
-      {label}
-    </Link>
-  );
-}

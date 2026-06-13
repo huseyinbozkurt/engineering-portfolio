@@ -125,3 +125,135 @@ a {
   overflow-wrap: anywhere;
   word-break: break-word;
 }
+
+/* =========================================================================
+   AI Insights nav — peeking robot micro-interaction.
+   A small illustrated robot overlaps the "AI Insights" label and idles
+   (gentle float + head tilt, blinking eyes, occasional antenna sway). On
+   hover it springs diagonally to the bottom-right and tucks behind the
+   label, leaving the text fully unobstructed and softly emphasised.
+   Transform/opacity/filter only — never reflows, so neighbouring nav items
+   never shift. Desktop-only (matches the active underline) and honours
+   prefers-reduced-motion.
+   ========================================================================= */
+.ainav {
+  isolation: isolate;
+}
+
+.ainav__label {
+  position: relative;
+  z-index: 1;
+  transition: text-shadow 0.3s ease;
+}
+.ainav:hover .ainav__label,
+.ainav:focus-visible .ainav__label {
+  text-shadow: 0 0 14px rgba(167, 139, 250, 0.45);
+}
+
+.ainav__robot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  margin-top: -9px;
+  pointer-events: none;
+  filter: drop-shadow(0 0 4px rgba(139, 92, 246, 0.28));
+  transition:
+    transform 0.45s cubic-bezier(0.34, 1.4, 0.6, 1),
+    opacity 0.35s ease,
+    filter 0.3s ease;
+}
+.ainav:hover .ainav__robot,
+.ainav:focus-visible .ainav__robot {
+  transform: translate(26px, 13px) scale(0.4);
+  opacity: 0;
+  filter: drop-shadow(0 1px 7px rgba(167, 139, 250, 0.6));
+}
+
+/* Idle (not hovering): the robot continuously travels AROUND the label on a
+   flat elliptical orbit (top -> right -> bottom -> left -> top). The orbit
+   lives on its own layer so it composes with the hover transform; on hover it
+   pauses and the robot darts aside and fades, leaving the label fully clear
+   and emphasised. Transform/opacity only -> never reflows, neighbours hold. */
+.ainav__orbit {
+  display: block;
+  width: 100%;
+  height: 100%;
+  animation: ainav-orbit 5.5s linear infinite;
+}
+.ainav:hover .ainav__orbit,
+.ainav:focus-visible .ainav__orbit {
+  animation-play-state: paused;
+}
+.ainav__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.ainav__eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ainav-blink 5.4s ease-in-out infinite;
+}
+
+@keyframes ainav-orbit {
+  0% {
+    transform: translate(0, -10px);
+  }
+  12.5% {
+    transform: translate(24px, -7px);
+  }
+  25% {
+    transform: translate(34px, 0);
+  }
+  37.5% {
+    transform: translate(24px, 7px);
+  }
+  50% {
+    transform: translate(0, 10px);
+  }
+  62.5% {
+    transform: translate(-24px, 7px);
+  }
+  75% {
+    transform: translate(-34px, 0);
+  }
+  87.5% {
+    transform: translate(-24px, -7px);
+  }
+  100% {
+    transform: translate(0, -10px);
+  }
+}
+@keyframes ainav-blink {
+  0%,
+  91%,
+  100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ainav__orbit,
+  .ainav__eye {
+    animation: none;
+  }
+  .ainav__orbit {
+    transform: translate(0, -10px);
+  }
+  .ainav__robot,
+  .ainav:hover .ainav__robot,
+  .ainav:focus-visible .ainav__robot {
+    transition:
+      opacity 0.2s ease,
+      transform 0.2s ease;
+    filter: none;
+  }
+}

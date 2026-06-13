@@ -25,6 +25,8 @@ import {
   projectLenses,
   projectPrinciples,
   projects,
+  siteImages,
+  siteSettings,
   projectSkills,
   projectTags,
   skills,
@@ -41,6 +43,12 @@ export type SkillRecord = InferSelectModel<typeof skills>;
 export type TagRecord = InferSelectModel<typeof tags>;
 export type ContactSubmissionRecord = InferSelectModel<typeof contactSubmissions>;
 export type ContactProfileRecord = InferSelectModel<typeof contactProfiles>;
+export type SiteImageRecord = InferSelectModel<typeof siteImages>;
+export type SiteImageMetaRecord = Omit<SiteImageRecord, "data">;
+export type SiteSettingsRecord = InferSelectModel<typeof siteSettings>;
+export interface SiteSettingsWithLogoRecord extends SiteSettingsRecord {
+  brandLogoImage: SiteImageMetaRecord | null;
+}
 export type HomepageSettingsRecord = InferSelectModel<typeof homepageSettings>;
 export type AiReviewQualitySnapshotRecord = InferSelectModel<typeof aiReviewQualitySnapshots>;
 
@@ -527,6 +535,42 @@ export async function getContactProfile(): Promise<ContactProfileRecord | null> 
       .limit(1);
 
     return profile;
+  });
+}
+
+const siteImageMetaColumns = {
+  id: siteImages.id,
+  filename: siteImages.filename,
+  mimeType: siteImages.mimeType,
+  sizeBytes: siteImages.sizeBytes,
+  createdAt: siteImages.createdAt,
+  updatedAt: siteImages.updatedAt,
+};
+
+export async function getSiteSettings(): Promise<SiteSettingsWithLogoRecord | null> {
+  return readOne(async (db) => {
+    const [settings] = await db
+      .select()
+      .from(siteSettings)
+      .orderBy(desc(siteSettings.updatedAt), desc(siteSettings.createdAt))
+      .limit(1);
+
+    if (!settings) {
+      return undefined;
+    }
+
+    const [brandLogoImage] = settings.brandLogoImageId
+      ? await db
+          .select(siteImageMetaColumns)
+          .from(siteImages)
+          .where(eq(siteImages.id, settings.brandLogoImageId))
+          .limit(1)
+      : [];
+
+    return {
+      ...settings,
+      brandLogoImage: brandLogoImage ?? null,
+    };
   });
 }
 

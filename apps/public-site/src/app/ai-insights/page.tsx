@@ -49,6 +49,7 @@ export default async function AiInsightsPage() {
   }
 
   const run = await getLatestPublishedAiInsightRun();
+  console.log("[AiInsightsPage] latest published run:", run?.outputJson);
   const parsedOutput = run ? portfolioInsightOutputSchema.safeParse(run.outputJson) : null;
 
   if (!run || !parsedOutput?.success) {
@@ -128,41 +129,6 @@ export default async function AiInsightsPage() {
         </div>
       </section>
 
-      {/* Blind spots as growth opportunities */}
-      <section className="mt-16">
-        <SectionHeader
-          eyebrow="Growth Opportunities"
-          title="Where the portfolio can speak more clearly"
-          description="Presentation gaps surfaced by the analysis — opportunities to make existing work more visible, never invented missing experience."
-        />
-        <div className="grid gap-4">
-          {output.blindSpots.map((spot) => (
-            <article key={spot.title} className="glass-panel rounded-lg p-5 md:p-6">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-lg font-semibold text-ink">{spot.title}</h3>
-                <ConfidencePill confidence={spot.confidence} />
-              </div>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-muted">{spot.summary}</p>
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                <div className="rounded-lg border border-line bg-white/[0.02] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-300">
-                    Why it matters
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-ink/85">{spot.impact}</p>
-                </div>
-                <div className="rounded-lg border border-line bg-white/[0.02] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300">
-                    Suggested next step
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-ink/85">{spot.recommendation}</p>
-                </div>
-              </div>
-              <EvidenceChips evidence={spot.evidence} resolve={resolve} />
-            </article>
-          ))}
-        </div>
-      </section>
-
       {/* Career trajectory */}
       <section className="mt-16">
         <SectionHeader
@@ -175,7 +141,7 @@ export default async function AiInsightsPage() {
             <li key={stage.title} className="relative pb-8 last:pb-0">
               <span
                 aria-hidden
-                className="absolute -left-6 top-1 flex size-5 items-center justify-center rounded-full border border-violet-300/50 bg-surface md:-left-8"
+                className="absolute -left-6 top-1 flex size-5 -translate-x-1/2 items-center justify-center rounded-full border border-violet-300/50 bg-surface md:-left-8"
               >
                 <span className="size-2 rounded-full bg-violet-300" />
               </span>
@@ -362,17 +328,17 @@ function EvidenceChips({
             key={entry.ref}
             href={resolved.href}
             title={title}
-            className="inline-flex items-center rounded-full border border-line bg-white/[0.03] px-3 py-1 text-xs text-muted transition hover:border-violet-300/50 hover:text-ink"
+            className="inline-flex max-w-full items-center rounded-full border border-line bg-white/[0.03] px-3 py-1 text-xs text-muted transition hover:border-violet-300/50 hover:text-ink"
           >
-            {resolved.label}
+            <span className="min-w-0 truncate">{resolved.label}</span>
           </a>
         ) : (
           <span
             key={entry.ref}
             title={title}
-            className="inline-flex items-center rounded-full border border-line bg-white/[0.03] px-3 py-1 text-xs text-muted"
+            className="inline-flex max-w-full items-center rounded-full border border-line bg-white/[0.03] px-3 py-1 text-xs text-muted"
           >
-            {resolved.label}
+            <span className="min-w-0 truncate">{resolved.label}</span>
           </span>
         );
       })}

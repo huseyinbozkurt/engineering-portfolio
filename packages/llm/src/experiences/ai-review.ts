@@ -76,6 +76,7 @@ export function buildContentAiReviewPrompt(input: ContentAiReviewInput): {
       "Return strict JSON only. Do not include markdown, prose outside JSON, or code fences.",
       `Current date: ${new Date().toISOString().split("T")[0]} Do not flag future/past dates. Date validation is handled by the application.`,
       "If an awards field is present, it may contain unstructured text about awards, recognitions, or accomplishments. Extract only grounded strengths from it, and do not infer or assume any specific awards if not explicitly stated.",
+      "if the type of record is project and it's not open source it should not have gitHub url present, if it's incomplete it should not have url and end date field present"
     ].join("\n"),
     user: JSON.stringify(
       {

@@ -10,6 +10,7 @@ interface RichTextFieldProps {
   placeholder?: string | undefined;
   rows?: number | undefined;
   hint?: string | undefined;
+  variant?: "block" | "inline" | undefined;
 }
 
 type Mode = "write" | "preview";
@@ -28,6 +29,7 @@ export function RichTextField({
   placeholder,
   rows = 10,
   hint,
+  variant = "block",
 }: RichTextFieldProps) {
   const [value, setValue] = useState(defaultValue);
   const [mode, setMode] = useState<Mode>("write");
@@ -45,6 +47,7 @@ export function RichTextField({
     setValue(next);
 
     requestAnimationFrame(() => {
+      el.dispatchEvent(new Event("input", { bubbles: true }));
       el.focus();
       const caret = start + before.length;
       el.setSelectionRange(caret, caret + selected.length);
@@ -68,12 +71,13 @@ export function RichTextField({
     setValue(next);
 
     requestAnimationFrame(() => {
+      el.dispatchEvent(new Event("input", { bubbles: true }));
       el.focus();
       el.setSelectionRange(lineStart, lineStart + prefixed.length);
     });
   }
 
-  const tools: Array<{ label: string; title: string; run: () => void }> = [
+  const blockTools: Array<{ label: string; title: string; run: () => void }> = [
     { label: "B", title: "Bold", run: () => wrapSelection("**", "**", "bold text") },
     { label: "I", title: "Italic", run: () => wrapSelection("_", "_", "italic text") },
     { label: "H2", title: "Heading", run: () => prefixLines("## ") },
@@ -84,6 +88,10 @@ export function RichTextField({
     { label: "Code", title: "Inline code", run: () => wrapSelection("`", "`", "code") },
     { label: "Link", title: "Link", run: () => wrapSelection("[", "](https://)", "label") },
   ];
+  const tools =
+    variant === "inline"
+      ? blockTools.filter((tool) => ["Bold", "Italic", "Inline code"].includes(tool.title))
+      : blockTools;
 
   return (
     <div className="grid gap-2">
@@ -137,7 +145,13 @@ export function RichTextField({
           <>
             {/* Preserve the value for submission while the textarea is unmounted. */}
             <input type="hidden" name={name} value={value} />
-            <div className="min-h-32 px-4 py-3 text-sm leading-6 text-muted [&_a]:text-accent-300 [&_blockquote]:border-l-2 [&_blockquote]:border-line [&_blockquote]:pl-3 [&_code]:rounded [&_code]:bg-white/10 [&_code]:px-1 [&_h2]:mt-3 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-ink [&_h3]:mt-3 [&_h3]:font-semibold [&_h3]:text-ink [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 [&_strong]:text-ink [&_ul]:list-disc [&_ul]:pl-5">
+            <div
+              className={
+                variant === "inline"
+                  ? "min-h-16 px-4 py-3 text-sm leading-6 text-muted [&_code]:rounded [&_code]:bg-white/10 [&_code]:px-1 [&_em]:text-ink/90 [&_p]:my-0 [&_strong]:text-ink"
+                  : "min-h-32 px-4 py-3 text-sm leading-6 text-muted [&_a]:text-accent-300 [&_blockquote]:border-l-2 [&_blockquote]:border-line [&_blockquote]:pl-3 [&_code]:rounded [&_code]:bg-white/10 [&_code]:px-1 [&_h2]:mt-3 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-ink [&_h3]:mt-3 [&_h3]:font-semibold [&_h3]:text-ink [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 [&_strong]:text-ink [&_ul]:list-disc [&_ul]:pl-5"
+              }
+            >
               {value.trim() ? (
                 <ReactMarkdown>{value}</ReactMarkdown>
               ) : (

@@ -673,6 +673,57 @@ export const homepageMetricSchema = z.object({
   detail: z.string().trim().max(180).optional(),
 });
 
+export const BRAND_LOGO_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+export const BRAND_LOGO_IMAGE_ALLOWED_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+] as const;
+
+export interface BrandLogoImageFileCandidate {
+  name: string;
+  type: string;
+  size: number;
+}
+
+export type BrandLogoImageValidation = { ok: true } | { ok: false; reason: string };
+
+export function validateBrandLogoImageFile(
+  file: BrandLogoImageFileCandidate,
+): BrandLogoImageValidation {
+  if (!file.name.trim() || file.name.length > 255) {
+    return { ok: false, reason: "The logo image needs a name shorter than 255 characters." };
+  }
+
+  if (file.size <= 0) {
+    return { ok: false, reason: "The selected logo image is empty." };
+  }
+
+  if (file.size > BRAND_LOGO_IMAGE_MAX_BYTES) {
+    return {
+      ok: false,
+      reason: `Logo images must be ${Math.round(BRAND_LOGO_IMAGE_MAX_BYTES / 1024 / 1024)} MB or smaller.`,
+    };
+  }
+
+  if (!(BRAND_LOGO_IMAGE_ALLOWED_TYPES as readonly string[]).includes(file.type.toLowerCase())) {
+    return {
+      ok: false,
+      reason: "Use a PNG, JPEG, WebP, or GIF image for the brand logo.",
+    };
+  }
+
+  return { ok: true };
+}
+
+export const siteSettingsSchema = z.object({
+  brandName: z.string().trim().min(1, "Brand name is required.").max(1000),
+  brandLogoImageId: nullableUuidSchema,
+  showBrandName: z.coerce.boolean().default(true),
+  brandLogoSize: z.coerce.number().int().min(16).max(96).default(28),
+});
+
 export const homepageSettingsSchema = z.object({
   roleLabel: nullableTextSchema,
   headline: nullableTextSchema,
@@ -741,6 +792,7 @@ export type CreateContactSubmissionInput = z.infer<typeof createContactSubmissio
 export type ContactIntent = CreateContactSubmissionInput["intent"];
 export type ContactSubmission = CreateContactSubmissionInput;
 export type ContactProfile = z.infer<typeof contactProfileSchema>;
+export type SiteSettings = z.infer<typeof siteSettingsSchema>;
 export type HomepageSettings = z.infer<typeof homepageSettingsSchema>;
 export type HomepageMetric = z.infer<typeof homepageMetricSchema>;
 export type BulkSkillsInput = z.infer<typeof bulkSkillsSchema>;

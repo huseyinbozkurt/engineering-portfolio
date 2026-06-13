@@ -1,13 +1,19 @@
-"use client";
+import { getSiteSettings } from "@portfolio/db/queries";
+import { siteImagePublicPath } from "@portfolio/db/site-images";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { NavClient, type NavBrand } from "@/components/nav-client";
+import { siteConfig } from "@/lib/site";
 
-import { navItems, siteConfig } from "@/lib/site";
+function clampLogoSize(value: number | null | undefined): number {
+  if (!Number.isFinite(value)) {
+    return 28;
+  }
 
-export function Nav() {
-  const pathname = usePathname();
-  const initials = siteConfig.name
+  return Math.min(96, Math.max(16, Math.round(value ?? 28)));
+}
+
+function getInitials(name: string): string {
+  const initials = name
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
@@ -15,53 +21,32 @@ export function Nav() {
     .join("")
     .toUpperCase();
 
-  return (
-    <header className="sticky top-0 z-50 border-b border-line bg-[#050914]/88 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-5 py-4 lg:px-8">
-        <Link href="/" className="flex items-center gap-3 text-sm font-semibold text-ink">
-          <span className="flex size-9 items-center justify-center rounded-sm bg-gradient-to-br from-violet-400 via-sky-400 to-emerald-300 text-base font-black text-slate-950">
-            {initials}
-          </span>
-          <span>{siteConfig.name}</span>
-        </Link>
-        <nav className="order-3 grid w-full grid-cols-2 gap-1 sm:grid-cols-3 md:order-none md:flex md:w-auto md:items-center">
-          {navItems
-            .filter((item) => item.href !== "/contact")
-            .map((item) => {
-              const isActive = pathname.startsWith(item.href);
+  return initials || "HB";
+}
 
-              return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={isActive ? "page" : undefined}
-                className={`relative shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition hover:bg-white/7 hover:text-ink ${
-                  isActive ? "text-violet-200" : "text-muted"
-                }`}
-              >
-                {item.label}
-                {isActive ? (
-                  <span
-                    className="absolute inset-x-3 -bottom-1 hidden h-px bg-gradient-to-r from-transparent via-violet-400 to-transparent md:block"
-                    aria-hidden
-                  />
-                ) : null}
-              </Link>
-              );
-            })}
-        </nav>
-        <Link
-          href="/contact"
-          aria-current={pathname === "/contact" ? "page" : undefined}
-          className={`rounded-lg border px-4 py-2 text-sm font-medium transition hover:border-violet-300 hover:bg-violet-400/10 ${
-            pathname === "/contact"
-              ? "border-violet-300 bg-violet-400/10 text-violet-100"
-              : "border-violet-400/70 text-ink"
-          }`}
-        >
-          Contact Me
-        </Link>
-      </div>
-    </header>
-  );
+function plainBrandName(value: string): string {
+  return value
+    .replace(/!\[[^\]]*]\([^)]*\)/g, "")
+    .replace(/\[([^\]]+)]\([^)]*\)/g, "$1")
+    .replace(/^[\s-]*[-*]\s+/gm, "")
+    .replace(/[`*_~>#]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export async function Nav() {
+  const settings = await getSiteSettings();
+  const brandName = settings?.brandName?.trim() || siteConfig.name;
+  const plainName = plainBrandName(brandName) || siteConfig.name;
+  const logoImageId = settings?.brandLogoImage ? settings.brandLogoImageId : null;
+  const brand: NavBrand = {
+    name: brandName,
+    plainName,
+    showName: settings?.showBrandName ?? true,
+    logoUrl: logoImageId ? siteImagePublicPath(logoImageId) : null,
+    logoSize: clampLogoSize(settings?.brandLogoSize),
+    initials: getInitials(plainName),
+  };
+
+  return <NavClient brand={brand} />;
 }

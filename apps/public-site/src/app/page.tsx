@@ -71,6 +71,7 @@ export default async function HomePage() {
     settings?.codeExperienceLabel?.trim() || getExperienceSpanLabel(content.experiences);
   const primaryCta = getConfiguredCta(settings?.primaryCtaLabel, settings?.primaryCtaHref);
   const secondaryCta = getConfiguredCta(settings?.secondaryCtaLabel, settings?.secondaryCtaHref);
+  const homepageMetrics = getHomepageMetrics(settings?.metricCards ?? []);
 
   return (
     <>
@@ -124,6 +125,33 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {homepageMetrics.length > 0 ? (
+        <section className="mx-auto max-w-7xl px-5 py-10 lg:px-8 lg:py-14">
+          <SectionHeader
+            title="Engineering Impact"
+            description="A few measurable outcomes from the work behind this portfolio."
+          />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {homepageMetrics.map((metric) => (
+              <article
+                key={`${metric.value}-${metric.label}`}
+                className="glass-panel rounded-lg p-5"
+              >
+                <p className="text-3xl font-semibold tracking-normal text-ink md:text-4xl">
+                  {metric.value}
+                </p>
+                <h3 className="mt-3 text-sm font-semibold uppercase tracking-[0.16em] text-violet-200">
+                  {metric.label}
+                </h3>
+                {metric.detail ? (
+                  <p className="mt-3 text-sm leading-6 text-muted">{metric.detail}</p>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {content.experiences.length > 0 || content.projects.length > 0 ? (
         <section className="mx-auto max-w-7xl px-5 py-12 lg:px-8 lg:py-16">
@@ -354,4 +382,12 @@ function getConfiguredCta(
     label: normalizedLabel,
     href: normalizedHref,
   };
+}
+
+function getHomepageMetrics(
+  metrics: NonNullable<
+    Awaited<ReturnType<typeof getPublicSiteAvailability>>["content"]["homepageSettings"]
+  >["metricCards"],
+) {
+  return metrics.filter((metric) => metric.value.trim() && metric.label.trim()).slice(0, 6);
 }

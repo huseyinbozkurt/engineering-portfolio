@@ -86,7 +86,12 @@ const defaultConfirmation: ConfirmationCopy = {
 function serializeForm(form: HTMLFormElement): string {
   const parts: string[] = [];
   for (const [key, value] of new FormData(form).entries()) {
-    parts.push(`${key}=${typeof value === "string" ? value : ""}`);
+    if (typeof value === "string") {
+      parts.push(`${key}=${value}`);
+      continue;
+    }
+
+    parts.push(`${key}=${value.name}:${value.type}:${value.size}`);
   }
   return parts.join("&");
 }

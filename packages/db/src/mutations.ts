@@ -14,6 +14,7 @@ import type {
   CreateTagInput,
   ContactProfile,
   HomepageSettings,
+  SiteSettings,
   UpdateCaseStudyInput,
   UpdateDecisionPatternInput,
   UpdateExperienceInput,
@@ -50,6 +51,8 @@ import {
   projectSkills,
   projectTags,
   projects,
+  siteImages,
+  siteSettings,
   skills,
   tags,
 } from "./schema";
@@ -455,6 +458,76 @@ export async function upsertContactProfile(input: ContactProfile): Promise<strin
   );
 
   return record.id;
+}
+
+interface SiteImageInput {
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  data: Buffer;
+}
+
+interface UpsertSiteSettingsOptions {
+  brandLogoImage?: SiteImageInput | undefined;
+  removeBrandLogoImage?: boolean | undefined;
+}
+
+export async function upsertSiteSettings(
+  input: SiteSettings,
+  options: UpsertSiteSettingsOptions = {},
+): Promise<string> {
+  const db = getDb();
+
+  return db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select({ id: siteSettings.id, brandLogoImageId: siteSettings.brandLogoImageId })
+      .from(siteSettings)
+      .orderBy(desc(siteSettings.updatedAt), desc(siteSettings.createdAt))
+      .limit(1);
+
+    let nextBrandLogoImageId = input.brandLogoImageId;
+
+    if (options.brandLogoImage) {
+      const [image] = await tx
+        .insert(siteImages)
+        .values(options.brandLogoImage)
+        .returning({ id: siteImages.id });
+
+      if (!image) {
+        throw new Error("Failed to store the brand logo image.");
+      }
+
+      nextBrandLogoImageId = image.id;
+    } else if (options.removeBrandLogoImage) {
+      nextBrandLogoImageId = null;
+    }
+
+    const values = {
+      ...input,
+      brandLogoImageId: nextBrandLogoImageId,
+      updatedAt: new Date(),
+    };
+
+    if (existing) {
+      await tx.update(siteSettings).set(values).where(eq(siteSettings.id, existing.id));
+
+      if (
+        existing.brandLogoImageId &&
+        existing.brandLogoImageId !== nextBrandLogoImageId &&
+        (options.brandLogoImage || options.removeBrandLogoImage)
+      ) {
+        await tx.delete(siteImages).where(eq(siteImages.id, existing.brandLogoImageId));
+      }
+
+      return existing.id;
+    }
+
+    const record = inserted(
+      await tx.insert(siteSettings).values(values).returning({ id: siteSettings.id }),
+    );
+
+    return record.id;
+  });
 }
 
 export async function upsertHomepageSettings(input: HomepageSettings): Promise<string> {

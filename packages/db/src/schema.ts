@@ -506,6 +506,44 @@ export const contactResume = pgTable("contact_resume", {
   uploadedAt: timestamp("uploaded_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const siteImages = pgTable(
+  "site_images",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    filename: varchar("filename", { length: 255 }).notNull(),
+    mimeType: varchar("mime_type", { length: 120 }).notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    data: bytea("data").notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index("site_images_created_at_idx").on(table.createdAt),
+    index("site_images_updated_at_idx").on(table.updatedAt),
+  ],
+);
+
+export const siteSettings = pgTable(
+  "site_settings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    brandName: text("brand_name").notNull().default("Huseyin Bozkurt"),
+    brandLogoImageId: uuid("brand_logo_image_id").references(() => siteImages.id, {
+      onDelete: "set null",
+    }),
+    showBrandName: boolean("show_brand_name").notNull().default(true),
+    brandLogoSize: integer("brand_logo_size").notNull().default(28),
+    ...timestamps,
+  },
+  (table) => [
+    index("site_settings_updated_at_idx").on(table.updatedAt),
+    index("site_settings_brand_logo_image_idx").on(table.brandLogoImageId),
+    check(
+      "site_settings_brand_logo_size_chk",
+      sql`${table.brandLogoSize} between 16 and 96`,
+    ),
+  ],
+);
+
 export const homepageSettings = pgTable(
   "homepage_settings",
   {
@@ -1010,6 +1048,17 @@ export const projectEvidenceAssetRelations = relations(projectEvidenceAssets, ({
   project: one(projects, {
     fields: [projectEvidenceAssets.projectId],
     references: [projects.id],
+  }),
+}));
+
+export const siteImageRelations = relations(siteImages, ({ many }) => ({
+  siteSettings: many(siteSettings),
+}));
+
+export const siteSettingsRelations = relations(siteSettings, ({ one }) => ({
+  brandLogoImage: one(siteImages, {
+    fields: [siteSettings.brandLogoImageId],
+    references: [siteImages.id],
   }),
 }));
 

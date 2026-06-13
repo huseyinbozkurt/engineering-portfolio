@@ -45,6 +45,7 @@ import {
   updateTag,
   upsertContactProfile,
   upsertHomepageSettings,
+  upsertSiteSettings,
 } from "@portfolio/db/admin";
 import {
   setContentAiReviewQueued,
@@ -103,6 +104,8 @@ import {
   updateProjectSchema,
   updateSkillSchema,
   updateTagSchema,
+  siteSettingsSchema,
+  validateBrandLogoImageFile,
   validateProjectEvidenceAssetFile,
   validateResumeFile,
 } from "@portfolio/validators";
@@ -1685,30 +1688,66 @@ export async function upsertContactProfileAction(formData: FormData): Promise<vo
 }
 
 export async function upsertHomepageSettingsAction(formData: FormData): Promise<void> {
-  await upsertHomepageSettings(
-    homepageSettingsSchema.parse({
-      roleLabel: text(formData, "roleLabel"),
-      headline: text(formData, "headline"),
-      headlineHighlight: text(formData, "headlineHighlight"),
-      summary: text(formData, "summary"),
-      primaryCtaLabel: text(formData, "primaryCtaLabel"),
-      primaryCtaHref: text(formData, "primaryCtaHref"),
-      secondaryCtaLabel: text(formData, "secondaryCtaLabel"),
-      secondaryCtaHref: text(formData, "secondaryCtaHref"),
-      codeRoleLabel: text(formData, "codeRoleLabel"),
-      codeMindsetLabel: text(formData, "codeMindsetLabel"),
-      codeLocationLabel: text(formData, "codeLocationLabel"),
-      codeExperienceLabel: text(formData, "codeExperienceLabel"),
-      codeFocusItems: bulkLines(text(formData, "codeFocusItems")),
-      metricCards: parseHomepageMetricRows(text(formData, "metricCards")),
-      featuredSkillIds: ids(formData, "featuredSkillIds"),
-      featuredPrincipleIds: ids(formData, "featuredPrincipleIds"),
-      featuredCaseStudyIds: ids(formData, "featuredCaseStudyIds"),
-      featuredRecognitionExperienceId: text(formData, "featuredRecognitionExperienceId"),
-    }),
-  );
+  const brandLogoImage = formData.get("brandLogoImage");
+  const logoUpload =
+    brandLogoImage instanceof File && brandLogoImage.size > 0 ? brandLogoImage : null;
+
+  if (logoUpload) {
+    const validation = validateBrandLogoImageFile({
+      name: logoUpload.name,
+      type: logoUpload.type,
+      size: logoUpload.size,
+    });
+
+    if (!validation.ok) {
+      await setFlash(validation.reason, "error");
+      redirect("/content/homepage");
+    }
+  }
+
+  const siteSettingsInput = siteSettingsSchema.parse({
+    brandName: text(formData, "brandName"),
+    brandLogoImageId: text(formData, "brandLogoImageId"),
+    showBrandName: formData.get("showBrandName") === "on",
+    brandLogoSize: text(formData, "brandLogoSize") || "28",
+  });
+  const homepageSettingsInput = homepageSettingsSchema.parse({
+    roleLabel: text(formData, "roleLabel"),
+    headline: text(formData, "headline"),
+    headlineHighlight: text(formData, "headlineHighlight"),
+    summary: text(formData, "summary"),
+    primaryCtaLabel: text(formData, "primaryCtaLabel"),
+    primaryCtaHref: text(formData, "primaryCtaHref"),
+    secondaryCtaLabel: text(formData, "secondaryCtaLabel"),
+    secondaryCtaHref: text(formData, "secondaryCtaHref"),
+    codeRoleLabel: text(formData, "codeRoleLabel"),
+    codeMindsetLabel: text(formData, "codeMindsetLabel"),
+    codeLocationLabel: text(formData, "codeLocationLabel"),
+    codeExperienceLabel: text(formData, "codeExperienceLabel"),
+    codeFocusItems: bulkLines(text(formData, "codeFocusItems")),
+    metricCards: parseHomepageMetricRows(text(formData, "metricCards")),
+    featuredSkillIds: ids(formData, "featuredSkillIds"),
+    featuredPrincipleIds: ids(formData, "featuredPrincipleIds"),
+    featuredCaseStudyIds: ids(formData, "featuredCaseStudyIds"),
+    featuredRecognitionExperienceId: text(formData, "featuredRecognitionExperienceId"),
+  });
+
+  await upsertSiteSettings(siteSettingsInput, {
+    brandLogoImage: logoUpload
+      ? {
+          filename: logoUpload.name,
+          mimeType: logoUpload.type,
+          sizeBytes: logoUpload.size,
+          data: Buffer.from(await logoUpload.arrayBuffer()),
+        }
+      : undefined,
+    removeBrandLogoImage: formData.get("removeBrandLogoImage") === "on",
+  });
+
+  await upsertHomepageSettings(homepageSettingsInput);
 
   await setFlash("Homepage saved");
+  revalidatePath("/", "layout");
   revalidatePath("/");
   refresh("/content/homepage");
   redirect("/content/homepage");

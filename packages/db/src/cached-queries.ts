@@ -2,6 +2,7 @@ import {
   getContactProfile,
   getHomeContent,
   getHomepageSettings,
+  getSiteSettings,
   getPublishedCaseStudies,
   getPublishedDecisionPatterns,
   getPublishedExperiences,
@@ -16,6 +17,7 @@ export const CACHE_TAGS = {
   homeContent: "home-content",
   contactProfile: "contact-profile",
   homepageSettings: "homepage-settings",
+  siteSettings: "site-settings",
   experiences: "experiences",
   projects: "projects",
   caseStudies: "case-studies",
@@ -28,6 +30,7 @@ export const CACHE_TAGS = {
 export const getCachedHomeContent = getHomeContent;
 export const getCachedContactProfile = getContactProfile;
 export const getCachedHomepageSettings = getHomepageSettings;
+export const getCachedSiteSettings = getSiteSettings;
 export const getCachedPublishedLenses = getPublishedLenses;
 export const getCachedPublishedPrinciples = getPublishedPrinciples;
 export const getCachedPublishedDecisionPatterns = getPublishedDecisionPatterns;

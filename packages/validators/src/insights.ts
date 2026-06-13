@@ -212,6 +212,52 @@ export const signalRadarSchema = z
   .strict();
 export type SignalRadar = z.infer<typeof signalRadarSchema>;
 
+const homePageSignalSchema = z
+  .object({
+    title: z.string().trim().min(1).max(80),
+    summary: z.string().trim().min(1).max(250),
+    confidence: insightConfidenceSchema,
+    evidence: evidenceListSchema
+  })
+  .strict();
+
+const homePageProofPointSchema = z
+  .object({
+    label: z.string().trim().min(1).max(60),
+    value: z.string().trim().min(1).max(60),
+    context: z.string().trim().min(1).max(180),
+    evidence: evidenceListSchema
+  })
+  .strict();
+
+const homePageCapabilitySchema = z
+  .object({
+    label: z.string().trim().min(1).max(60),
+    score: z.number().int().min(0).max(100),
+    summary: z.string().trim().min(1).max(180),
+    evidence: evidenceListSchema
+  })
+  .strict();
+
+const homePageContentSchema = z
+  .object({
+    eyebrow: z.string().trim().min(1).max(50),
+    headline: z.string().trim().min(1).max(140),
+    summary: z.string().trim().min(1).max(350),
+
+    primarySignals: z.array(homePageSignalSchema).min(1).max(3),
+    proofPoints: z.array(homePageProofPointSchema).min(1).max(4),
+    capabilitySnapshot: z.array(homePageCapabilitySchema).min(1).max(6),
+
+    cta: z
+      .object({
+        label: z.string().trim().min(1).max(60),
+        href: z.string().trim().min(1).max(200),
+      })
+      .strict(),
+  })
+  .strict();
+
 export const portfolioInsightOutputSchema = z
   .object({
     executiveSummary: insightStatementSchema,
@@ -224,6 +270,7 @@ export const portfolioInsightOutputSchema = z
     opportunityHeatmap: z.array(opportunitySchema).min(1).max(8),
     signalRadar: signalRadarSchema,
     groundedDataNotes: z.array(z.string().trim().min(1).max(300)).min(1).max(8),
+    homePageContent: homePageContentSchema.optional(),
   })
   .strict();
 export type PortfolioInsightOutput = z.infer<typeof portfolioInsightOutputSchema>;

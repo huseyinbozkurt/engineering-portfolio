@@ -1,4 +1,8 @@
-import { getAdminContentIndex, getHomepageSettings } from "@portfolio/db/queries";
+import {
+  getAdminContentIndex,
+  getHomepageSettings,
+  getSiteSettings,
+} from "@portfolio/db/queries";
 
 import { upsertHomepageSettingsAction } from "@/app/actions";
 import { HomepageSettingsForm } from "@/components/forms/homepage-settings-form";
@@ -6,8 +10,9 @@ import { HomepageSettingsForm } from "@/components/forms/homepage-settings-form"
 export const dynamic = "force-dynamic";
 
 export default async function HomepageSettingsPage() {
-  const [settings, content] = await Promise.all([
+  const [settings, siteSettings, content] = await Promise.all([
     getHomepageSettings(),
+    getSiteSettings(),
     getAdminContentIndex(),
   ]);
 
@@ -16,6 +21,7 @@ export default async function HomepageSettingsPage() {
       <HomepageSettingsForm
         action={upsertHomepageSettingsAction}
         defaults={settings}
+        siteSettings={siteSettings}
         skills={content.skills}
         principles={content.principles}
         caseStudies={content.caseStudies}

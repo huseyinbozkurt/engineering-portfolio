@@ -141,7 +141,19 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
   const hasArchitecture =
     !isNda && (project.architecture.trim().length > 0 || architectureStackBoxes.length > 0);
   const relatedCaseStudies = isNda ? [] : detail.caseStudies;
+  const relatedExperience: MetaItem = {id: detail.experience!.id,
+          label: `${detail.experience!.role} at ${detail.experience!.company}`
+        }
+  if (detail.experience) {
+    relatedExperience.href = experienceHref(detail.experience);
+  }
   const relationshipGroups = [
+    {
+      title: "Related Experience",
+      items: [
+        relatedExperience
+        ].filter((item): item is MetaItem => Boolean(item.id)),
+    },
     {
       title: "Lenses",
       items: detail.lenses.map((lens) => ({
@@ -255,23 +267,11 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
 
       {!isNda && (detail.experience || hasRelationshipContext) ? (
         <section className="mx-auto grid max-w-7xl gap-6 px-5 py-12 lg:grid-cols-[minmax(0,1fr)_20rem] lg:px-8 lg:py-16">
-          {detail.experience ? (
-            <section className="glass-panel rounded-lg p-6 lg:p-8">
-              <SectionTitle title="Related Experience" />
-              <p className="mt-4 text-sm leading-6 text-muted">
-                Built during{" "}
-                <Link
-                  href={experienceHref(detail.experience)}
-                  className="text-violet-200 underline-offset-4 transition hover:underline"
-                >
-                  {detail.experience.role} at {detail.experience.company}
-                </Link>
-                .
-              </p>
-            </section>
-          ) : (
-            <div />
-          )}
+          {lessons.length > 0 ? (
+        <section className="mx-auto max-w-7xl px-5 pb-14 lg:px-8 lg:pb-20">
+          <ListSection title="What I Learned" items={lessons} />
+        </section>
+      ) : null}
 
           {hasRelationshipContext ? (
             <aside className="grid content-start gap-5">
@@ -283,11 +283,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
         </section>
       ) : null}
 
-      {lessons.length > 0 ? (
-        <section className="mx-auto max-w-7xl px-5 pb-14 lg:px-8 lg:pb-20">
-          <ListSection title="What I Learned" items={lessons} />
-        </section>
-      ) : null}
+      
     </>
   );
 }

@@ -190,6 +190,7 @@ export async function getLatestPublishedAiInsightRun(): Promise<AiInsightRunReco
       .orderBy(desc(aiInsightRuns.publishedAt))
       .limit(1);
 
+    console.log("[db] getLatestPublishedAiInsightRun:", record);
     return record ?? null;
   } catch (error) {
     console.error("[db] ai_insight_runs read failed; treating as missing:", error);
