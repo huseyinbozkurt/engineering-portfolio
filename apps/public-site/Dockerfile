@@ -2,7 +2,8 @@ FROM node:22-alpine AS base
 
 WORKDIR /app
 
-RUN corepack enable
+ARG PNPM_VERSION=11.6.0
+RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 
 ENV NEXT_TELEMETRY_DISABLED=1
 

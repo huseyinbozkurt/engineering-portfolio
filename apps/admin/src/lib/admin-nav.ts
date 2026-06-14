@@ -12,6 +12,7 @@ import {
   Mail,
   Sparkles,
   Tag,
+  Tags,
   Wrench,
 } from "lucide-react";
 import type { ComponentType } from "react";
@@ -32,6 +33,7 @@ export const adminNavGroups: AdminNavGroup[] = ["Workspace", "Content", "Inbox"]
 export const adminNavItems: AdminNavItem[] = [
   { href: "/", label: "Overview", group: "Workspace", icon: LayoutDashboard },
   { href: "/ai-insights", label: "AI Insights", group: "Workspace", icon: Sparkles },
+  { href: "/taxonomy-review", label: "Taxonomy Review", group: "Workspace", icon: Tags },
   { href: "/ai-stories", label: "AI Stories", group: "Workspace", icon: BookOpen },
   { href: "/tasks", label: "LLM Tasks", group: "Workspace", icon: ListChecks },
   { href: "/content/homepage", label: "Homepage", group: "Content", icon: Home },

@@ -3,6 +3,7 @@ import { z } from "zod";
 export * from "./insights";
 export * from "./resume";
 export * from "./stories";
+export * from "./taxonomy-review";
 
 export const contentStatusSchema = z.enum(["draft", "published", "archived"]);
 

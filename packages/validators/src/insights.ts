@@ -212,7 +212,7 @@ export const signalRadarSchema = z
   .strict();
 export type SignalRadar = z.infer<typeof signalRadarSchema>;
 
-const homePageSignalSchema = z
+export const homePageSignalSchema = z
   .object({
     title: z.string().trim().min(1).max(80),
     summary: z.string().trim().min(1).max(250),
@@ -221,7 +221,7 @@ const homePageSignalSchema = z
   })
   .strict();
 
-const homePageProofPointSchema = z
+export const homePageProofPointSchema = z
   .object({
     label: z.string().trim().min(1).max(60),
     value: z.string().trim().min(1).max(60),
@@ -230,7 +230,7 @@ const homePageProofPointSchema = z
   })
   .strict();
 
-const homePageCapabilitySchema = z
+export const homePageCapabilitySchema = z
   .object({
     label: z.string().trim().min(1).max(60),
     score: z.number().int().min(0).max(100),
@@ -239,7 +239,7 @@ const homePageCapabilitySchema = z
   })
   .strict();
 
-const homePageContentSchema = z
+export const homePageContentSchema = z
   .object({
     eyebrow: z.string().trim().min(1).max(50),
     headline: z.string().trim().min(1).max(140),
@@ -258,6 +258,11 @@ const homePageContentSchema = z
   })
   .strict();
 
+export type HomePageSignal = z.infer<typeof homePageSignalSchema>;
+export type HomePageProofPoint = z.infer<typeof homePageProofPointSchema>;
+export type HomePageCapability = z.infer<typeof homePageCapabilitySchema>;
+export type HomePageContent = z.infer<typeof homePageContentSchema>;
+
 export const portfolioInsightOutputSchema = z
   .object({
     executiveSummary: insightStatementSchema,
@@ -270,7 +275,7 @@ export const portfolioInsightOutputSchema = z
     opportunityHeatmap: z.array(opportunitySchema).min(1).max(8),
     signalRadar: signalRadarSchema,
     groundedDataNotes: z.array(z.string().trim().min(1).max(300)).min(1).max(8),
-    homePageContent: homePageContentSchema.optional(),
+    homePageContent: homePageContentSchema,
   })
   .strict();
 export type PortfolioInsightOutput = z.infer<typeof portfolioInsightOutputSchema>;

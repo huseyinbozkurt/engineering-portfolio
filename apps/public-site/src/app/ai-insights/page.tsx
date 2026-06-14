@@ -6,12 +6,12 @@ import {
   portfolioInsightInputSchema,
   portfolioInsightOutputSchema,
   type EvidenceRef,
-  type InsightConfidence,
   type PortfolioInsightOutput,
 } from "@portfolio/validators";
 
 import { ComingSoon } from "@/components/coming-soon";
 import { EmptyState } from "@/components/empty-state";
+import { ConfidencePill } from "@/components/insights/insight-primitives";
 import { InsightRadar, type RadarAxis } from "@/components/insights/insight-radar";
 import { RecruiterTabs, type RecruiterTabView } from "@/components/insights/recruiter-tabs";
 import { SectionHeader } from "@/components/portfolio-ui";
@@ -71,8 +71,8 @@ export default async function AiInsightsPage() {
     <div className="mx-auto w-full max-w-6xl px-5 py-10 lg:px-8 lg:py-14">
       {/* Hero */}
       <section className="grid gap-6">
-        <div>
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-violet-300">
+        <div className="min-w-0">
+          <p className="mb-3 break-words text-xs font-semibold uppercase tracking-[0.22em] text-violet-300">
             AI Insights · Portfolio Intelligence
           </p>
           <h1 className="max-w-3xl text-3xl font-semibold text-ink md:text-4xl">
@@ -81,14 +81,14 @@ export default async function AiInsightsPage() {
           <p className="mt-4 max-w-3xl text-sm leading-7 text-muted">{INTEGRITY_LINE}</p>
         </div>
 
-        <div className="glass-panel rounded-lg p-6 shadow-glow md:p-8">
+        <div className="glass-panel min-w-0 rounded-lg p-6 shadow-glow md:p-8">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-300">
               Executive summary
             </span>
             <ConfidencePill confidence={output.executiveSummary.confidence} />
           </div>
-          <p className="mt-4 text-base leading-8 text-ink/95 md:text-lg md:leading-9">
+          <p className="mt-4 break-words text-base leading-8 text-ink/95 md:text-lg md:leading-9">
             {output.executiveSummary.summary}
           </p>
           <EvidenceChips evidence={output.executiveSummary.evidence} resolve={resolve} />
@@ -117,12 +117,12 @@ export default async function AiInsightsPage() {
         />
         <div className="grid gap-4 md:grid-cols-2">
           {output.strengthSignals.map((signal) => (
-            <article key={signal.title} className="glass-panel h-full rounded-lg p-5 md:p-6">
+            <article key={signal.title} className="glass-panel h-full w-full min-w-0 max-w-full rounded-lg p-5 md:p-6">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-lg font-semibold text-ink">{signal.title}</h3>
+                <h3 className="min-w-0 break-words text-lg font-semibold text-ink">{signal.title}</h3>
                 <ConfidencePill confidence={signal.confidence} />
               </div>
-              <p className="mt-3 text-sm leading-7 text-muted">{signal.summary}</p>
+              <p className="mt-3 break-words text-sm leading-7 text-muted">{signal.summary}</p>
               <EvidenceChips evidence={signal.evidence} resolve={resolve} />
             </article>
           ))}
@@ -138,24 +138,24 @@ export default async function AiInsightsPage() {
         />
         <ol className="relative grid gap-0 border-l border-violet-300/25 pl-6 md:pl-8">
           {output.careerTrajectory.stages.map((stage, index) => (
-            <li key={stage.title} className="relative pb-8 last:pb-0">
+            <li key={stage.title} className="relative min-w-0 pb-8 last:pb-0">
               <span
                 aria-hidden
                 className="absolute -left-6 top-1 flex size-5 -translate-x-1/2 items-center justify-center rounded-full border border-violet-300/50 bg-surface md:-left-8"
               >
                 <span className="size-2 rounded-full bg-violet-300" />
               </span>
-              <div className="glass-panel rounded-lg p-5">
+              <div className="glass-panel w-full min-w-0 max-w-full rounded-lg p-5">
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-300">
                     Stage {index + 1}
                   </span>
-                  <span className="rounded-full border border-line bg-white/[0.03] px-2.5 py-0.5 text-xs text-muted">
+                  <span className="max-w-full break-words rounded-full border border-line bg-white/[0.03] px-2.5 py-0.5 text-xs text-muted">
                     {stage.timeframe}
                   </span>
                 </div>
-                <h3 className="mt-2 text-lg font-semibold text-ink">{stage.title}</h3>
-                <p className="mt-2 text-sm leading-7 text-muted">{stage.explanation}</p>
+                <h3 className="mt-2 break-words text-lg font-semibold text-ink">{stage.title}</h3>
+                <p className="mt-2 break-words text-sm leading-7 text-muted">{stage.explanation}</p>
                 <EvidenceChips evidence={stage.evidence} resolve={resolve} />
               </div>
             </li>
@@ -257,26 +257,10 @@ export default async function AiInsightsPage() {
 
 function HeroMeta({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <div className="min-w-0">
       <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-muted/70">{label}</dt>
-      <dd className="mt-1 font-medium text-ink">{value}</dd>
+      <dd className="mt-1 break-words font-medium text-ink">{value}</dd>
     </div>
-  );
-}
-
-const confidencePillClasses: Record<InsightConfidence, string> = {
-  high: "border-emerald-300/30 bg-emerald-300/10 text-emerald-200",
-  medium: "border-amber-300/30 bg-amber-300/10 text-amber-200",
-  low: "border-line bg-white/[0.04] text-muted",
-};
-
-function ConfidencePill({ confidence }: { confidence: InsightConfidence }) {
-  return (
-    <span
-      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${confidencePillClasses[confidence]}`}
-    >
-      {confidence} confidence
-    </span>
   );
 }
 

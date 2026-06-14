@@ -12,6 +12,9 @@ A production-oriented, data-driven engineering portfolio for `huseyinbozkurt.dev
 
 ## Getting Started
 
+This repository uses pnpm as its only package manager. Run workspace commands
+through pnpm from the repository root.
+
 ```bash
 cp .env.example .env
 docker compose up -d
@@ -31,6 +34,41 @@ Run either app separately:
 pnpm dev:public
 pnpm dev:admin
 ```
+
+Common validation commands:
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+Workspace filters are available for scoped commands:
+
+```bash
+pnpm --filter @portfolio/db db:migrate
+pnpm --filter admin dev
+```
+
+### pnpm Build Approvals
+
+pnpm may pause installation when a dependency asks to run a build script. Review
+those requests manually with:
+
+```bash
+pnpm approve-builds
+```
+
+The currently approved build-script dependencies are recorded in
+`pnpm-workspace.yaml` under `allowBuilds`:
+
+- `esbuild`
+- `sharp`
+
+When a new dependency legitimately needs a build script, run the approval
+command locally, review the package, and commit the resulting
+`pnpm-workspace.yaml` change.
 
 ## Admin LLM Configuration
 

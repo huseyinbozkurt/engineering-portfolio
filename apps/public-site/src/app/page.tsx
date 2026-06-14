@@ -1,12 +1,15 @@
 import Link from "next/link";
 
+import { getLatestPublishedAiInsightRun } from "@portfolio/db/ai-insight-runs";
 import {
   getCaseStudyBySlug,
   type CaseStudyDetailRecord,
   type CaseStudyRecord,
 } from "@portfolio/db/queries";
+import { portfolioInsightOutputSchema, type HomePageContent } from "@portfolio/validators";
 
 import { ComingSoon } from "@/components/coming-soon";
+import { HomeAiInsight } from "@/components/insights/home-ai-insight";
 import {
   CaseStudyCard,
   CTAButton,
@@ -35,6 +38,7 @@ export default async function HomePage() {
     return <ComingSoon />;
   }
 
+  const homeInsight = await getHomeAiInsightContent();
   const settings = content.homepageSettings;
   const role = settings?.roleLabel?.trim() || getRoleLabel(content.experiences);
   const headline = settings?.headline?.trim() || getHeroHeadline(content) || role;
@@ -125,6 +129,8 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      <HomeAiInsight content={homeInsight} />
 
       {homepageMetrics.length > 0 ? (
         <section className="mx-auto max-w-7xl px-5 py-10 lg:px-8 lg:py-14">
@@ -390,4 +396,19 @@ function getHomepageMetrics(
   >["metricCards"],
 ) {
   return metrics.filter((metric) => metric.value.trim() && metric.label.trim()).slice(0, 6);
+}
+
+async function getHomeAiInsightContent(): Promise<HomePageContent | undefined> {
+  // Latest published report drives the section; absent/older reports (no
+  // homePageContent) or any read error simply hide it — never crash the home page.
+  try {
+    const run = await getLatestPublishedAiInsightRun();
+    if (!run?.outputJson) {
+      return undefined;
+    }
+    const parsed = portfolioInsightOutputSchema.safeParse(run.outputJson);
+    return parsed.success ? parsed.data.homePageContent : undefined;
+  } catch {
+    return undefined;
+  }
 }

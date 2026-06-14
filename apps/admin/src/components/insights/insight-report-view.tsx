@@ -1,5 +1,6 @@
 import type {
   EvidenceRef,
+  HomePageContent,
   InsightConfidence,
   PortfolioInsightOutput,
 } from "@portfolio/validators";
@@ -285,6 +286,114 @@ export function InsightReportView({
           ))}
         </ul>
       </SectionCard>
+
+      {output.homePageContent ? (
+        <SectionCard
+          title="Homepage AI Insight Preview"
+          description="How the generated homepage summary will appear publicly."
+        >
+          <HomepageInsightPreview content={output.homePageContent} resolve={resolve} />
+        </SectionCard>
+      ) : null}
+    </div>
+  );
+}
+
+function HomepageInsightPreview({
+  content,
+  resolve,
+}: {
+  content: HomePageContent;
+  resolve: EvidenceResolver;
+}) {
+  return (
+    <div className="grid gap-6">
+      <div className="rounded-xl border border-line bg-white/[0.02] p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent-200">
+          {content.eyebrow}
+        </p>
+        <h3 className="mt-2 text-xl font-semibold text-ink">{content.headline}</h3>
+        <p className="mt-2 text-sm leading-7 text-muted">{content.summary}</p>
+      </div>
+
+      <div>
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted/70">
+          Primary signals
+        </h3>
+        <div className="grid gap-4 md:grid-cols-3">
+          {content.primarySignals.map((signal) => (
+            <article
+              key={signal.title}
+              className="rounded-xl border border-line bg-white/[0.02] p-4"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h4 className="text-sm font-semibold text-ink">{signal.title}</h4>
+                <ConfidenceBadge confidence={signal.confidence} />
+              </div>
+              <p className="mt-2 text-sm leading-6 text-muted">{signal.summary}</p>
+              <EvidenceList evidence={signal.evidence} resolve={resolve} />
+            </article>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted/70">
+          Proof points
+        </h3>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {content.proofPoints.map((proof) => (
+            <article
+              key={`${proof.label}-${proof.value}`}
+              className="rounded-xl border border-line bg-white/[0.02] p-4"
+            >
+              <p className="text-2xl font-semibold text-ink">{proof.value}</p>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-accent-200">
+                {proof.label}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-muted">{proof.context}</p>
+              <EvidenceList evidence={proof.evidence} resolve={resolve} />
+            </article>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted/70">
+          Capability snapshot
+        </h3>
+        <div className="grid gap-3.5">
+          {content.capabilitySnapshot.map((capability) => (
+            <div key={capability.label}>
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="text-ink">{capability.label}</span>
+                <span className="tabular-nums text-muted">{capability.score}/100</span>
+              </div>
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+                <div
+                  className="h-full rounded-full bg-accent-400"
+                  style={{ width: `${Math.max(capability.score, 2)}%` }}
+                />
+              </div>
+              <p className="mt-1.5 text-xs leading-5 text-muted">{capability.summary}</p>
+              <EvidenceList evidence={capability.evidence} resolve={resolve} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted/70">
+          Call to action (read-only preview)
+        </h3>
+        <div className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-line bg-white/[0.02] px-4 py-2.5 text-sm">
+          <span className="font-medium text-ink">{content.cta.label}</span>
+          <span aria-hidden className="text-muted">
+            →
+          </span>
+          <span className="break-all font-mono text-xs text-accent-200">{content.cta.href}</span>
+        </div>
+      </div>
     </div>
   );
 }

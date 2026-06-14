@@ -2,28 +2,22 @@
   "name": "engineering-portfolio",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.12.1",
+  "packageManager": "pnpm@11.6.0",
   "scripts": {
-    "dev": "corepack pnpm -r --parallel --filter @portfolio/public-site --filter @portfolio/admin dev",
-    "dev:public": "corepack pnpm --filter @portfolio/public-site dev",
-    "dev:admin": "corepack pnpm --filter @portfolio/admin dev",
-    "build": "corepack pnpm -r --if-present build",
-    "typecheck": "corepack pnpm -r --if-present typecheck",
-    "db:generate": "corepack pnpm --filter @portfolio/db db:generate",
-    "db:migrate": "corepack pnpm --filter @portfolio/db db:migrate",
-    "db:push": "corepack pnpm --filter @portfolio/db db:push",
-    "db:studio": "corepack pnpm --filter @portfolio/db db:studio",
+    "dev": "pnpm -r --parallel --filter @portfolio/public-site --filter @portfolio/admin dev",
+    "dev:public": "pnpm --filter @portfolio/public-site dev",
+    "dev:admin": "pnpm --filter @portfolio/admin dev",
+    "build": "pnpm -r --if-present build",
+    "lint": "pnpm -r --if-present lint",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "db:generate": "pnpm --filter @portfolio/db db:generate",
+    "db:migrate": "pnpm --filter @portfolio/db db:migrate",
+    "db:push": "pnpm --filter @portfolio/db db:push",
+    "db:studio": "pnpm --filter @portfolio/db db:studio",
     "test": "vitest run"
   },
-  "overrides": {
-    "next": {
-      ".": "16.2.7",
-      "postcss": "8.5.15"
-    },
-    "postcss": "8.5.15"
-  },
   "devDependencies": {
-    "@types/node": "^22.15.0",
+    "@types/node": "^22.19.19",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "autoprefixer": "^10.4.21",
@@ -31,12 +25,6 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
-  },
-  "pnpm": {
-    "overrides": {
-      "postcss": "8.5.15",
-      "next>postcss": "8.5.15"
-    }
   },
   "dependencies": {
     "drizzle-kit": "^0.31.10"

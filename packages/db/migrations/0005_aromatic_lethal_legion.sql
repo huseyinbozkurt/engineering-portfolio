@@ -1,1 +1,0 @@
-CREATE UNIQUE INDEX "llm_tasks_active_ai_insights_idx" ON "llm_tasks" USING btree ("task_type") WHERE "llm_tasks"."task_type" = 'ai_insights' and "llm_tasks"."status" in ('pending', 'running');

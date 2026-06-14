@@ -14,6 +14,12 @@ export * from "./insights/validate";
 export * from "./insights/runner";
 export * from "./insights/logger";
 
+// Taxonomy review pipeline.
+export * from "./taxonomy-review/input";
+export * from "./taxonomy-review/prompt";
+export * from "./taxonomy-review/validate";
+export * from "./taxonomy-review/runner";
+
 // AI story generation (prompt + response parsing).
 export * from "./stories/prompt";
 export * from "./stories/parse";

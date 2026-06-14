@@ -16,6 +16,13 @@ import type {
   ProjectStatus,
   ProjectType,
   SourceAvailability,
+  TaxonomyConfidence,
+  TaxonomyEvidenceRef,
+  TaxonomyReviewOutput,
+  TaxonomyReviewRunStatus,
+  TaxonomySuggestionAction,
+  TaxonomySuggestionStatus,
+  TaxonomyTargetGroup,
 } from "@portfolio/validators";
 import {
   boolean,
@@ -672,6 +679,59 @@ export interface AiInsightRunAttempt {
   } | null;
 }
 
+export const taxonomyReviewRunStatusEnum = pgEnum("taxonomy_review_run_status", [
+  "pending",
+  "running",
+  "succeeded",
+  "failed",
+]);
+
+export type TaxonomyReviewRunStatusValue =
+  (typeof taxonomyReviewRunStatusEnum.enumValues)[number];
+
+export const taxonomyReviewSuggestionStatusEnum = pgEnum(
+  "taxonomy_review_suggestion_status",
+  ["pending", "approved", "rejected"],
+);
+
+export type TaxonomyReviewSuggestionStatusValue =
+  (typeof taxonomyReviewSuggestionStatusEnum.enumValues)[number];
+
+export const taxonomyReviewTargetGroupEnum = pgEnum("taxonomy_review_target_group", [
+  "skills",
+  "tags",
+  "lenses",
+  "principles",
+  "decisionPatterns",
+]);
+
+export const taxonomyReviewActionEnum = pgEnum("taxonomy_review_action", [
+  "add",
+  "remove",
+  "rename",
+  "merge",
+]);
+
+export const taxonomyReviewConfidenceEnum = pgEnum("taxonomy_review_confidence", [
+  "low",
+  "medium",
+  "high",
+]);
+
+export interface TaxonomyReviewRunAttempt {
+  attemptNo: number;
+  provider: string;
+  model: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  errorMessage: string | null;
+  usage?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+  } | null;
+}
+
 /**
  * Evidence-driven AI insight generation runs. Every generation is persisted —
  * never overwritten — with its full audit trail: the normalized input snapshot,
@@ -722,6 +782,74 @@ export const aiInsightRuns = pgTable(
       .on(table.status)
       .where(sql`${table.status} in ('pending', 'running')`),
   ]
+);
+
+export const taxonomyReviewRuns = pgTable(
+  "taxonomy_review_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    status: taxonomyReviewRunStatusEnum("status").notNull().default("pending"),
+    provider: varchar("provider", { length: 180 }),
+    model: varchar("model", { length: 220 }),
+    promptVersion: varchar("prompt_version", { length: 60 }).notNull(),
+    promptSystem: text("prompt_system").notNull().default(""),
+    promptUser: text("prompt_user").notNull().default(""),
+    inputSnapshot: jsonb("input_snapshot").$type<unknown>().notNull(),
+    rawResponse: text("raw_response"),
+    outputJson: jsonb("output_json").$type<TaxonomyReviewOutput>(),
+    validationNotes: jsonb("validation_notes").$type<string[]>(),
+    tokenUsage: jsonb("token_usage").$type<{
+      promptTokens?: number;
+      completionTokens?: number;
+      totalTokens?: number;
+    }>(),
+    attempts: jsonb("attempts").$type<TaxonomyReviewRunAttempt[]>(),
+    errorStage: varchar("error_stage", { length: 80 }),
+    errorMessage: text("error_message"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    durationMs: integer("duration_ms"),
+    generatedAt: timestamp("generated_at", { withTimezone: true }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    index("taxonomy_review_runs_created_at_idx").on(table.createdAt),
+    index("taxonomy_review_runs_status_idx").on(table.status),
+    uniqueIndex("taxonomy_review_runs_single_active_idx")
+      .on(table.status)
+      .where(sql`${table.status} in ('running')`),
+  ],
+);
+
+export const taxonomyReviewSuggestions = pgTable(
+  "taxonomy_review_suggestions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => taxonomyReviewRuns.id, { onDelete: "cascade" }),
+    targetGroup: taxonomyReviewTargetGroupEnum("target_group").$type<TaxonomyTargetGroup>().notNull(),
+    action: taxonomyReviewActionEnum("action").$type<TaxonomySuggestionAction>().notNull(),
+    status: taxonomyReviewSuggestionStatusEnum("status")
+      .$type<TaxonomySuggestionStatus>()
+      .notNull()
+      .default("pending"),
+    currentValue: text("current_value"),
+    proposedValue: text("proposed_value"),
+    originalValue: text("original_value"),
+    reason: text("reason").notNull(),
+    confidence: taxonomyReviewConfidenceEnum("confidence").$type<TaxonomyConfidence>().notNull(),
+    evidenceRefs: jsonb("evidence_refs").$type<TaxonomyEvidenceRef[]>().notNull(),
+    affectedRecords: jsonb("affected_records").$type<TaxonomyEvidenceRef[]>().notNull(),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    index("taxonomy_review_suggestions_run_idx").on(table.runId),
+    index("taxonomy_review_suggestions_status_idx").on(table.status),
+    index("taxonomy_review_suggestions_group_idx").on(table.targetGroup),
+  ],
 );
 
 export const aiReviewQualitySnapshots = pgTable(

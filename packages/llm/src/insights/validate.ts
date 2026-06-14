@@ -239,6 +239,7 @@ export function validateInsightOutput(
       opportunityHeatmap,
       signalRadar,
       groundedDataNotes: output.groundedDataNotes,
+      homePageContent: output.homePageContent
     },
     notes,
   };

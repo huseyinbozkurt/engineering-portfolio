@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   PORTFOLIO_INSIGHT_PROMPT_V1,
   PORTFOLIO_INSIGHT_PROMPT_V2,
+  PORTFOLIO_INSIGHT_PROMPT_V3,
   getInsightPromptVersion,
   insightPromptVersions,
   latestInsightPromptVersion,
@@ -11,12 +12,15 @@ import { REFS, makeInput } from "./fixtures";
 
 describe("insight prompt registry", () => {
   it("tracks versions and resolves the latest", () => {
-    expect(latestInsightPromptVersion).toBe(PORTFOLIO_INSIGHT_PROMPT_V2);
+    expect(latestInsightPromptVersion).toBe(PORTFOLIO_INSIGHT_PROMPT_V3);
     expect(insightPromptVersions[PORTFOLIO_INSIGHT_PROMPT_V1]?.version).toBe(
       PORTFOLIO_INSIGHT_PROMPT_V1,
     );
     expect(insightPromptVersions[PORTFOLIO_INSIGHT_PROMPT_V2]?.version).toBe(
       PORTFOLIO_INSIGHT_PROMPT_V2,
+    );
+    expect(insightPromptVersions[PORTFOLIO_INSIGHT_PROMPT_V3]?.version).toBe(
+      PORTFOLIO_INSIGHT_PROMPT_V3,
     );
   });
 
