@@ -3,7 +3,7 @@ export const siteConfig = {
   title: "Huseyin Bozkurt | Engineering Portfolio",
   description:
     "",
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  url: "https://huseyinbozkurt.dev",
 };
 
 export const navItems = [
