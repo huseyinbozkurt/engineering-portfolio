@@ -76,7 +76,7 @@ export function HomeAiInsight({
           <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-300">
             Capability snapshot
           </h3>
-          <div className="mt-5 grid gap-x-8 gap-y-5 sm:grid-cols-2">
+          <div className="mt-5 grid gap-x-8 gap-y-5">
             <InsightRadar content={content} />
           </div>
         </div>
