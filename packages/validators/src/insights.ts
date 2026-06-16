@@ -231,46 +231,6 @@ export const SIGNAL_RADAR_LABELS: Record<SignalRadarKey, string> = {
   peopleManagement: "People Management",
 };
 
-const signalRadarLabelAliases: Record<SignalRadarKey, string[]> = {
-  frontendEngineering: ["frontend", "frontend engineering", "front end", "front-end"],
-  technicalLeadership: ["leadership", "technical leadership", "tech leadership"],
-  systemDesign: ["system design", "systems design", "architecture"],
-  devopsCloud: ["devops", "devops cloud", "devops & cloud", "cloud", "infrastructure"],
-  aiEngineering: ["ai", "ai engineering", "llm", "ml engineering"],
-  peopleManagement: ["people management", "people mgmt", "management", "team management"],
-};
-
-export function resolveCapabilityRadarKey(input: {
-  label?: string | null | undefined;
-  radarKey?: string | null | undefined;
-}): SignalRadarKey | null {
-  if (input.radarKey && signalRadarKeySchema.safeParse(input.radarKey).success) {
-    return input.radarKey as SignalRadarKey;
-  }
-
-  const normalizedLabel = normalizeCapabilityLabel(input.label);
-  if (!normalizedLabel) {
-    return null;
-  }
-
-  for (const [key, label] of Object.entries(SIGNAL_RADAR_LABELS) as Array<
-    [SignalRadarKey, string]
-  >) {
-    if (normalizeCapabilityLabel(label) === normalizedLabel) {
-      return key;
-    }
-  }
-
-  for (const [key, aliases] of Object.entries(signalRadarLabelAliases) as Array<
-    [SignalRadarKey, string[]]
-  >) {
-    if (aliases.some((alias) => normalizeCapabilityLabel(alias) === normalizedLabel)) {
-      return key;
-    }
-  }
-
-  return null;
-}
 
 export const homePageSignalSchema = z
   .object({

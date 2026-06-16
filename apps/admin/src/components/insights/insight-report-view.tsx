@@ -4,7 +4,6 @@ import type {
   InsightConfidence,
   PortfolioInsightOutput,
 } from "@portfolio/validators";
-import { resolveCapabilityRadarScore, type SignalRadar } from "@portfolio/validators";
 
 /**
  * Admin review rendering of a validated insight report: every section with its
@@ -295,7 +294,6 @@ export function InsightReportView({
         >
           <HomepageInsightPreview
             content={output.homePageContent}
-            signalRadar={output.signalRadar}
             resolve={resolve}
           />
         </SectionCard>
@@ -306,11 +304,9 @@ export function InsightReportView({
 
 function HomepageInsightPreview({
   content,
-  signalRadar,
   resolve,
 }: {
   content: HomePageContent;
-  signalRadar: SignalRadar;
   resolve: EvidenceResolver;
 }) {
   return (
@@ -371,21 +367,20 @@ function HomepageInsightPreview({
         </h3>
         <div className="grid gap-3.5">
           {content.capabilitySnapshot.map((capability) => {
-            const score = resolveCapabilityRadarScore({ capability, signalRadar });
 
             return (
               <div key={`${capability.radarKey ?? capability.label}-${capability.label}`}>
                 <div className="flex items-center justify-between gap-3 text-sm">
                   <span className="text-ink">{capability.label}</span>
-                  {score !== null ? (
-                    <span className="tabular-nums text-muted">{score}/100</span>
+                  {capability.score !== null ? (
+                    <span className="tabular-nums text-muted">{capability.score}/100</span>
                   ) : null}
                 </div>
-                {score !== null ? (
+                {capability.score !== null ? (
                   <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
                     <div
                       className="h-full rounded-full bg-accent-400"
-                      style={{ width: `${Math.max(score, 2)}%` }}
+                      style={{ width: `${Math.max(capability.score!, 2)}%` }}
                     />
                   </div>
                 ) : null}

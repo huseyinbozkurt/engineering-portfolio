@@ -1,14 +1,11 @@
 import {
   type HomePageContent,
-  type SignalRadar,
 } from "@portfolio/validators";
 
 export function InsightRadar({
   content,
-  signalRadar,
 }: {
-  content: HomePageContent | undefined;
-  signalRadar: SignalRadar | undefined;
+  content: HomePageContent | undefined
 }) {
   if (!content) {
     return null;

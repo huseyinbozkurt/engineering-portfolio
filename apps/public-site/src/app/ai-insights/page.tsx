@@ -206,7 +206,7 @@ export default async function AiInsightsPage() {
           description="Scores are capped by validation to what the cited evidence supports — axes without enough records are shown as insufficient rather than estimated."
         />
         <div className="glass-panel rounded-lg p-6 md:p-8">
-          <InsightRadar content={output.homePageContent} signalRadar={output.signalRadar} />
+          <InsightRadar content={output.homePageContent} />
         </div>
       </section>
 
@@ -370,52 +370,6 @@ function countRecords(inputSnapshot: unknown): number | null {
   return Object.values(parsed.data.meta.totals).reduce((sum, value) => sum + value, 0);
 }
 
-function buildRecruiterViews(
-  output: PortfolioInsightOutput,
-  resolve: EvidenceResolver,
-): RecruiterTabView[] {
-  const toView = (
-    id: string,
-    label: string,
-    view: PortfolioInsightOutput["recruiterSimulation"]["recruiter"],
-  ): RecruiterTabView => ({
-    id,
-    label,
-    summary: view.summary,
-    confidence: view.confidence,
-    evidence: view.evidence.map((entry) => {
-      const resolved = resolve(entry);
-      return { label: resolved.label, href: resolved.href, note: entry.note };
-    }),
-  });
-
-  return [
-    toView("recruiter", "Recruiter", output.recruiterSimulation.recruiter),
-    toView("hiring-manager", "Hiring Manager", output.recruiterSimulation.hiringManager),
-    toView("staff-engineer", "Staff Engineer", output.recruiterSimulation.staffEngineer),
-    toView("startup-founder", "Startup Founder", output.recruiterSimulation.startupFounder),
-  ];
-}
-
-function buildRadarAxes(output: PortfolioInsightOutput): RadarAxis[] {
-  const axes: Array<{ key: keyof PortfolioInsightOutput["signalRadar"]; label: string }> = [
-    { key: "frontendEngineering", label: "Frontend" },
-    { key: "technicalLeadership", label: "Leadership" },
-    { key: "systemDesign", label: "System Design" },
-    { key: "devopsCloud", label: "DevOps & Cloud" },
-    { key: "aiEngineering", label: "AI Engineering" },
-    { key: "peopleManagement", label: "People Mgmt" },
-  ];
-
-  return axes.map(({ key, label }) => {
-    const axis = output.signalRadar[key];
-    return {
-      label,
-      score: axis.score,
-      insufficient: axis.score === 0 && axis.evidence.length === 0,
-    };
-  });
-}
 
 function formatDate(value: Date | string): string {
   const date = value instanceof Date ? value : new Date(value);

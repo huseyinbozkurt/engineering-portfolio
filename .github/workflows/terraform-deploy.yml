@@ -30,7 +30,7 @@ env:
 
 jobs:
   terraform:
-    name: Terraform
+    name: Build with Terraform and deploy to AWS
     runs-on: ubuntu-latest
     environment: Deployment
     steps:
