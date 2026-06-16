@@ -200,6 +200,16 @@ export const signalAxisSchema = z
   .strict();
 export type SignalAxis = z.infer<typeof signalAxisSchema>;
 
+export const signalRadarKeySchema = z.enum([
+  "frontendEngineering",
+  "technicalLeadership",
+  "systemDesign",
+  "devopsCloud",
+  "aiEngineering",
+  "peopleManagement",
+]);
+export type SignalRadarKey = z.infer<typeof signalRadarKeySchema>;
+
 export const signalRadarSchema = z
   .object({
     frontendEngineering: signalAxisSchema,
@@ -211,6 +221,56 @@ export const signalRadarSchema = z
   })
   .strict();
 export type SignalRadar = z.infer<typeof signalRadarSchema>;
+
+export const SIGNAL_RADAR_LABELS: Record<SignalRadarKey, string> = {
+  frontendEngineering: "Frontend Engineering",
+  technicalLeadership: "Technical Leadership",
+  systemDesign: "System Design",
+  devopsCloud: "DevOps & Cloud",
+  aiEngineering: "AI Engineering",
+  peopleManagement: "People Management",
+};
+
+const signalRadarLabelAliases: Record<SignalRadarKey, string[]> = {
+  frontendEngineering: ["frontend", "frontend engineering", "front end", "front-end"],
+  technicalLeadership: ["leadership", "technical leadership", "tech leadership"],
+  systemDesign: ["system design", "systems design", "architecture"],
+  devopsCloud: ["devops", "devops cloud", "devops & cloud", "cloud", "infrastructure"],
+  aiEngineering: ["ai", "ai engineering", "llm", "ml engineering"],
+  peopleManagement: ["people management", "people mgmt", "management", "team management"],
+};
+
+export function resolveCapabilityRadarKey(input: {
+  label?: string | null | undefined;
+  radarKey?: string | null | undefined;
+}): SignalRadarKey | null {
+  if (input.radarKey && signalRadarKeySchema.safeParse(input.radarKey).success) {
+    return input.radarKey as SignalRadarKey;
+  }
+
+  const normalizedLabel = normalizeCapabilityLabel(input.label);
+  if (!normalizedLabel) {
+    return null;
+  }
+
+  for (const [key, label] of Object.entries(SIGNAL_RADAR_LABELS) as Array<
+    [SignalRadarKey, string]
+  >) {
+    if (normalizeCapabilityLabel(label) === normalizedLabel) {
+      return key;
+    }
+  }
+
+  for (const [key, aliases] of Object.entries(signalRadarLabelAliases) as Array<
+    [SignalRadarKey, string[]]
+  >) {
+    if (aliases.some((alias) => normalizeCapabilityLabel(alias) === normalizedLabel)) {
+      return key;
+    }
+  }
+
+  return null;
+}
 
 export const homePageSignalSchema = z
   .object({
@@ -233,7 +293,9 @@ export const homePageProofPointSchema = z
 export const homePageCapabilitySchema = z
   .object({
     label: z.string().trim().min(1).max(60),
-    score: z.number().int().min(0).max(100),
+    radarKey: signalRadarKeySchema.optional(),
+    /** Legacy field accepted for older reports. UI must derive scores from signalRadar. */
+    score: z.number().int().min(0).max(100).optional(),
     summary: z.string().trim().min(1).max(180),
     evidence: evidenceListSchema
   })
@@ -275,7 +337,7 @@ export const portfolioInsightOutputSchema = z
     opportunityHeatmap: z.array(opportunitySchema).min(1).max(8),
     signalRadar: signalRadarSchema,
     groundedDataNotes: z.array(z.string().trim().min(1).max(300)).min(1).max(8),
-    homePageContent: homePageContentSchema,
+    homePageContent: homePageContentSchema.optional(),
   })
   .strict();
 export type PortfolioInsightOutput = z.infer<typeof portfolioInsightOutputSchema>;

@@ -143,6 +143,46 @@ const report = {
     aiEngineering: { score: 0, evidence: [] },
     peopleManagement: { score: 30, evidence: cite(ref.experience) },
   },
+  homePageContent: {
+    eyebrow: "AI Portfolio Insight",
+    headline: "Delivery ownership with product-minded systems work.",
+    summary:
+      "A homepage summary grounded in the same published records and validated insight report.",
+    primarySignals: [
+      {
+        title: "Delivery ownership",
+        summary: "Release and delivery improvements are backed by concrete portfolio evidence.",
+        confidence: "medium" as const,
+        evidence: cite(ref.experience),
+      },
+    ],
+    proofPoints: [
+      {
+        label: "Release signal",
+        value: "85%",
+        context: "Release success improvement cited from the experience record.",
+        evidence: cite(ref.experience),
+      },
+    ],
+    capabilitySnapshot: [
+      {
+        label: "Frontend Engineering",
+        radarKey: "frontendEngineering" as const,
+        summary: "Presented on the homepage; score is resolved from signalRadar.",
+        evidence: cite(ref.project, ref.skill),
+      },
+      {
+        label: "Technical Leadership",
+        radarKey: "technicalLeadership" as const,
+        summary: "Presented on the homepage; score is resolved from signalRadar.",
+        evidence: cite(ref.experience),
+      },
+    ],
+    cta: {
+      label: "View full AI insight",
+      href: "/ai-insights",
+    },
+  },
   groundedDataNotes: [
     "This run was generated with the mock provider for pipeline verification — scores reflect the validation caps, not a model's judgement.",
     "Signals are limited to published records; drafts are excluded by design.",

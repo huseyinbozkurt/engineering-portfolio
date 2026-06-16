@@ -1,8 +1,12 @@
 import type { PortfolioInsightInput, PortfolioInsightOutput } from "@portfolio/validators";
 
-import type { LLMAdapter, LLMUsage } from "../adapters/types";
+import type { LLMAdapter, LLMGenerationSettings, LLMUsage } from "../adapters/types";
 import { LlmHttpError } from "../adapters/http";
-import { getInsightPromptVersion, latestInsightPromptVersion } from "./prompt";
+import {
+  PORTFOLIO_INSIGHT_PROMPT_V4,
+  getInsightPromptVersion,
+  latestInsightPromptVersion,
+} from "./prompt";
 import { InsightValidationError, validateInsightOutput } from "./validate";
 import { silentInsightLogger, type InsightLogger } from "./logger";
 
@@ -15,6 +19,10 @@ export interface InsightRunAttempt {
   completedAt: string | null;
   errorMessage: string | null;
   usage?: LLMUsage | null;
+  /** Validation stage that rejected this attempt's output, if any. */
+  validationErrorStage?: string | null;
+  /** Raw model text for an attempt rejected by validation (debugging retries). */
+  rawResponse?: string | null;
 }
 
 /**
@@ -49,8 +57,17 @@ export interface RunPortfolioInsightOptions {
   promptVersion?: string;
   logger?: InsightLogger;
   startedAt?: Date;
-  /** Total attempts including the first call. Default 2. */
+  /**
+   * Total attempts including the first call — covers transient transport errors
+   * AND schema-validation failures (a fresh generation is the remedy for both).
+   * Default 3.
+   */
   maxAttempts?: number;
+  /**
+   * Per-call generation overrides forwarded to the adapter. Unset fields fall
+   * back to the adapter's defaults (the structured-JSON profile / env config).
+   */
+  generation?: LLMGenerationSettings;
   /** Backoff between attempts; injectable for tests. */
   sleep?: (ms: number) => Promise<void>;
   retryDelayMs?: number;
@@ -79,7 +96,8 @@ export async function runPortfolioInsight(
     promptVersion = latestInsightPromptVersion,
     logger = silentInsightLogger,
     startedAt = new Date(),
-    maxAttempts = 2,
+    maxAttempts = 3,
+    generation,
     sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     retryDelayMs = 1500,
   } = options;
@@ -132,46 +150,39 @@ export async function runPortfolioInsight(
     );
   }
 
-  // Provider loop with bounded retry on transient failures (timeout, 5xx, 429).
+  // One attempt = generate → validate. A transient transport error (timeout,
+  // 5xx, 429) OR a schema/JSON/evidence validation failure is retried with a
+  // fresh generation until attempts are exhausted; non-transient transport
+  // errors fail fast. Every attempt's outcome (including the failing validation
+  // stage and the raw text it produced) is recorded for the debug view.
+  const generateParams = {
+    systemPrompt: prompt.system,
+    userPrompt: prompt.user,
+    schema: "json" as const,
+    ...(generation ? { generation } : {}),
+  };
+
   let response: Awaited<ReturnType<LLMAdapter["generate"]>> | null = null;
-  let lastError: Error | null = null;
+  let validated: ReturnType<typeof validateInsightOutput> | null = null;
+  let lastRequestError: Error | null = null;
 
   for (let attemptNo = 1; attemptNo <= maxAttempts; attemptNo += 1) {
     const attemptStartedAt = new Date();
     logger.event("request-started", { provider, model, attemptNo });
 
+    let attemptResponse: Awaited<ReturnType<LLMAdapter["generate"]>>;
     try {
-      response = await adapter.generate({
-        systemPrompt: prompt.system,
-        userPrompt: prompt.user,
-        schema: "json",
-      });
-      attempts.push({
-        attemptNo,
-        provider,
-        model,
-        startedAt: attemptStartedAt.toISOString(),
-        completedAt: new Date().toISOString(),
-        errorMessage: null,
-        usage: response.usage ?? null,
-      });
-      logger.event("response-received", {
-        attemptNo,
-        textChars: response.text.length,
-        finishReason: response.finishReason ?? null,
-        usage: response.usage ?? null,
-      });
-      break;
+      attemptResponse = await adapter.generate(generateParams);
     } catch (error) {
       const message = error instanceof Error ? error.message : "LLM request failed.";
-      
-      // Include LLM provider error details if available
+
+      // Include LLM provider error details if available.
       let detailedMessage = message;
       if (error instanceof LlmHttpError && error.details) {
         detailedMessage += `\n\nProvider details: ${String(error.details)}`;
       }
-      
-      lastError = error instanceof Error ? error : new Error(message);
+
+      lastRequestError = error instanceof Error ? error : new Error(message);
       attempts.push({
         attemptNo,
         provider,
@@ -180,37 +191,77 @@ export async function runPortfolioInsight(
         completedAt: new Date().toISOString(),
         errorMessage: detailedMessage,
       });
+      logger.error("request-failed", { attemptNo, message, transient: isTransient(error) });
 
       if (attemptNo < maxAttempts && isTransient(error)) {
-        logger.event("request-started", { retryScheduled: true, afterMs: retryDelayMs });
         await sleep(retryDelayMs);
         continue;
       }
-
-      break;
+      // Non-transient, or retries exhausted: the request stage is terminal.
+      return finishFailed("request", lastRequestError.message, null);
     }
-  }
 
-  if (!response) {
-    return finishFailed("request", lastError?.message ?? "LLM request failed.", null);
-  }
-
-  let validated;
-  try {
-    validated = validateInsightOutput(response.text, input);
-  } catch (error) {
-    if (error instanceof InsightValidationError) {
-      logger.error("validation-failed", { stage: error.stage, message: error.message });
-      return finishFailed(error.stage, error.message, response.text);
-    }
-    logger.error("validation-failed", {
-      stage: "unknown",
-      message: error instanceof Error ? error.message : "Validation failed.",
+    logger.event("response-received", {
+      attemptNo,
+      textChars: attemptResponse.text.length,
+      finishReason: attemptResponse.finishReason ?? null,
+      usage: attemptResponse.usage ?? null,
     });
+
+    try {
+      const attemptValidated = validateInsightOutput(attemptResponse.text, input, {
+        requireHomePageContent: promptVersion === PORTFOLIO_INSIGHT_PROMPT_V4,
+      });
+      attempts.push({
+        attemptNo,
+        provider,
+        model,
+        startedAt: attemptStartedAt.toISOString(),
+        completedAt: new Date().toISOString(),
+        errorMessage: null,
+        usage: attemptResponse.usage ?? null,
+      });
+      response = attemptResponse;
+      validated = attemptValidated;
+      break;
+    } catch (error) {
+      const stage = error instanceof InsightValidationError ? error.stage : "validation";
+      const message = error instanceof Error ? error.message : "Validation failed.";
+      attempts.push({
+        attemptNo,
+        provider,
+        model,
+        startedAt: attemptStartedAt.toISOString(),
+        completedAt: new Date().toISOString(),
+        errorMessage: message,
+        usage: attemptResponse.usage ?? null,
+        validationErrorStage: stage,
+        rawResponse: attemptResponse.text,
+      });
+      logger.error("validation-failed", {
+        stage,
+        message,
+        attemptNo,
+        willRetry: attemptNo < maxAttempts,
+      });
+
+      if (attemptNo < maxAttempts) {
+        await sleep(retryDelayMs);
+        continue;
+      }
+      // Retries exhausted: persist the last raw output and the failing stage.
+      return finishFailed(stage, message, attemptResponse.text);
+    }
+  }
+
+  // Every terminal path inside the loop returns, so a null here is a logic
+  // error rather than an expected outcome — fail closed rather than persist a
+  // half-built run.
+  if (!response || !validated) {
     return finishFailed(
-      "validation",
-      error instanceof Error ? error.message : "Validation failed.",
-      response.text,
+      "request",
+      lastRequestError?.message ?? "Insight run produced no usable result.",
+      null,
     );
   }
 

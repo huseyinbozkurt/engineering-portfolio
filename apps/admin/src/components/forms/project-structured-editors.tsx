@@ -46,10 +46,10 @@ interface EvidenceRow
   extends BaseRow,
     Omit<
       ProjectEvidence,
-      "description" | "url" | "assetUrl" | "assetKey" | "assetMimeType" | "assetSizeBytes"
+      "description" | "externalUrl" | "assetUrl" | "assetKey" | "assetMimeType" | "assetSizeBytes"
     > {
   description: string;
-  url: string;
+  externalUrl: string;
   assetUrl: string;
   assetKey: string;
   assetMimeType: string;
@@ -684,7 +684,7 @@ export function ProjectEvidenceEditor({
         source,
         visibility: item.visibility,
         description: item.description ?? "",
-        url: item.url ?? "",
+        externalUrl: item.externalUrl ?? "",
         assetUrl: item.assetUrl ?? "",
         assetKey: item.assetKey ?? "",
         assetMimeType: item.assetMimeType ?? "",
@@ -709,7 +709,7 @@ export function ProjectEvidenceEditor({
       if (row.source === "external-url") {
         return {
           ...base,
-          ...(row.url.trim() ? { url: row.url.trim() } : {}),
+          ...(row.externalUrl.trim() ? { externalUrl: row.externalUrl.trim() } : {}),
         };
       }
 
@@ -808,10 +808,10 @@ export function ProjectEvidenceEditor({
                     <input
                       className="ui-input sm:col-span-2"
                       type="url"
-                      value={row.url}
+                      value={row.externalUrl}
                       placeholder="https://..."
                       aria-label="Evidence URL"
-                      onChange={(event) => patch(row.id, { url: event.target.value })}
+                      onChange={(event) => patch(row.id, { externalUrl: event.target.value })}
                     />
                   ) : (
                     <div className="grid gap-3 sm:col-span-2">
@@ -833,7 +833,6 @@ export function ProjectEvidenceEditor({
                       <div className="grid gap-3 sm:grid-cols-2">
                         <input
                           className="ui-input"
-                          type="url"
                           value={row.assetUrl}
                           placeholder="Asset URL"
                           aria-label="Evidence asset URL"
@@ -899,7 +898,7 @@ export function ProjectEvidenceEditor({
                 title: "",
                 source: "external-url",
                 description: "",
-                url: "",
+                externalUrl: "",
                 assetUrl: "",
                 assetKey: "",
                 assetMimeType: "",

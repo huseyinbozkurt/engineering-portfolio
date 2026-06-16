@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { getLlmTask, type LlmTaskRecord } from "@portfolio/db/llm-tasks";
+import { getAiModelDisplayName } from "@portfolio/validators";
 
 import { LlmTaskAutoStarter } from "@/components/llm-task-auto-starter";
 import { PageTitle } from "@/components/page-title";
@@ -38,8 +39,13 @@ export default async function LlmTaskDetailPage({ params }: LlmTaskDetailPagePro
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Detail label="Status" value={task.status} />
         <Detail label="Task type" value={task.taskType.replace(/_/g, " ")} />
-        <Detail label="Provider" value={task.providerName ?? "Not selected yet"} />
-        <Detail label="Model" value={task.providerModel ?? "Not selected yet"} />
+        <Detail
+          label="Model"
+          value={getAiModelDisplayName({
+            provider: task.providerName,
+            model: task.providerModel,
+          })}
+        />
         <Detail label="Finish reason" value={task.finishReason ?? "Not available"} />
         <Detail label="Started" value={formatDate(task.startedAt ?? task.createdAt)} />
         <Detail label="Completed" value={task.completedAt ? formatDate(task.completedAt) : "Not completed"} />
@@ -80,7 +86,7 @@ export default async function LlmTaskDetailPage({ params }: LlmTaskDetailPagePro
 function TaskTimeline({ task }: { task: LlmTaskRecord }) {
   const steps = [
     { label: "Task created", done: true },
-    { label: "Provider selected", done: Boolean(task.providerName) },
+    { label: "Model selected", done: Boolean(task.providerName || task.providerModel) },
     { label: "Raw response captured", done: Boolean(task.rawResponse) },
     {
       label: task.status === "failed" ? "Failed" : "Parsed",

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { LlmHttpError } from "../src/adapters/http";
 import { MockAdapter } from "../src/adapters/mock-adapter";
-import type { LLMAdapter } from "../src/adapters/types";
+import type { LLMAdapter, LLMGenerateParams } from "../src/adapters/types";
 import { runPortfolioInsight, type InsightRunStore } from "../src/insights/runner";
 import { makeInput, makeOutput } from "./fixtures";
 
@@ -151,5 +151,98 @@ describe("runPortfolioInsight", () => {
     });
 
     expect(result).toEqual({ status: "failed", errorStage: "persist" });
+  });
+
+  it("retries a schema-validation failure and succeeds on a later attempt", async () => {
+    const { store, updates } = makeStore();
+    let calls = 0;
+    const adapter: LLMAdapter = {
+      async generate() {
+        calls += 1;
+        // Attempt 1: valid JSON but wrong shape (schema stage). Attempt 2: valid.
+        return { text: calls === 1 ? JSON.stringify({ not: "a report" }) : JSON.stringify(makeOutput()) };
+      },
+      getProvider: () => "custom",
+      getModel: () => "retry-model",
+    };
+
+    const result = await runPortfolioInsight({
+      runId: "run-validate-retry",
+      input: makeInput(),
+      adapter,
+      store,
+      sleep: noSleep,
+    });
+
+    expect(result.status).toBe("succeeded");
+    expect(calls).toBe(2);
+    const patch = updates[0]!.patch;
+    expect(patch.attempts).toHaveLength(2);
+    // The failed attempt records the failing stage AND its raw output.
+    expect(patch.attempts?.[0]?.validationErrorStage).toBe("schema");
+    expect(patch.attempts?.[0]?.rawResponse).toContain("a report");
+    expect(patch.attempts?.[0]?.errorMessage).toContain("schema");
+    expect(patch.attempts?.[1]?.errorMessage).toBeNull();
+    expect(patch.outputJson?.strengthSignals.length).toBeGreaterThan(0);
+  });
+
+  it("exhausts validation retries and persists the failing stage with the raw output", async () => {
+    const { store, updates } = makeStore();
+    let calls = 0;
+    const adapter = new MockAdapter({
+      respond: () => {
+        calls += 1;
+        return JSON.stringify({ still: "wrong shape" });
+      },
+    });
+
+    const result = await runPortfolioInsight({
+      runId: "run-validate-exhaust",
+      input: makeInput(),
+      adapter,
+      store,
+      maxAttempts: 3,
+      sleep: noSleep,
+    });
+
+    expect(result).toEqual({ status: "failed", errorStage: "schema" });
+    expect(calls).toBe(3);
+    const patch = updates[0]!.patch;
+    expect(patch.attempts).toHaveLength(3);
+    expect(patch.attempts?.every((a) => a.validationErrorStage === "schema")).toBe(true);
+    expect(patch.rawResponse).toContain("wrong shape");
+  });
+
+  it("forwards the generation option to the adapter (and omits it when unset)", async () => {
+    const { store } = makeStore();
+    const captured: Array<LLMGenerateParams["generation"]> = [];
+    const adapter: LLMAdapter = {
+      async generate(params) {
+        captured.push(params.generation);
+        return { text: JSON.stringify(makeOutput()) };
+      },
+      getProvider: () => "custom",
+      getModel: () => "gen-model",
+    };
+
+    await runPortfolioInsight({
+      runId: "run-gen",
+      input: makeInput(),
+      adapter,
+      store,
+      generation: { temperature: 0.1, topP: 0.8, maxTokens: 30001 },
+      sleep: noSleep,
+    });
+    expect(captured[0]).toEqual({ temperature: 0.1, topP: 0.8, maxTokens: 30001 });
+
+    await runPortfolioInsight({
+      runId: "run-gen-default",
+      input: makeInput(),
+      adapter,
+      store,
+      sleep: noSleep,
+    });
+    // Unset → the runner sends no per-call generation, so adapter defaults apply.
+    expect(captured[1]).toBeUndefined();
   });
 });

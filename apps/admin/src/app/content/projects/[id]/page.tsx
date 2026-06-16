@@ -1105,8 +1105,8 @@ function EvidencePreview({ items }: { items: ProjectEditRecord["evidence"] }) {
             {item.description ? (
               <p className="mt-2 text-sm leading-6 text-muted">{item.description}</p>
             ) : null}
-            {source === "external-url" && item.url ? (
-              <ExternalLinkValue href={item.url} label={item.url} />
+            {source === "external-url" && item.externalUrl ? (
+              <ExternalLinkValue href={item.externalUrl} label={item.externalUrl} />
             ) : null}
             {source === "upload" ? <EvidenceAssetSummary item={item} /> : null}
           </li>

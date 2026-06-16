@@ -6,7 +6,11 @@ import {
   type CaseStudyDetailRecord,
   type CaseStudyRecord,
 } from "@portfolio/db/queries";
-import { portfolioInsightOutputSchema, type HomePageContent } from "@portfolio/validators";
+import {
+  portfolioInsightOutputSchema,
+  type HomePageContent,
+  type SignalRadar,
+} from "@portfolio/validators";
 
 import { ComingSoon } from "@/components/coming-soon";
 import { HomeAiInsight } from "@/components/insights/home-ai-insight";
@@ -130,7 +134,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <HomeAiInsight content={homeInsight} />
+      <HomeAiInsight content={homeInsight?.content} signalRadar={homeInsight?.signalRadar} />
 
       {homepageMetrics.length > 0 ? (
         <section className="mx-auto max-w-7xl px-5 py-10 lg:px-8 lg:py-14">
@@ -398,7 +402,12 @@ function getHomepageMetrics(
   return metrics.filter((metric) => metric.value.trim() && metric.label.trim()).slice(0, 6);
 }
 
-async function getHomeAiInsightContent(): Promise<HomePageContent | undefined> {
+interface HomeAiInsightData {
+  content: HomePageContent;
+  signalRadar: SignalRadar;
+}
+
+async function getHomeAiInsightContent(): Promise<HomeAiInsightData | undefined> {
   // Latest published report drives the section; absent/older reports (no
   // homePageContent) or any read error simply hide it — never crash the home page.
   try {
@@ -407,7 +416,9 @@ async function getHomeAiInsightContent(): Promise<HomePageContent | undefined> {
       return undefined;
     }
     const parsed = portfolioInsightOutputSchema.safeParse(run.outputJson);
-    return parsed.success ? parsed.data.homePageContent : undefined;
+    return parsed.success && parsed.data.homePageContent
+      ? { content: parsed.data.homePageContent, signalRadar: parsed.data.signalRadar }
+      : undefined;
   } catch {
     return undefined;
   }

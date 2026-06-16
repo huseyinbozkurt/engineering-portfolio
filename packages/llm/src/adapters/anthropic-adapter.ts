@@ -2,9 +2,11 @@ import type {
   LLMAdapter,
   LLMGenerateParams,
   LLMGenerateResult,
+  LLMGenerationSettings,
   LLMProvider,
   LLMUsage,
 } from "./types";
+import { resolveGeneration, STRUCTURED_JSON_GENERATION } from "./generation";
 import { joinUrl, readNumber, readPath, timedFetch } from "./http";
 
 export interface AnthropicAdapterConfig {
@@ -12,8 +14,12 @@ export interface AnthropicAdapterConfig {
   apiKey: string;
   model: string;
   timeoutMs?: number;
+  /** Default completion-token ceiling; per-call `generation.maxTokens` overrides it. */
   maxTokens?: number;
+  /** Default sampling temperature; per-call `generation.temperature` overrides it. */
   temperature?: number;
+  /** Default nucleus-sampling cutoff; per-call `generation.topP` overrides it. */
+  topP?: number;
   apiVersion?: string;
 }
 
@@ -27,8 +33,7 @@ export class AnthropicAdapter implements LLMAdapter {
   private readonly apiKey: string;
   private readonly model: string;
   private readonly timeoutMs: number;
-  private readonly maxTokens: number;
-  private readonly temperature: number;
+  private readonly generationDefaults: Required<LLMGenerationSettings>;
   private readonly apiVersion: string;
 
   constructor(config: AnthropicAdapterConfig) {
@@ -39,12 +44,18 @@ export class AnthropicAdapter implements LLMAdapter {
     // production floor. A hardcoded value here would silently cap higher
     // configs (and break injectable timeouts in tests).
     this.timeoutMs = config.timeoutMs ?? 900000;
-    this.maxTokens = config.maxTokens ?? 12000;
-    this.temperature = config.temperature ?? 0.2;
+    // Default to the structured-JSON profile; the resolver passes env overrides,
+    // and individual calls can still override per field via `params.generation`.
+    this.generationDefaults = {
+      temperature: config.temperature ?? STRUCTURED_JSON_GENERATION.temperature,
+      topP: config.topP ?? STRUCTURED_JSON_GENERATION.topP,
+      maxTokens: config.maxTokens ?? STRUCTURED_JSON_GENERATION.maxTokens,
+    };
     this.apiVersion = config.apiVersion ?? "2023-06-01";
   }
 
   async generate(params: LLMGenerateParams): Promise<LLMGenerateResult> {
+    const generation = resolveGeneration(params.generation, this.generationDefaults);
     const response = await timedFetch(
       joinUrl(this.baseUrl, "messages"),
       {
@@ -56,8 +67,9 @@ export class AnthropicAdapter implements LLMAdapter {
         },
         body: JSON.stringify({
           model: this.model,
-          max_tokens: this.maxTokens,
-          temperature: this.temperature,
+          max_tokens: generation.maxTokens,
+          temperature: generation.temperature,
+          top_p: generation.topP,
           ...(params.systemPrompt ? { system: params.systemPrompt } : {}),
           messages: [{ role: "user", content: params.userPrompt }],
         }),

@@ -1,8 +1,9 @@
 import { z } from "zod";
 
 export * from "./insights";
+export * from "./ai-model-display";
+export * from "./llm-prompts";
 export * from "./resume";
-export * from "./stories";
 export * from "./taxonomy-review";
 
 export const contentStatusSchema = z.enum(["draft", "published", "archived"]);
@@ -373,7 +374,7 @@ export const projectEvidenceSchema = z.preprocess(
       title: z.string().trim().min(1).max(220),
       description: z.string().trim().max(2000).optional(),
       source: projectEvidenceSourceSchema.default("external-url"),
-      url: z.string().trim().url().optional(),
+      externalUrl: z.string().trim().optional(),
       assetUrl: projectEvidenceAssetUrlSchema.optional(),
       assetKey: z.string().trim().min(1).max(1024).optional(),
       assetMimeType: z.string().trim().max(120).optional(),
@@ -386,11 +387,11 @@ export const projectEvidenceSchema = z.preprocess(
       visibility: projectEvidenceVisibilitySchema.default("public"),
     })
     .superRefine((value, context) => {
-      if (value.source === "external-url" && !value.url) {
+      if (value.source === "external-url" && !value.externalUrl) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           message: "URL is required for external evidence.",
-          path: ["url"],
+          path: ["externalUrl"],
         });
       }
 

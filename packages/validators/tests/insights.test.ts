@@ -4,14 +4,16 @@ import {
   aiInsightRunStatusSchema,
   evidenceRefSchema,
   portfolioInsightOutputSchema,
+  resolveCapabilityRadarScore,
 } from "../src/insights";
+import { getAiModelDisplayName } from "../src/ai-model-display";
 
 const evidence = [{ ref: "experience:acme", note: "shows delivery ownership" }];
-const statement = { summary: "Grounded summary.", confidence: "medium", evidence };
+const statement = () => ({ summary: "Grounded summary.", confidence: "medium" as const, evidence });
 
 function validOutput(): Record<string, unknown> {
   return {
-    executiveSummary: statement,
+    executiveSummary: statement(),
     strengthSignals: [
       { title: "Delivery Excellence", summary: "Documented improvements.", confidence: "high", evidence },
     ],
@@ -32,10 +34,10 @@ function validOutput(): Record<string, unknown> {
       ],
     },
     recruiterSimulation: {
-      recruiter: statement,
-      hiringManager: statement,
-      staffEngineer: statement,
-      startupFounder: statement,
+      recruiter: statement(),
+      hiringManager: statement(),
+      staffEngineer: statement(),
+      startupFounder: statement(),
     },
     opportunityHeatmap: [
       {
@@ -55,6 +57,39 @@ function validOutput(): Record<string, unknown> {
       peopleManagement: { score: 20, evidence },
     },
     groundedDataNotes: ["Based on a single employer's records."],
+    homePageContent: {
+      eyebrow: "AI Portfolio Insight",
+      headline: "Evidence-backed engineering signal.",
+      summary: "A short homepage summary grounded in the same report.",
+      primarySignals: [
+        {
+          title: "Delivery signal",
+          summary: "Evidence-backed delivery signal.",
+          confidence: "medium",
+          evidence,
+        },
+      ],
+      proofPoints: [
+        {
+          label: "Release success",
+          value: "85%",
+          context: "Release success improved in the cited experience.",
+          evidence,
+        },
+      ],
+      capabilitySnapshot: [
+        {
+          label: "Frontend Engineering",
+          radarKey: "frontendEngineering",
+          summary: "Presented as homepage copy, scored from signalRadar.",
+          evidence,
+        },
+      ],
+      cta: {
+        label: "View full AI insight",
+        href: "/ai-insights",
+      },
+    },
   };
 }
 
@@ -112,6 +147,48 @@ describe("portfolioInsightOutputSchema", () => {
       (bad.careerTrajectory as { stages: unknown[] }).stages[0],
     ];
     expect(portfolioInsightOutputSchema.safeParse(bad).success).toBe(false);
+  });
+
+  it("accepts legacy homepage capabilities with scores but no radarKey", () => {
+    const legacy = validOutput();
+    legacy.homePageContent = {
+      ...(legacy.homePageContent as Record<string, unknown>),
+      capabilitySnapshot: [
+        {
+          label: "Frontend Engineering",
+          score: 12,
+          summary: "Legacy generated score should parse but not drive UI.",
+          evidence,
+        },
+      ],
+    };
+
+    const parsed = portfolioInsightOutputSchema.safeParse(legacy);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(
+        resolveCapabilityRadarScore({
+          capability: parsed.data.homePageContent!.capabilitySnapshot[0]!,
+          signalRadar: parsed.data.signalRadar,
+        }),
+      ).toBe(70);
+    }
+  });
+
+  it("accepts older reports without homepage content", () => {
+    const { homePageContent: _homePageContent, ...older } = validOutput();
+    expect(portfolioInsightOutputSchema.safeParse(older).success).toBe(true);
+  });
+});
+
+describe("getAiModelDisplayName", () => {
+  it("uses configured display names before falling back", () => {
+    expect(getAiModelDisplayName({ provider: "openai", model: "gpt-4.1" })).toBe("GPT-4.1");
+    expect(getAiModelDisplayName({ provider: "custom", model: "unknown-model" })).toBe(
+      "unknown-model",
+    );
+    expect(getAiModelDisplayName({ provider: "custom", model: null })).toBe("custom");
+    expect(getAiModelDisplayName({ provider: null, model: null })).toBe("AI model");
   });
 });
 

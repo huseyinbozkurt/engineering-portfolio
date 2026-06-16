@@ -4,6 +4,7 @@ import type {
   TaxonomySuggestionStatus,
   TaxonomyTargetGroup,
 } from "@portfolio/validators";
+import { getAiModelDisplayName } from "@portfolio/validators";
 import {
   getActiveTaxonomyReviewRun,
   getLatestTaxonomyReviewRunWithSuggestions,
@@ -213,7 +214,7 @@ export default async function TaxonomyReviewPage({
                 <thead className="ui-table-head border-b border-line bg-white/[0.015]">
                   <tr>
                     <th className="px-4 py-2.5 font-semibold">Status</th>
-                    <th className="px-4 py-2.5 font-semibold">Provider / model</th>
+                    <th className="px-4 py-2.5 font-semibold">Model</th>
                     <th className="px-4 py-2.5 font-semibold">Generated</th>
                     <th className="px-4 py-2.5 font-semibold">Reviewed</th>
                   </tr>
@@ -225,8 +226,9 @@ export default async function TaxonomyReviewPage({
                         <RunStatusBadge status={item.status} />
                       </td>
                       <td className="px-4 py-3 text-muted">
-                        <span className="text-ink">{item.provider ?? "-"}</span>
-                        {item.model ? <span className="block text-xs">{item.model}</span> : null}
+                        <span className="text-ink">
+                          {getAiModelDisplayName({ provider: item.provider, model: item.model })}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-muted">
                         {formatDate(item.generatedAt ?? item.createdAt)}
@@ -262,9 +264,9 @@ function RunSummary({
       <div className="ui-card p-5 shadow-card md:col-span-2 xl:col-span-4">
         <div className="flex flex-wrap items-center gap-2">
           <RunStatusBadge status={run.status} />
-          <span className="ui-chip">{run.provider ?? "provider -"}</span>
-          <span className="ui-chip">{run.model ?? "model -"}</span>
-          <span className="ui-chip">{run.promptVersion}</span>
+          <span className="ui-chip">
+            {getAiModelDisplayName({ provider: run.provider, model: run.model })}
+          </span>
           <span className="ui-chip">generated {formatDate(run.generatedAt ?? run.createdAt)}</span>
           {run.reviewedAt ? <span className="ui-chip">reviewed {formatDate(run.reviewedAt)}</span> : null}
         </div>

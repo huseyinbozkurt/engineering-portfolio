@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { getLlmTasks, type LlmTaskRecord } from "@portfolio/db/llm-tasks";
+import { getAiModelDisplayName } from "@portfolio/validators";
 
 import { EmptyPanel } from "@/components/empty-panel";
 import { LlmTaskAutoStarter } from "@/components/llm-task-auto-starter";
@@ -62,9 +63,14 @@ export default async function LlmTasksPage() {
                   </Link>
                 </div>
 
-                <div className="mt-4 grid gap-3 md:grid-cols-5">
-                  <Detail label="Provider" value={task.providerName ?? "Not selected yet"} />
-                  <Detail label="Model" value={task.providerModel ?? "Not selected yet"} />
+                <div className="mt-4 grid gap-3 md:grid-cols-4">
+                  <Detail
+                    label="Model"
+                    value={getAiModelDisplayName({
+                      provider: task.providerName,
+                      model: task.providerModel,
+                    })}
+                  />
                   <Detail label="Finish reason" value={task.finishReason ?? "Not available"} />
                   <Detail label="Duration" value={formatDuration(task.durationMs)} />
                   <Detail label="Error stage" value={task.errorStage ?? "None"} />

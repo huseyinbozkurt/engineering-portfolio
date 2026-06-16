@@ -1,6 +1,5 @@
 import {
   Aperture,
-  BookOpen,
   ChevronRight,
   Compass,
   FileText,
@@ -19,11 +18,9 @@ import {
   getContactSubmissions,
   hasDatabaseUrl,
 } from "@portfolio/db";
-import { getAiGeneratedStories } from "@portfolio/db/ai-stories";
 
 import { AiReviewInsightsDashboard } from "@/components/ai-review-insights-dashboard";
 import { AiReviewUpdates } from "@/components/ai-review-updates";
-import { CreateWithAiModal } from "@/components/create-with-ai-modal";
 import { EmptyPanel } from "@/components/empty-panel";
 import { LlmStatusPanel } from "@/components/llm-status-panel";
 import { PageTitle } from "@/components/page-title";
@@ -55,18 +52,12 @@ const SEGMENT_COLORS = [
 ];
 
 export default async function AdminHomePage() {
-  const [content, contactSubmissions, llmStatuses, aiStories, aiReviewSnapshots] = await Promise.all([
+  const [content, contactSubmissions, llmStatuses, aiReviewSnapshots] = await Promise.all([
     getAdminContentIndex(),
     getContactSubmissions(),
     getLlmConnectionStatuses(),
-    readAiStories(),
     getAiReviewQualitySnapshots(30),
   ]);
-  const onlineLlmCount = llmStatuses.filter((status) => status.status === "online").length;
-  const createWithAiDisabledReason =
-    onlineLlmCount === 0
-      ? "No LLM connection is online. Configure a reachable provider before creating AI stories."
-      : null;
   const metrics: Metric[] = [
     { label: "Lenses", value: content.lenses.length, icon: Aperture },
     { label: "Principles", value: content.principles.length, icon: Compass },
@@ -75,7 +66,6 @@ export default async function AdminHomePage() {
     { label: "Case Studies", value: content.caseStudies.length, icon: FileText },
     { label: "Skills", value: content.skills.length, icon: Wrench },
     { label: "Tags", value: content.tags.length, icon: Tag },
-    { label: "AI Stories", value: aiStories.length, icon: BookOpen },
     { label: "Contact", value: contactSubmissions.length, icon: Mail },
   ].map((metric, index) => ({ ...metric, color: SEGMENT_COLORS[index % SEGMENT_COLORS.length]! }));
 
@@ -94,17 +84,6 @@ export default async function AdminHomePage() {
       <PageTitle
         title="Content Overview"
         description="Manage the portfolio as structured content. Published content can render in the public site; drafts stay private to this app."
-        actions={
-          <>
-            <CreateWithAiModal
-              canCreate={onlineLlmCount > 0}
-              disabledReason={createWithAiDisabledReason}
-            />
-            <Link className="ui-btn-secondary" href="/ai-stories">
-              Review AI stories
-            </Link>
-          </>
-        }
       />
       {!hasDatabaseUrl() ? (
         <div className="mb-8">
@@ -225,6 +204,8 @@ export default async function AdminHomePage() {
   );
 }
 
+
+
 /** Pure-SVG donut built from already-fetched counts (no client JS, no new data). */
 function DonutChart({
   segments,
@@ -273,12 +254,4 @@ function DonutChart({
       </div>
     </div>
   );
-}
-
-async function readAiStories() {
-  try {
-    return await getAiGeneratedStories();
-  } catch {
-    return [];
-  }
 }

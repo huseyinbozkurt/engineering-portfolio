@@ -39,6 +39,10 @@ export interface ValidatedInsight {
   notes: string[];
 }
 
+export interface ValidateInsightOutputOptions {
+  requireHomePageContent?: boolean;
+}
+
 /** All refs issued by the input normalizer — the only legal evidence targets. */
 export function collectInputRefs(input: PortfolioInsightInput): Set<string> {
   const refs = new Set<string>();
@@ -53,6 +57,7 @@ export function collectInputRefs(input: PortfolioInsightInput): Set<string> {
 export function validateInsightOutput(
   rawText: string,
   input: PortfolioInsightInput,
+  options: ValidateInsightOutputOptions = {},
 ): ValidatedInsight {
   // Stage 1 — JSON.
   let parsedJson: unknown;
@@ -78,6 +83,35 @@ export function validateInsightOutput(
       throw new InsightValidationError("schema", `Output failed schema validation — ${issues}`);
     }
     throw new InsightValidationError("schema", "Output failed schema validation.");
+  }
+
+  if (options.requireHomePageContent) {
+    if (!output.homePageContent) {
+      throw new InsightValidationError(
+        "schema",
+        "Output failed schema validation — homePageContent is required for the current prompt version.",
+      );
+    }
+
+    const missingRadarKey = output.homePageContent.capabilitySnapshot.find(
+      (capability) => !capability.radarKey,
+    );
+    if (missingRadarKey) {
+      throw new InsightValidationError(
+        "schema",
+        `Output failed schema validation — homePageContent.capabilitySnapshot "${missingRadarKey.label}" must include radarKey.`,
+      );
+    }
+
+    const duplicatedScore = output.homePageContent.capabilitySnapshot.find(
+      (capability) => capability.score !== undefined,
+    );
+    if (duplicatedScore) {
+      throw new InsightValidationError(
+        "schema",
+        `Output failed schema validation — homePageContent.capabilitySnapshot "${duplicatedScore.label}" must not include score; use radarKey instead.`,
+      );
+    }
   }
 
   // Stage 3 — evidence + confidence enforcement.
@@ -229,6 +263,32 @@ export function validateInsightOutput(
     peopleManagement: capRadarAxis(output.signalRadar.peopleManagement, "signalRadar.peopleManagement"),
   };
 
+  const homePageContent = output.homePageContent
+    ? {
+        ...output.homePageContent,
+        primarySignals: output.homePageContent.primarySignals.map((signal) => {
+          const where = `homePageContent.primarySignals "${signal.title}"`;
+          const evidence = keepValid(signal.evidence, where);
+          return {
+            ...signal,
+            evidence,
+            confidence: enforceConfidence(signal.confidence, evidence.length, where),
+          };
+        }),
+        proofPoints: output.homePageContent.proofPoints.map((proof) => ({
+          ...proof,
+          evidence: keepValid(proof.evidence, `homePageContent.proofPoints "${proof.label}"`),
+        })),
+        capabilitySnapshot: output.homePageContent.capabilitySnapshot.map((capability) => ({
+          ...capability,
+          evidence: keepValid(
+            capability.evidence,
+            `homePageContent.capabilitySnapshot "${capability.label}"`,
+          ),
+        })),
+      }
+    : undefined;
+
   return {
     output: {
       executiveSummary,
@@ -239,7 +299,7 @@ export function validateInsightOutput(
       opportunityHeatmap,
       signalRadar,
       groundedDataNotes: output.groundedDataNotes,
-      homePageContent: output.homePageContent
+      ...(homePageContent ? { homePageContent } : {}),
     },
     notes,
   };

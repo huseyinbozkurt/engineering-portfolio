@@ -1,7 +1,7 @@
 import type { TaxonomyReviewInput, TaxonomyReviewOutput } from "@portfolio/validators";
 
 import { LlmHttpError } from "../adapters/http";
-import type { LLMAdapter, LLMUsage } from "../adapters/types";
+import type { LLMAdapter, LLMGenerationSettings, LLMUsage } from "../adapters/types";
 import {
   getTaxonomyReviewPromptVersion,
   latestTaxonomyReviewPromptVersion,
@@ -19,6 +19,10 @@ export interface TaxonomyReviewRunAttempt {
   completedAt: string | null;
   errorMessage: string | null;
   usage?: LLMUsage | null;
+  /** Validation stage that rejected this attempt's output, if any. */
+  validationErrorStage?: string | null;
+  /** Raw model text for an attempt rejected by validation (debugging retries). */
+  rawResponse?: string | null;
 }
 
 export interface TaxonomyReviewRunStore {
@@ -66,7 +70,17 @@ export interface RunTaxonomyReviewOptions {
   store: TaxonomyReviewRunStore;
   promptVersion?: string;
   startedAt?: Date;
+  /**
+   * Total attempts including the first call — covers transient transport errors
+   * AND schema-validation failures (a fresh generation is the remedy for both).
+   * Default 3.
+   */
   maxAttempts?: number;
+  /**
+   * Per-call generation overrides forwarded to the adapter. Unset fields fall
+   * back to the adapter's defaults (the structured-JSON profile / env config).
+   */
+  generation?: LLMGenerationSettings;
   sleep?: (ms: number) => Promise<void>;
   retryDelayMs?: number;
 }
@@ -86,7 +100,8 @@ export async function runTaxonomyReview(
     store,
     promptVersion = latestTaxonomyReviewPromptVersion,
     startedAt = new Date(),
-    maxAttempts = 2,
+    maxAttempts = 3,
+    generation,
     sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     retryDelayMs = 1500,
   } = options;
@@ -131,30 +146,29 @@ export async function runTaxonomyReview(
     );
   }
 
+  // One attempt = generate → validate. A transient transport error OR a
+  // schema/JSON/evidence validation failure is retried with a fresh generation
+  // until attempts are exhausted; non-transient transport errors fail fast.
+  const generateParams = {
+    systemPrompt: prompt.system,
+    userPrompt: prompt.user,
+    schema: "json" as const,
+    ...(generation ? { generation } : {}),
+  };
+
   let response: Awaited<ReturnType<LLMAdapter["generate"]>> | null = null;
-  let lastError: Error | null = null;
+  let validated: ReturnType<typeof validateTaxonomyReviewOutput> | null = null;
+  let lastRequestError: Error | null = null;
 
   for (let attemptNo = 1; attemptNo <= maxAttempts; attemptNo += 1) {
     const attemptStartedAt = new Date();
+
+    let attemptResponse: Awaited<ReturnType<LLMAdapter["generate"]>>;
     try {
-      response = await adapter.generate({
-        systemPrompt: prompt.system,
-        userPrompt: prompt.user,
-        schema: "json",
-      });
-      attempts.push({
-        attemptNo,
-        provider,
-        model,
-        startedAt: attemptStartedAt.toISOString(),
-        completedAt: new Date().toISOString(),
-        errorMessage: null,
-        usage: response.usage ?? null,
-      });
-      break;
+      attemptResponse = await adapter.generate(generateParams);
     } catch (error) {
       const message = error instanceof Error ? error.message : "LLM request failed.";
-      lastError = error instanceof Error ? error : new Error(message);
+      lastRequestError = error instanceof Error ? error : new Error(message);
       attempts.push({
         attemptNo,
         provider,
@@ -168,26 +182,55 @@ export async function runTaxonomyReview(
         await sleep(retryDelayMs);
         continue;
       }
+      // Non-transient, or retries exhausted: the request stage is terminal.
+      return finishFailed("request", lastRequestError.message, null);
+    }
 
+    try {
+      const attemptValidated = validateTaxonomyReviewOutput(attemptResponse.text, input);
+      attempts.push({
+        attemptNo,
+        provider,
+        model,
+        startedAt: attemptStartedAt.toISOString(),
+        completedAt: new Date().toISOString(),
+        errorMessage: null,
+        usage: attemptResponse.usage ?? null,
+      });
+      response = attemptResponse;
+      validated = attemptValidated;
       break;
+    } catch (error) {
+      const stage = error instanceof TaxonomyReviewValidationError ? error.stage : "validation";
+      const message = error instanceof Error ? error.message : "Validation failed.";
+      attempts.push({
+        attemptNo,
+        provider,
+        model,
+        startedAt: attemptStartedAt.toISOString(),
+        completedAt: new Date().toISOString(),
+        errorMessage: message,
+        usage: attemptResponse.usage ?? null,
+        validationErrorStage: stage,
+        rawResponse: attemptResponse.text,
+      });
+
+      if (attemptNo < maxAttempts) {
+        await sleep(retryDelayMs);
+        continue;
+      }
+      // Retries exhausted: persist the last raw output and the failing stage.
+      return finishFailed(stage, message, attemptResponse.text);
     }
   }
 
-  if (!response) {
-    return finishFailed("request", lastError?.message ?? "LLM request failed.", null);
-  }
-
-  let validated;
-  try {
-    validated = validateTaxonomyReviewOutput(response.text, input);
-  } catch (error) {
-    if (error instanceof TaxonomyReviewValidationError) {
-      return finishFailed(error.stage, error.message, response.text);
-    }
+  // Every terminal path inside the loop returns, so a null here is a logic
+  // error — fail closed rather than persist a half-built run.
+  if (!response || !validated) {
     return finishFailed(
-      "validation",
-      error instanceof Error ? error.message : "Validation failed.",
-      response.text,
+      "request",
+      lastRequestError?.message ?? "Taxonomy review produced no usable result.",
+      null,
     );
   }
 

@@ -156,6 +156,45 @@ export function makeOutput(overrides: Partial<PortfolioInsightOutput> = {}): Por
       peopleManagement: { score: 30, evidence: evidence(REFS.experience) },
     },
     groundedDataNotes: ["Leadership signals originate from a single employer's records."],
+    homePageContent: {
+      eyebrow: "AI Portfolio Insight",
+      headline: "Evidence-backed delivery and systems signal.",
+      summary: "Homepage-ready summary grounded in the same validated report.",
+      primarySignals: [
+        {
+          title: "Delivery signal",
+          summary: "Release success improvements are supported by the cited experience.",
+          confidence: "medium",
+          evidence: evidence(REFS.experience),
+        },
+      ],
+      proofPoints: [
+        {
+          label: "Release success",
+          value: "85%",
+          context: "Release success improved in the cited experience.",
+          evidence: evidence(REFS.experience),
+        },
+      ],
+      capabilitySnapshot: [
+        {
+          label: "Frontend Engineering",
+          radarKey: "frontendEngineering",
+          summary: "Product UI and TypeScript evidence support this homepage card.",
+          evidence: evidence(REFS.project, REFS.skill),
+        },
+        {
+          label: "Technical Leadership",
+          radarKey: "technicalLeadership",
+          summary: "Leadership presentation copy is backed by the experience record.",
+          evidence: evidence(REFS.experience),
+        },
+      ],
+      cta: {
+        label: "View full AI insight",
+        href: "/ai-insights",
+      },
+    },
     ...overrides,
   };
 }

@@ -1,5 +1,6 @@
 // Adapters — provider-agnostic LLM access.
 export * from "./adapters/types";
+export * from "./adapters/generation";
 export * from "./adapters/http";
 export * from "./adapters/online";
 export * from "./adapters/openai-compatible-adapter";
@@ -20,12 +21,12 @@ export * from "./taxonomy-review/prompt";
 export * from "./taxonomy-review/validate";
 export * from "./taxonomy-review/runner";
 
-// AI story generation (prompt + response parsing).
-export * from "./stories/prompt";
-export * from "./stories/parse";
-
 // Experience AI metadata review.
 export * from "./experiences/ai-review";
+
+// Centralized prompt/config resolution (DB-managed with hardcoded/.env fallback).
+export * from "./management/prompt-resolution";
+export * from "./management/config-resolution";
 
 // Task registry.
 export * from "./tasks/types";

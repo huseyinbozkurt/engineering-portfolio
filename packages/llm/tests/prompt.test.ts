@@ -4,6 +4,7 @@ import {
   PORTFOLIO_INSIGHT_PROMPT_V1,
   PORTFOLIO_INSIGHT_PROMPT_V2,
   PORTFOLIO_INSIGHT_PROMPT_V3,
+  PORTFOLIO_INSIGHT_PROMPT_V4,
   getInsightPromptVersion,
   insightPromptVersions,
   latestInsightPromptVersion,
@@ -12,7 +13,7 @@ import { REFS, makeInput } from "./fixtures";
 
 describe("insight prompt registry", () => {
   it("tracks versions and resolves the latest", () => {
-    expect(latestInsightPromptVersion).toBe(PORTFOLIO_INSIGHT_PROMPT_V3);
+    expect(latestInsightPromptVersion).toBe(PORTFOLIO_INSIGHT_PROMPT_V4);
     expect(insightPromptVersions[PORTFOLIO_INSIGHT_PROMPT_V1]?.version).toBe(
       PORTFOLIO_INSIGHT_PROMPT_V1,
     );
@@ -22,12 +23,27 @@ describe("insight prompt registry", () => {
     expect(insightPromptVersions[PORTFOLIO_INSIGHT_PROMPT_V3]?.version).toBe(
       PORTFOLIO_INSIGHT_PROMPT_V3,
     );
+    expect(insightPromptVersions[PORTFOLIO_INSIGHT_PROMPT_V4]?.version).toBe(
+      PORTFOLIO_INSIGHT_PROMPT_V4,
+    );
   });
 
   it("throws for unknown versions instead of silently falling back", () => {
     expect(() => getInsightPromptVersion("portfolio-insight-v999")).toThrow(
       "Unknown insight prompt version",
     );
+  });
+});
+
+describe("PORTFOLIO_INSIGHT_PROMPT_V4", () => {
+  const prompt = getInsightPromptVersion(PORTFOLIO_INSIGHT_PROMPT_V4).build(makeInput());
+
+  it("makes signalRadar the homepage capability score authority", () => {
+    expect(prompt.system).toContain("HOMEPAGE CAPABILITY RULES");
+    expect(prompt.system).toContain("signalRadar is the single source of truth");
+    expect(prompt.system).toContain("Do not independently generate homepage capability scores");
+    expect(prompt.user).toContain("radarKey");
+    expect(prompt.user).not.toContain("Short reason for the score");
   });
 });
 

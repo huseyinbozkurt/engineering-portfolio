@@ -2,9 +2,11 @@ import type {
   LLMAdapter,
   LLMGenerateParams,
   LLMGenerateResult,
+  LLMGenerationSettings,
   LLMProvider,
   LLMUsage,
 } from "./types";
+import { resolveGeneration, STRUCTURED_JSON_GENERATION } from "./generation";
 import { joinUrl, readNumber, readPath, timedFetch } from "./http";
 
 export interface OpenAiCompatibleAdapterConfig {
@@ -14,8 +16,12 @@ export interface OpenAiCompatibleAdapterConfig {
   apiKey?: string | null;
   model: string;
   timeoutMs?: number;
+  /** Default completion-token ceiling; per-call `generation.maxTokens` overrides it. */
   maxTokens?: number;
+  /** Default sampling temperature; per-call `generation.temperature` overrides it. */
   temperature?: number;
+  /** Default nucleus-sampling cutoff; per-call `generation.topP` overrides it. */
+  topP?: number;
   /**
    * Whether to request `response_format: json_object`. Defaults to true for
    * hosted providers; pass false for local servers that reject the field.
@@ -35,8 +41,7 @@ export class OpenAiCompatibleAdapter implements LLMAdapter {
   private readonly apiKey: string | null;
   private readonly model: string;
   private readonly timeoutMs: number;
-  private readonly maxTokens: number;
-  private readonly temperature: number;
+  private readonly generationDefaults: Required<LLMGenerationSettings>;
   private readonly jsonResponseFormat: boolean;
 
   constructor(config: OpenAiCompatibleAdapterConfig) {
@@ -48,12 +53,18 @@ export class OpenAiCompatibleAdapter implements LLMAdapter {
     // production floor. A hardcoded value here would silently cap higher
     // configs (and break injectable timeouts in tests).
     this.timeoutMs = config.timeoutMs ?? 900000;
-    this.maxTokens = config.maxTokens ?? 12000;
-    this.temperature = config.temperature ?? 0.2;
+    // Default to the structured-JSON profile; the resolver passes env overrides,
+    // and individual calls can still override per field via `params.generation`.
+    this.generationDefaults = {
+      temperature: config.temperature ?? STRUCTURED_JSON_GENERATION.temperature,
+      topP: config.topP ?? STRUCTURED_JSON_GENERATION.topP,
+      maxTokens: config.maxTokens ?? STRUCTURED_JSON_GENERATION.maxTokens,
+    };
     this.jsonResponseFormat = config.jsonResponseFormat ?? this.provider !== "custom";
   }
 
   async generate(params: LLMGenerateParams): Promise<LLMGenerateResult> {
+    const generation = resolveGeneration(params.generation, this.generationDefaults);
     const response = await timedFetch(
       joinUrl(this.baseUrl, "chat/completions"),
       {
@@ -64,8 +75,9 @@ export class OpenAiCompatibleAdapter implements LLMAdapter {
         },
         body: JSON.stringify({
           model: this.model,
-          temperature: this.temperature,
-          max_tokens: this.maxTokens,
+          temperature: generation.temperature,
+          top_p: generation.topP,
+          max_tokens: generation.maxTokens,
           messages: [
             ...(params.systemPrompt
               ? [{ role: "system", content: params.systemPrompt }]

@@ -116,7 +116,7 @@ describe("project evidence source validation", () => {
         type: "documentation",
         title: "Docs",
         source: "external-url",
-        url: "https://example.com/docs",
+        externalUrl: "https://example.com/docs",
       }).success,
     ).toBe(true);
   });
@@ -187,7 +187,7 @@ describe("project evidence source validation", () => {
     const parsed = projectEvidenceSchema.parse({
       type: "documentation",
       title: "Docs",
-      url: "https://example.com/docs",
+      externalUrl: "https://example.com/docs",
     });
 
     expect(parsed.source).toBe("external-url");

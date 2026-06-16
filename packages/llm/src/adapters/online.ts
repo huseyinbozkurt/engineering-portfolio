@@ -1,4 +1,5 @@
 import { AnthropicAdapter } from "./anthropic-adapter";
+import { STRUCTURED_JSON_GENERATION } from "./generation";
 import { joinUrl, LlmHttpError, timedFetch } from "./http";
 import { OpenAiCompatibleAdapter } from "./openai-compatible-adapter";
 import type { LLMAdapter, LLMProvider } from "./types";
@@ -60,7 +61,6 @@ const providerDefaults: Record<
 
 const defaultStatusTimeoutMs = 5000;
 const defaultGenerationTimeoutMs = 900000;
-const defaultMaxTokens = 12000;
 /** Generation requests never run with less than 15 minutes, regardless of env. */
 const minimumGenerationTimeoutMs = 900000;
 
@@ -103,7 +103,15 @@ export async function resolveOnlineLlmAdapter(): Promise<ResolvedLlmAdapter | nu
     positiveNumber(process.env.LLM_ANALYSIS_TIMEOUT_MS) ?? defaultGenerationTimeoutMs,
     minimumGenerationTimeoutMs,
   );
-  const maxTokens = positiveNumber(process.env.LLM_ANALYSIS_MAX_TOKENS) ?? defaultMaxTokens;
+  // Structured-JSON generation profile, overridable per field from the
+  // environment. Hosted providers cap completion length below the local-first
+  // default (32k) — set LLM_ANALYSIS_MAX_TOKENS to their ceiling when needed.
+  const maxTokens =
+    positiveNumber(process.env.LLM_ANALYSIS_MAX_TOKENS) ?? STRUCTURED_JSON_GENERATION.maxTokens;
+  const temperature =
+    nonNegativeNumber(process.env.LLM_ANALYSIS_TEMPERATURE) ?? STRUCTURED_JSON_GENERATION.temperature;
+  const topP =
+    nonNegativeNumber(process.env.LLM_ANALYSIS_TOP_P) ?? STRUCTURED_JSON_GENERATION.topP;
 
   if (connection.provider === "anthropic") {
     if (!connection.apiKey) {
@@ -118,6 +126,8 @@ export async function resolveOnlineLlmAdapter(): Promise<ResolvedLlmAdapter | nu
         model: connection.model,
         timeoutMs,
         maxTokens,
+        temperature,
+        topP,
       }),
     };
   }
@@ -134,6 +144,8 @@ export async function resolveOnlineLlmAdapter(): Promise<ResolvedLlmAdapter | nu
       model: connection.model,
       timeoutMs,
       maxTokens,
+      temperature,
+      topP,
       // Local/custom servers sometimes reject response_format; hosted ones use it.
       jsonResponseFormat: connection.provider !== "custom",
     }),
@@ -381,6 +393,15 @@ function stringValue(value: unknown): string | null {
 function positiveNumber(value: string | undefined): number | null {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+/** Like {@link positiveNumber} but allows 0 (valid for temperature / topP). */
+function nonNegativeNumber(value: string | undefined): number | null {
+  if (value === undefined || value.trim() === "") {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
 function safeUrlLabel(url: string): string {

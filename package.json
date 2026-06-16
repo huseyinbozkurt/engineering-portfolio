@@ -10,10 +10,10 @@
     "build": "pnpm -r --if-present build",
     "lint": "pnpm -r --if-present lint",
     "typecheck": "pnpm -r --if-present typecheck",
-    "db:generate": "pnpm --filter @portfolio/db db:generate",
-    "db:migrate": "pnpm --filter @portfolio/db db:migrate",
-    "db:push": "pnpm --filter @portfolio/db db:push",
-    "db:studio": "pnpm --filter @portfolio/db db:studio",
+    "db:generate": "cd packages/db && pnpm db:generate",
+    "db:migrate": "cd packages/db && pnpm db:migrate",
+    "db:push": "cd packages/db && pnpm db:push",
+    "db:studio": "cd packages/db && pnpm db:studio",
     "test": "vitest run"
   },
   "devDependencies": {

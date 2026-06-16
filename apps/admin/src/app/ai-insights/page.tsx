@@ -2,6 +2,7 @@ import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 
 import { getActiveAiInsightRun, getAiInsightRuns } from "@portfolio/db/ai-insight-runs";
+import { getAiModelDisplayName } from "@portfolio/validators";
 
 import { EmptyPanel } from "@/components/empty-panel";
 import { GenerateInsightsButton } from "@/components/insights/generate-insights-button";
@@ -56,12 +57,11 @@ export default async function AiInsightsPage() {
         ) : (
           <div className="ui-card overflow-hidden shadow-card">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[58rem] text-left text-sm">
+              <table className="w-full min-w-[52rem] text-left text-sm">
                 <thead className="ui-table-head border-b border-line bg-white/[0.015]">
                   <tr>
                     <th className="px-4 py-2.5 font-semibold">Status</th>
-                    <th className="px-4 py-2.5 font-semibold">Provider / model</th>
-                    <th className="px-4 py-2.5 font-semibold">Prompt</th>
+                    <th className="px-4 py-2.5 font-semibold">Model</th>
                     <th className="px-4 py-2.5 font-semibold">Records</th>
                     <th className="px-4 py-2.5 font-semibold">Tokens</th>
                     <th className="px-4 py-2.5 font-semibold">Duration</th>
@@ -78,10 +78,10 @@ export default async function AiInsightsPage() {
                         <RunStatusBadge status={run.status} />
                       </td>
                       <td className="px-4 py-3 text-muted">
-                        <span className="text-ink">{run.provider ?? "—"}</span>
-                        {run.model ? <span className="block text-xs">{run.model}</span> : null}
+                        <span className="text-ink">
+                          {getAiModelDisplayName({ provider: run.provider, model: run.model })}
+                        </span>
                       </td>
-                      <td className="px-4 py-3 text-muted">{run.promptVersion}</td>
                       <td className="px-4 py-3 tabular-nums text-muted">
                         {recordsAnalyzed(run) ?? "—"}
                       </td>

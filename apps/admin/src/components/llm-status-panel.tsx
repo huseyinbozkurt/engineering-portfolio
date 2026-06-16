@@ -1,3 +1,5 @@
+import { getAiModelDisplayName } from "@portfolio/validators";
+
 import type { LlmConnectionStatus } from "@/lib/llm-config";
 
 interface LlmStatusPanelProps {
@@ -37,9 +39,6 @@ export function LlmStatusPanel({ statuses }: LlmStatusPanelProps) {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-semibold text-ink">{connection.name}</h3>
-                  <p className="mt-1 text-xs uppercase tracking-wide text-muted">
-                    {connection.provider}
-                  </p>
                 </div>
                 <StatusBadge status={connection.status} />
               </div>
@@ -47,7 +46,12 @@ export function LlmStatusPanel({ statuses }: LlmStatusPanelProps) {
                 {connection.model ? (
                   <div className="flex items-center justify-between gap-3">
                     <dt className="font-medium text-ink/80">Model</dt>
-                    <dd className="truncate">{connection.model}</dd>
+                    <dd className="truncate">
+                      {getAiModelDisplayName({
+                        provider: connection.provider,
+                        model: connection.model,
+                      })}
+                    </dd>
                   </div>
                 ) : null}
                 <div className="grid gap-1">

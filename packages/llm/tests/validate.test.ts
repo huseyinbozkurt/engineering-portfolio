@@ -75,6 +75,44 @@ describe("stage: schema", () => {
     const bad = { ...makeOutput(), invented: true };
     expect(() => run(bad)).toThrowError(InsightValidationError);
   });
+
+  it("can require homepage capability radar keys for current prompt generation", () => {
+    const missingHome = makeOutput({ homePageContent: undefined });
+    expect(() =>
+      validateInsightOutput(JSON.stringify(missingHome), input, {
+        requireHomePageContent: true,
+      }),
+    ).toThrowError(InsightValidationError);
+
+    const legacyCapability = makeOutput();
+    legacyCapability.homePageContent!.capabilitySnapshot[0] = {
+      label: "Frontend Engineering",
+      score: 10,
+      summary: "Legacy shape.",
+      evidence: evidence(REFS.project),
+    };
+
+    expect(() =>
+      validateInsightOutput(JSON.stringify(legacyCapability), input, {
+        requireHomePageContent: true,
+      }),
+    ).toThrowError(InsightValidationError);
+
+    const duplicatedScore = makeOutput();
+    duplicatedScore.homePageContent!.capabilitySnapshot[0] = {
+      label: "Frontend Engineering",
+      radarKey: "frontendEngineering",
+      score: 10,
+      summary: "Duplicated score.",
+      evidence: evidence(REFS.project),
+    };
+
+    expect(() =>
+      validateInsightOutput(JSON.stringify(duplicatedScore), input, {
+        requireHomePageContent: true,
+      }),
+    ).toThrowError(InsightValidationError);
+  });
 });
 
 describe("stage: evidence", () => {

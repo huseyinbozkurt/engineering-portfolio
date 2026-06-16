@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { getLatestPublishedAiInsightRun } from "@portfolio/db/ai-insight-runs";
 import {
+  getAiModelDisplayName,
   portfolioInsightInputSchema,
   portfolioInsightOutputSchema,
   type EvidenceRef,
@@ -12,8 +13,7 @@ import {
 import { ComingSoon } from "@/components/coming-soon";
 import { EmptyState } from "@/components/empty-state";
 import { ConfidencePill } from "@/components/insights/insight-primitives";
-import { InsightRadar, type RadarAxis } from "@/components/insights/insight-radar";
-import { RecruiterTabs, type RecruiterTabView } from "@/components/insights/recruiter-tabs";
+import { InsightRadar } from "@/components/insights/insight-radar";
 import { SectionHeader } from "@/components/portfolio-ui";
 import { getPublicSiteAvailability } from "@/lib/site-availability";
 
@@ -49,7 +49,6 @@ export default async function AiInsightsPage() {
   }
 
   const run = await getLatestPublishedAiInsightRun();
-  console.log("[AiInsightsPage] latest published run:", run?.outputJson);
   const parsedOutput = run ? portfolioInsightOutputSchema.safeParse(run.outputJson) : null;
 
   if (!run || !parsedOutput?.success) {
@@ -93,7 +92,7 @@ export default async function AiInsightsPage() {
           </p>
           <EvidenceChips evidence={output.executiveSummary.evidence} resolve={resolve} />
 
-          <dl className="mt-7 grid gap-4 border-t border-line pt-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <dl className="mt-7 grid gap-4 border-t border-line pt-5 text-sm sm:grid-cols-2 lg:grid-cols-3">
             <HeroMeta label="Records analyzed" value={recordsAnalyzed ? String(recordsAnalyzed) : "—"} />
             <HeroMeta
               label="Generated"
@@ -101,9 +100,8 @@ export default async function AiInsightsPage() {
             />
             <HeroMeta
               label="Model"
-              value={[run.provider, run.model].filter(Boolean).join(" · ") || "—"}
+              value={getAiModelDisplayName({ provider: run.provider, model: run.model })}
             />
-            <HeroMeta label="Prompt version" value={run.promptVersion} />
           </dl>
         </div>
       </section>
@@ -163,16 +161,6 @@ export default async function AiInsightsPage() {
         </ol>
       </section>
 
-      {/* Recruiter simulation */}
-      <section className="mt-16">
-        <SectionHeader
-          eyebrow="Reader Perspectives"
-          title="The same portfolio, four different readers"
-          description="How a recruiter, a hiring manager, a staff engineer, and a startup founder each interpret the same evidence."
-        />
-        <RecruiterTabs views={buildRecruiterViews(output, resolve)} />
-      </section>
-
       {/* Opportunity heatmap */}
       <section className="mt-16">
         <SectionHeader
@@ -218,7 +206,7 @@ export default async function AiInsightsPage() {
           description="Scores are capped by validation to what the cited evidence supports — axes without enough records are shown as insufficient rather than estimated."
         />
         <div className="glass-panel rounded-lg p-6 md:p-8">
-          <InsightRadar axes={buildRadarAxes(output)} />
+          <InsightRadar content={output.homePageContent} signalRadar={output.signalRadar} />
         </div>
       </section>
 
@@ -241,10 +229,9 @@ export default async function AiInsightsPage() {
         </ul>
         <p className="mt-8 border-t border-line pt-5 text-xs leading-6 text-muted">
           {INTEGRITY_LINE} Generated{" "}
-          {run.completedAt ? formatDate(run.completedAt) : formatDate(run.createdAt)} · prompt{" "}
-          {run.promptVersion}
-          {run.provider ? ` · ${run.provider}` : ""}
-          {run.model ? ` (${run.model})` : ""}. Reviewed and published from the portfolio admin.
+          {run.completedAt ? formatDate(run.completedAt) : formatDate(run.createdAt)} with{" "}
+          {getAiModelDisplayName({ provider: run.provider, model: run.model })}. Reviewed and
+          published from the portfolio admin.
         </p>
       </section>
     </div>

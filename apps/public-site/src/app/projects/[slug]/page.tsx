@@ -567,15 +567,15 @@ function EvidenceSection({ items }: { items: ProjectRecord["evidence"] }) {
                 {item.description ? (
                   <p className="mt-2 text-sm leading-6 text-muted">{item.description}</p>
                 ) : null}
-                {source === "external-url" && item.url ? (
+                {source === "external-url" && item.externalUrl ? (
                   <p className="mt-4 text-sm font-semibold text-sky-300">Open evidence ↗</p>
                 ) : null}
               </div>
             </article>
           );
 
-          return source === "external-url" && item.url ? (
-            <a key={`${item.title}-${index}`} href={item.url} target="_blank" rel="noreferrer">
+          return source === "external-url" && item.externalUrl ? (
+            <a key={`${item.title}-${index}`} href={item.externalUrl} target="_blank" rel="noreferrer">
               {content}
             </a>
           ) : (

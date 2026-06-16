@@ -10,6 +10,7 @@ import {
 import {
   portfolioInsightInputSchema,
   portfolioInsightOutputSchema,
+  getAiModelDisplayName,
   type PortfolioInsightOutput,
 } from "@portfolio/validators";
 
@@ -70,9 +71,9 @@ export default async function InsightRunPage({ params, searchParams }: RunPagePr
               <RunStatusBadge status={run.status} />
             </div>
             <div className="mt-3 flex flex-wrap gap-1.5">
-              <span className="ui-chip">{run.provider ?? "provider —"}</span>
-              <span className="ui-chip">{run.model ?? "model —"}</span>
-              <span className="ui-chip">{run.promptVersion}</span>
+              <span className="ui-chip">
+                {getAiModelDisplayName({ provider: run.provider, model: run.model })}
+              </span>
               <span className="ui-chip tabular-nums">{formatDuration(run.durationMs)}</span>
               <span className="ui-chip tabular-nums">
                 {run.tokenUsage?.totalTokens ?? "—"} tokens
@@ -149,7 +150,10 @@ export default async function InsightRunPage({ params, searchParams }: RunPagePr
                   .map((candidate) => (
                     <option key={candidate.id} value={candidate.id}>
                       {formatDate(candidate.createdAt)} · {candidate.status} ·{" "}
-                      {candidate.provider ?? "?"} · {candidate.promptVersion}
+                      {getAiModelDisplayName({
+                        provider: candidate.provider,
+                        model: candidate.model,
+                      })}
                     </option>
                   ))}
               </select>
@@ -170,7 +174,7 @@ export default async function InsightRunPage({ params, searchParams }: RunPagePr
           description="Exact prompts sent, validated JSON, validation notes, attempts, and the raw provider response. No secrets are stored."
         >
           <div className="grid gap-4">
-            <DebugBlock title={`System prompt (${run.promptVersion})`}>
+            <DebugBlock title="System prompt">
               <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-xl border border-line bg-black/30 p-4 text-xs leading-5 text-ink/80">
                 {run.promptSystem || "—"}
               </pre>
@@ -209,9 +213,19 @@ export default async function InsightRunPage({ params, searchParams }: RunPagePr
                       key={attempt.attemptNo}
                       className="rounded-lg border border-line bg-white/[0.02] px-3 py-2"
                     >
-                      #{attempt.attemptNo} · {attempt.provider} ·{" "}
+                      #{attempt.attemptNo} ·{" "}
+                      {getAiModelDisplayName({
+                        provider: attempt.provider,
+                        model: attempt.model,
+                      })}{" "}
+                      ·{" "}
                       {attempt.errorMessage ? (
-                        <span className="text-danger-200">{attempt.errorMessage}</span>
+                        <span className="text-danger-200">
+                          {attempt.validationErrorStage
+                            ? `[${attempt.validationErrorStage}] `
+                            : ""}
+                          {attempt.errorMessage}
+                        </span>
                       ) : (
                         <span className="text-success-200">ok</span>
                       )}
@@ -269,9 +283,11 @@ function CompareView({
 
   const metaRows: Array<[string, string, string]> = [
     ["Status", baseRun.status, otherRun.status],
-    ["Provider", baseRun.provider ?? "—", otherRun.provider ?? "—"],
-    ["Model", baseRun.model ?? "—", otherRun.model ?? "—"],
-    ["Prompt version", baseRun.promptVersion, otherRun.promptVersion],
+    [
+      "Model",
+      getAiModelDisplayName({ provider: baseRun.provider, model: baseRun.model }),
+      getAiModelDisplayName({ provider: otherRun.provider, model: otherRun.model }),
+    ],
     ["Duration", formatDuration(baseRun.durationMs), formatDuration(otherRun.durationMs)],
     [
       "Total tokens",
@@ -311,12 +327,12 @@ function CompareView({
               <tr key={label}>
                 <td className="py-2.5 pr-4 text-muted">{label}</td>
                 <td
-                  className={`py-2.5 pr-4 capitalize ${left !== right ? "font-medium text-warning-100" : "text-ink"}`}
+                  className={`py-2.5 pr-4 ${left !== right ? "font-medium text-warning-100" : "text-ink"}`}
                 >
                   {left}
                 </td>
                 <td
-                  className={`py-2.5 capitalize ${left !== right ? "font-medium text-warning-100" : "text-ink"}`}
+                  className={`py-2.5 ${left !== right ? "font-medium text-warning-100" : "text-ink"}`}
                 >
                   {right}
                 </td>

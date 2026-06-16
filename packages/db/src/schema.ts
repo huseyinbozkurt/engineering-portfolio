@@ -1,6 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import type {
-  AiGeneratedStoryPayload,
+  LlmWorkflow,
   PortfolioVisibility,
   ProjectConfidentiality,
   ProjectContribution,
@@ -32,6 +32,7 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
   primaryKey,
@@ -70,14 +71,6 @@ export const llmTaskStatusEnum = pgEnum("llm_task_status", [
 ]);
 
 export type LlmTaskStatus = (typeof llmTaskStatusEnum.enumValues)[number];
-
-export const aiGeneratedStoryStatusEnum = pgEnum("ai_generated_story_status", [
-  "draft",
-  "applied",
-  "failed",
-]);
-
-export type AiGeneratedStoryStatus = (typeof aiGeneratedStoryStatusEnum.enumValues)[number];
 
 export const aiReviewStatusEnum = pgEnum("ai_review_status", [
   "idle",
@@ -677,6 +670,10 @@ export interface AiInsightRunAttempt {
     completionTokens?: number;
     totalTokens?: number;
   } | null;
+  /** Validation stage that rejected this attempt's output, if any. */
+  validationErrorStage?: string | null;
+  /** Raw model text for an attempt rejected by validation (debugging retries). */
+  rawResponse?: string | null;
 }
 
 export const taxonomyReviewRunStatusEnum = pgEnum("taxonomy_review_run_status", [
@@ -730,6 +727,10 @@ export interface TaxonomyReviewRunAttempt {
     completionTokens?: number;
     totalTokens?: number;
   } | null;
+  /** Validation stage that rejected this attempt's output, if any. */
+  validationErrorStage?: string | null;
+  /** Raw model text for an attempt rejected by validation (debugging retries). */
+  rawResponse?: string | null;
 }
 
 /**
@@ -869,42 +870,213 @@ export const aiReviewQualitySnapshots = pgTable(
   ],
 );
 
-// Story content types live in @portfolio/validators (shared with the LLM
-// package); re-exported here so existing `@portfolio/db/schema` imports keep
-// working.
-export type {
-  AiGeneratedLensRenameSuggestion,
-  AiGeneratedStoryPart,
-  AiGeneratedStoryPayload,
-} from "@portfolio/validators";
+// ---------------------------------------------------------------------------
+// Centralized LLM prompt / configuration / run management.
+//
+// The DB stores prompt *text* and configuration values only — the per-workflow
+// template-variable contract lives in code (@portfolio/validators
+// LLM_PROMPT_VARIABLES). `workflow` is a plain varchar typed as `LlmWorkflow`:
+// the app validates it with `llmWorkflowSchema` before writing, so the column
+// stays migration-friendly while remaining type-safe in code.
+// ---------------------------------------------------------------------------
 
-export const aiGeneratedStories = pgTable(
-  "ai_generated_stories",
+export const llmRunStatusEnum = pgEnum("llm_run_status", [
+  "pending",
+  "running",
+  "succeeded",
+  "failed",
+  "published",
+  "reviewed",
+]);
+
+export type LlmRunStatusValue = (typeof llmRunStatusEnum.enumValues)[number];
+
+export const llmRunSuggestionStatusEnum = pgEnum("llm_run_suggestion_status", [
+  "pending",
+  "approved",
+  "rejected",
+]);
+
+export type LlmRunSuggestionStatusValue =
+  (typeof llmRunSuggestionStatusEnum.enumValues)[number];
+
+/** Whether a run used a DB prompt version or fell back to the hardcoded prompt. */
+export type LlmPromptSource = "db" | "codeFallback";
+/** Whether a run used a DB configuration or fell back to .env config. */
+export type LlmConfigSource = "db" | "envFallback";
+
+/** One LLM attempt within a unified run (retries append entries). Stored as jsonb. */
+export interface LlmRunAttempt {
+  attemptNo: number;
+  provider: string;
+  model: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  errorMessage: string | null;
+  usage?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+  } | null;
+  validationErrorStage?: string | null;
+  rawResponse?: string | null;
+}
+
+/**
+ * DB-managed prompt versions. At most one active version per workflow (partial
+ * unique index). When no active version exists for a workflow the runtime falls
+ * back to the hardcoded prompt — see prompt resolution in @portfolio/llm.
+ */
+export const llmPromptVersions = pgTable(
+  "llm_prompt_versions",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    title: varchar("title", { length: 220 }).notNull(),
-    sourcePrompt: text("source_prompt").notNull(),
-    status: aiGeneratedStoryStatusEnum("status").notNull().default("draft"),
-    providerName: varchar("provider_name", { length: 180 }),
-    providerModel: varchar("provider_model", { length: 220 }),
-    // Prompt audit trail (nullable: stories generated before prompt logging).
-    promptVersion: varchar("prompt_version", { length: 40 }),
-    promptSystem: text("prompt_system"),
-    promptUser: text("prompt_user"),
-    generatedContent: jsonb("generated_content").$type<AiGeneratedStoryPayload>().notNull(),
-    rawResponse: text("raw_response"),
-    finishReason: varchar("finish_reason", { length: 120 }),
-    errorMessage: text("error_message"),
-    targetType: varchar("target_type", { length: 60 }),
-    targetId: uuid("target_id"),
-    appliedAt: timestamp("applied_at", { withTimezone: true }),
+    workflow: varchar("workflow", { length: 60 }).$type<LlmWorkflow>().notNull(),
+    version: varchar("version", { length: 60 }).notNull(),
+    name: varchar("name", { length: 200 }).notNull(),
+    description: text("description"),
+    systemPrompt: text("system_prompt").notNull(),
+    userPromptTemplate: text("user_prompt_template").notNull(),
+    isActive: boolean("is_active").notNull().default(false),
     ...timestamps,
   },
   (table) => [
-    index("ai_generated_stories_created_at_idx").on(table.createdAt),
-    index("ai_generated_stories_status_idx").on(table.status),
+    index("llm_prompt_versions_workflow_idx").on(table.workflow),
+    // At most one active prompt version per workflow.
+    uniqueIndex("llm_prompt_versions_single_active_idx")
+      .on(table.workflow)
+      .where(sql`${table.isActive} = true`),
   ],
 );
+
+/**
+ * DB-managed LLM configurations. At most one active config per workflow. When
+ * no active config exists the runtime falls back to the .env-derived config.
+ */
+export const llmConfigurations = pgTable(
+  "llm_configurations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workflow: varchar("workflow", { length: 60 }).$type<LlmWorkflow>().notNull(),
+    provider: varchar("provider", { length: 120 }).notNull(),
+    model: varchar("model", { length: 220 }).notNull(),
+    visibleModelName: varchar("visible_model_name", { length: 200 }),
+    baseUrl: text("base_url"),
+    temperature: numeric("temperature", { precision: 4, scale: 3, mode: "number" })
+      .notNull()
+      .default(0.2),
+    topP: numeric("top_p", { precision: 4, scale: 3, mode: "number" }).notNull().default(0.9),
+    maxTokens: integer("max_tokens").notNull().default(12000),
+    maxRetries: integer("max_retries").notNull().default(2),
+    timeoutMs: integer("timeout_ms"),
+    isActive: boolean("is_active").notNull().default(false),
+    ...timestamps,
+  },
+  (table) => [
+    index("llm_configurations_workflow_idx").on(table.workflow),
+    uniqueIndex("llm_configurations_single_active_idx")
+      .on(table.workflow)
+      .where(sql`${table.isActive} = true`),
+  ],
+);
+
+/**
+ * Unified LLM run audit log. Every new LLM execution (insights, content review,
+ * taxonomy/relation review, homepage insight) writes here with its full prompt
+ * + config provenance, rendered prompts, raw + validated output, attempts, and
+ * token usage. `outputJson` is `unknown` on purpose — readers re-validate with
+ * the workflow's Zod schema before use.
+ */
+export const llmRuns = pgTable(
+  "llm_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workflow: varchar("workflow", { length: 60 }).$type<LlmWorkflow>().notNull(),
+    targetType: varchar("target_type", { length: 80 }),
+    targetId: uuid("target_id"),
+    status: llmRunStatusEnum("status").notNull().default("pending"),
+    provider: varchar("provider", { length: 180 }),
+    model: varchar("model", { length: 220 }),
+    visibleModelName: varchar("visible_model_name", { length: 200 }),
+    promptSource: varchar("prompt_source", { length: 20 }).$type<LlmPromptSource>().notNull(),
+    promptVersionId: uuid("prompt_version_id"),
+    promptVersion: varchar("prompt_version", { length: 60 }),
+    promptName: varchar("prompt_name", { length: 200 }),
+    configSource: varchar("config_source", { length: 20 }).$type<LlmConfigSource>().notNull(),
+    llmConfigurationId: uuid("llm_configuration_id"),
+    temperature: numeric("temperature", { precision: 4, scale: 3, mode: "number" }),
+    topP: numeric("top_p", { precision: 4, scale: 3, mode: "number" }),
+    maxTokens: integer("max_tokens"),
+    maxRetries: integer("max_retries"),
+    timeoutMs: integer("timeout_ms"),
+    promptSystem: text("prompt_system").notNull().default(""),
+    promptUser: text("prompt_user").notNull().default(""),
+    inputSnapshot: jsonb("input_snapshot").$type<unknown>(),
+    rawResponse: text("raw_response"),
+    outputJson: jsonb("output_json").$type<unknown>(),
+    validationNotes: jsonb("validation_notes").$type<string[]>(),
+    tokenUsage: jsonb("token_usage").$type<{
+      promptTokens?: number;
+      completionTokens?: number;
+      totalTokens?: number;
+    }>(),
+    attempts: jsonb("attempts").$type<LlmRunAttempt[]>(),
+    errorStage: varchar("error_stage", { length: 80 }),
+    errorMessage: text("error_message"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    durationMs: integer("duration_ms"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    index("llm_runs_workflow_idx").on(table.workflow),
+    index("llm_runs_status_idx").on(table.status),
+    index("llm_runs_created_at_idx").on(table.createdAt),
+    index("llm_runs_target_idx").on(table.targetType, table.targetId),
+    // At most one published run per workflow (the public source of truth, e.g. AI Insights).
+    uniqueIndex("llm_runs_single_published_idx")
+      .on(table.workflow)
+      .where(sql`${table.status} = 'published'`),
+  ],
+);
+
+/**
+ * Review-only suggestions produced by a run (taxonomy / relation review).
+ * Approving or rejecting a suggestion records a decision ONLY — it never
+ * mutates live portfolio data. There is no auto-apply path.
+ */
+export const llmRunSuggestions = pgTable(
+  "llm_run_suggestions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => llmRuns.id, { onDelete: "cascade" }),
+    suggestionType: varchar("suggestion_type", { length: 60 }).notNull(),
+    targetGroup: varchar("target_group", { length: 60 }),
+    targetRecordType: varchar("target_record_type", { length: 60 }),
+    targetRecordId: uuid("target_record_id"),
+    relationType: varchar("relation_type", { length: 60 }),
+    action: varchar("action", { length: 40 }).notNull(),
+    status: llmRunSuggestionStatusEnum("status").notNull().default("pending"),
+    currentValue: text("current_value"),
+    proposedValue: text("proposed_value"),
+    originalValue: text("original_value"),
+    reason: text("reason").notNull(),
+    confidence: varchar("confidence", { length: 20 }),
+    evidenceRefs: jsonb("evidence_refs").$type<unknown[]>().notNull().default([]),
+    affectedRecords: jsonb("affected_records").$type<unknown[]>().notNull().default([]),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    index("llm_run_suggestions_run_idx").on(table.runId),
+    index("llm_run_suggestions_status_idx").on(table.status),
+  ],
+);
+
 
 export const experienceLenses = pgTable(
   "experience_lenses",

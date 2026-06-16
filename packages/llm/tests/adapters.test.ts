@@ -49,6 +49,46 @@ describe("OpenAiCompatibleAdapter", () => {
     expect(result.usage).toEqual({ promptTokens: 12, completionTokens: 4, totalTokens: 16 });
   });
 
+  it("sends the structured-JSON generation profile by default (temp 0.2, top_p 0.9, max_tokens > 30k)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({ choices: [{ message: { content: "{}" } }] }),
+    );
+    setLlmFetchForTesting(fetchMock);
+
+    const adapter = new OpenAiCompatibleAdapter({ baseUrl: "http://x", model: "m" });
+    await adapter.generate({ userPrompt: "hi" });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+    expect(body.temperature).toBe(0.2);
+    expect(body.top_p).toBe(0.9);
+    expect(body.max_tokens).toBeGreaterThan(30000);
+  });
+
+  it("honors per-call generation overrides field-by-field", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({ choices: [{ message: { content: "{}" } }] }),
+    );
+    setLlmFetchForTesting(fetchMock);
+
+    // Construct with non-default defaults to prove per-call wins over them.
+    const adapter = new OpenAiCompatibleAdapter({
+      baseUrl: "http://x",
+      model: "m",
+      temperature: 0.7,
+      topP: 0.5,
+      maxTokens: 8000,
+    });
+    // Only override maxTokens (and temperature 0, which must not be ignored).
+    await adapter.generate({ userPrompt: "hi", generation: { temperature: 0, maxTokens: 31000 } });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+    expect(body.temperature).toBe(0); // explicit 0 overrides the 0.7 default
+    expect(body.max_tokens).toBe(31000);
+    expect(body.top_p).toBe(0.5); // unset per-call field keeps the configured default
+  });
+
   it("omits response_format for custom providers and works without an API key", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse({ choices: [{ message: { content: "{}" } }] }),
@@ -124,6 +164,28 @@ describe("AnthropicAdapter", () => {
     expect(result.text).toBe('{"ok":true}');
     expect(result.finishReason).toBe("end_turn");
     expect(result.usage).toEqual({ promptTokens: 20, completionTokens: 8, totalTokens: 28 });
+  });
+
+  it("sends top_p with the structured-JSON defaults and honors per-call overrides", async () => {
+    // Fresh Response per call — a Response body can only be read once.
+    const fetchMock = vi.fn().mockImplementation(async () =>
+      jsonResponse({ content: [{ text: "{}" }], stop_reason: "end_turn" }),
+    );
+    setLlmFetchForTesting(fetchMock);
+
+    const adapter = new AnthropicAdapter({ apiKey: "k", model: "m" });
+    await adapter.generate({ userPrompt: "hi" });
+    const [, defaultInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const defaultBody = JSON.parse(String(defaultInit.body)) as Record<string, unknown>;
+    expect(defaultBody.temperature).toBe(0.2);
+    expect(defaultBody.top_p).toBe(0.9);
+    expect(defaultBody.max_tokens).toBeGreaterThan(30000);
+
+    await adapter.generate({ userPrompt: "hi", generation: { topP: 0.3, maxTokens: 4096 } });
+    const [, overrideInit] = fetchMock.mock.calls[1] as [string, RequestInit];
+    const overrideBody = JSON.parse(String(overrideInit.body)) as Record<string, unknown>;
+    expect(overrideBody.top_p).toBe(0.3);
+    expect(overrideBody.max_tokens).toBe(4096);
   });
 
   it("rejects when the response has no text content", async () => {
