@@ -11,17 +11,19 @@ variable "secret_names" {
   type        = list(string)
   default = [
     "DATABASE_URL",
-    "NEXT_PUBLIC_SITE_URL"
+    "NEXT_PUBLIC_SITE_URL",
+    "GOOGLE_ADSENSE_VERIFICATION"
   ]
 
   validation {
     condition = alltrue([
       for secret_name in [
         "DATABASE_URL",
-        "NEXT_PUBLIC_SITE_URL"
+        "NEXT_PUBLIC_SITE_URL",
+        "GOOGLE_ADSENSE_VERIFICATION"
       ] : contains(var.secret_names, secret_name)
     ])
-    error_message = "secret_names must include DATABASE_URL, and NEXT_PUBLIC_SITE_URL."
+    error_message = "secret_names must include DATABASE_URL, NEXT_PUBLIC_SITE_URL and GOOGLE_ADSENSE_VERIFICATION."
   }
 
   validation {

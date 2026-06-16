@@ -13,3 +13,6 @@ output "database_url_secret_arn" {
 output "next_public_site_url_secret_arn" {
   value = aws_secretsmanager_secret.this["NEXT_PUBLIC_SITE_URL"].arn
 }
+output "next_google_adsense_verification_code_secret_arn" {
+  value = aws_secretsmanager_secret.this["GOOGLE_ADSENSE_VERIFICATION"].arn
+}
