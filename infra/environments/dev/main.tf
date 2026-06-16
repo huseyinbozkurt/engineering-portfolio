@@ -45,8 +45,17 @@ module "ecs" {
 
   container_environment = local.ecs_container_environment
 
-  # Terraform creates secret metadata only. Populate values later in AWS Secrets Manager before ECS tasks start.
-  container_secrets = module.secrets.secret_arns
+  # The `secrets` module creates secret metadata only (values populated later in
+  # AWS Secrets Manager). The Turnstile secret is value-managed here, so its ARN
+  # is merged in. The ECS module injects every entry as a runtime-only secret and
+  # scopes the task execution role's secretsmanager:GetSecretValue to exactly
+  # these ARNs (no wildcard), so TURNSTILE_SECRET_KEY readability comes for free.
+  container_secrets = merge(
+    module.secrets.secret_arns,
+    {
+      TURNSTILE_SECRET_KEY = aws_secretsmanager_secret.turnstile.arn
+    }
+  )
 }
 
 module "rds" {

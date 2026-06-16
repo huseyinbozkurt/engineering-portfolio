@@ -20,6 +20,13 @@ env:
   TF_INPUT: "false"
   TF_VAR_acm_certificate_arn: ${{ secrets.TF_VAR_ACM_CERTIFICATE_ARN }}
   TF_VAR_alb_https_ssl_policy: ${{ vars.TF_VAR_ALB_HTTPS_SSL_POLICY }}
+  # Cloudflare Turnstile. Account ID is non-sensitive (repository variable);
+  # the API token and secret key are sensitive (repository secrets). Add these
+  # in repo settings before deploying, or Terraform plan will fail on the
+  # required turnstile_secret_key / cloudflare_account_id variables.
+  TF_VAR_cloudflare_account_id: ${{ vars.TF_VAR_CLOUDFLARE_ACCOUNT_ID }}
+  TF_VAR_turnstile_secret_key: ${{ secrets.TF_VAR_TURNSTILE_SECRET_KEY }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
 jobs:
   terraform:

@@ -12,6 +12,60 @@ Application Load Balancer, and an ACM certificate in `ca-central-1`.
 - Cloudflare SSL mode: use Full (strict), because TLS terminates at the ALB with
   the issued ACM certificate.
 
+## Cloudflare Turnstile (contact form)
+
+Terraform manages a Cloudflare Turnstile widget (`Portfolio Contact Form`,
+domain `huseyinbozkurt.dev`, mode `managed`, region `world`) in
+`turnstile.tf` and wires both keys into the public-site ECS task:
+
+- **`NEXT_PUBLIC_TURNSTILE_SITE_KEY`** — the widget's public site key. It is read
+  from the Terraform-managed widget (`cloudflare_turnstile_widget.portfolio_contact.sitekey`),
+  never hardcoded, and injected as a normal ECS container environment variable
+  (see `locals.tf`). It is also exposed as the non-sensitive `turnstile_site_key`
+  output for deployment visibility.
+- **`TURNSTILE_SECRET_KEY`** — the server-side secret. Its value comes from the
+  sensitive `turnstile_secret_key` variable, is stored in AWS Secrets Manager
+  (`portfolio/dev/TURNSTILE_SECRET_KEY`), and is injected into the container as an
+  ECS *secret* (runtime only) — never as a plain environment variable, never
+  output or logged. The task execution role's `secretsmanager:GetSecretValue` is
+  scoped to exactly this secret's ARN (plus the existing app secrets), with no
+  wildcard.
+
+> Note: `NEXT_PUBLIC_*` values are normally inlined at Next.js build time. If the
+> contact form reads the site key in a client component, ensure the build also
+> receives `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (e.g. as a Docker build arg), or read
+> it server-side and pass it to the client. The infrastructure provides it at
+> runtime as specified.
+
+### Required Terraform variables
+
+| Variable                | Sensitive | Source                                                        |
+| ----------------------- | --------- | ------------------------------------------------------------- |
+| `cloudflare_account_id` | no        | `terraform.tfvars` (local) or `TF_VAR_cloudflare_account_id`  |
+| `turnstile_secret_key`  | **yes**   | `TF_VAR_turnstile_secret_key` only — never `terraform.tfvars` |
+
+Provider authentication uses a scoped **`CLOUDFLARE_API_TOKEN`** environment
+variable (Turnstile write permission). It is never committed or placed in state.
+
+Local example:
+
+```bash
+export CLOUDFLARE_API_TOKEN="<scoped-cloudflare-api-token>"
+export TF_VAR_turnstile_secret_key="<turnstile-secret-key>"
+# cloudflare_account_id can live in the gitignored terraform.tfvars
+terraform plan
+```
+
+### Required CI/CD secrets (GitHub Actions)
+
+The `terraform-deploy.yml` workflow expects these to be configured before deploy:
+
+- `secrets.TF_VAR_TURNSTILE_SECRET_KEY` — the Turnstile secret key.
+- `secrets.CLOUDFLARE_API_TOKEN` — scoped Cloudflare API token for the provider.
+- `vars.TF_VAR_CLOUDFLARE_ACCOUNT_ID` — the Cloudflare account ID (non-sensitive).
+
+The Turnstile secret value is never echoed, output, or committed.
+
 ## Current Live Values
 
 - ALB DNS name: `portfolio-dev-alb-2138299774.ca-central-1.elb.amazonaws.com`

@@ -19,3 +19,14 @@ database_ssl_ca_file = "/app/global-bundle.pem"
 
 # Download source used by the public-site container when database_ssl_ca_file is missing.
 database_ssl_ca_url = "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem"
+
+# Cloudflare account ID that owns the Turnstile widget. Not a secret — safe to
+# store in your local terraform.tfvars.
+cloudflare_account_id = "<cloudflare-account-id>"
+
+# Cloudflare Turnstile secret key — DO NOT set it here and DO NOT commit it.
+# Provide it via the environment instead:
+#   export TF_VAR_turnstile_secret_key="<turnstile-secret-key>"
+# or as a secure CI/CD secret (TF_VAR_turnstile_secret_key). Provider auth uses a
+# scoped CLOUDFLARE_API_TOKEN environment variable (also never committed).
+# turnstile_secret_key = "set via TF_VAR_turnstile_secret_key, never here"

@@ -90,3 +90,24 @@ variable "database_ssl_ca_url" {
     error_message = "database_ssl_ca_url must be an HTTPS URL."
   }
 }
+
+variable "cloudflare_account_id" {
+  description = "Cloudflare account ID that owns the Turnstile widget for huseyinbozkurt.dev. Safe to store in tfvars (not a secret). Pair it with a scoped CLOUDFLARE_API_TOKEN environment variable for provider auth."
+  type        = string
+
+  validation {
+    condition     = length(trimspace(var.cloudflare_account_id)) > 0
+    error_message = "cloudflare_account_id must not be empty."
+  }
+}
+
+variable "turnstile_secret_key" {
+  description = "Cloudflare Turnstile secret key used for server-side verification. Provide it via TF_VAR_turnstile_secret_key (local) or a secure CI/CD secret — never commit it to terraform.tfvars."
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = length(trimspace(var.turnstile_secret_key)) > 0
+    error_message = "turnstile_secret_key must not be empty."
+  }
+}

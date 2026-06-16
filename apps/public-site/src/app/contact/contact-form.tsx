@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 
 import { submitContactForm } from "./actions";
 import type { ContactFormValues } from "./contact-form-state";
@@ -229,16 +231,27 @@ export function ContactForm() {
   );
   const [values, setValues] = useState<ContactFormValues>(initialContactFormState.values);
 
+  // Turnstile is enabled only when a site key is configured, so the form keeps
+  // working unchanged where it is not set (e.g. local development / previews).
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileInstance>(null);
+
   useEffect(() => {
     if (state.status === "success") {
       setValues(initialContactFormState.values);
-      return;
-    }
-
-    if (state.version > 0) {
+    } else if (state.version > 0) {
       setValues(state.values);
     }
-  }, [state.status, state.values, state.version]);
+
+    // Turnstile tokens are single-use, so after any completed submission clear
+    // the stored token and reset the widget. Managed mode immediately issues a
+    // fresh token for the next attempt.
+    if (state.version > 0 && turnstileSiteKey) {
+      setTurnstileToken(null);
+      turnstileRef.current?.reset();
+    }
+  }, [state.status, state.values, state.version, turnstileSiteKey]);
 
   const activeIntent = useMemo(
     () => intentOptions.find((intent) => intent.value === values.intent) ?? defaultIntent,
@@ -260,6 +273,8 @@ export function ContactForm() {
     <form action={formAction} className="glass-panel grid gap-5 rounded-lg p-5">
       <input name="intent" type="hidden" value={values.intent} />
       <input name="wantsResponse" type="hidden" value="true" />
+      <input name="turnstileToken" type="hidden" value={turnstileToken ?? ""} />
+      <HoneypotField />
 
       {state.message ? (
         <p
@@ -330,9 +345,21 @@ export function ContactForm() {
         values={values}
       />
 
+      {turnstileSiteKey ? (
+        <Turnstile
+          ref={turnstileRef}
+          siteKey={turnstileSiteKey}
+          onSuccess={(token) => setTurnstileToken(token)}
+          onExpire={() => setTurnstileToken(null)}
+          onError={() => setTurnstileToken(null)}
+          options={{ appearance: "interaction-only", size: "flexible", theme: "dark" }}
+          className="w-full min-w-0"
+        />
+      ) : null}
+
       <button
         className="rounded-lg bg-gradient-to-r from-violet-500 to-sky-400 px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={isPending}
+        disabled={isPending || (Boolean(turnstileSiteKey) && !turnstileToken)}
         type="submit"
       >
         {isPending ? "Sending..." : "Send message"}
@@ -566,4 +593,36 @@ function FieldError({ errors }: { errors?: string[] | undefined }) {
   }
 
   return <span className="text-xs font-medium text-amber-200">{errors[0]}</span>;
+}
+
+// Honeypot: a real, named field that is submitted with the form but is invisible
+// to humans and assistive technology. Naive spambots fill every field, so a
+// non-empty value is a strong bot signal (checked server-side). Inline styles
+// keep it hidden regardless of future CSS/utility changes; `aria-hidden` removes
+// it from the accessibility tree and `tabIndex={-1}` keeps it out of tab order.
+function HoneypotField() {
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        position: "absolute",
+        left: "-9999px",
+        top: "-9999px",
+        width: "1px",
+        height: "1px",
+        overflow: "hidden",
+      }}
+    >
+      <label htmlFor="contact-company-website">Company website</label>
+      <input
+        id="contact-company-website"
+        type="text"
+        name="companyWebsite"
+        autoComplete="off"
+        tabIndex={-1}
+        aria-hidden="true"
+        defaultValue=""
+      />
+    </div>
+  );
 }

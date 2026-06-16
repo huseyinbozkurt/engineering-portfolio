@@ -41,3 +41,11 @@ output "database_url_secret_arn" {
 output "next_public_site_url_secret_arn" {
   value = module.secrets.next_public_site_url_secret_arn
 }
+
+# Public Turnstile site key — safe to expose for deployment visibility. The
+# Turnstile SECRET key is intentionally never output.
+output "turnstile_site_key" {
+  description = "Public Cloudflare Turnstile site key for the portfolio contact form."
+  value       = cloudflare_turnstile_widget.portfolio_contact.sitekey
+  sensitive   = false
+}
