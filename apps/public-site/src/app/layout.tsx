@@ -34,6 +34,11 @@ export const metadata: Metadata = {
     title: siteConfig.title,
     description: siteConfig.description,
   },
+  verification: {
+    other: {
+      "google-adsense-account": [process.env.GOOGLE_ADSENSE_VERIFICATION ?? ""],
+    }
+  }
 };
 
 export const viewport: Viewport = {
