@@ -1,8 +1,8 @@
 import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 
-import { getActiveAiInsightRun, getAiInsightRuns } from "@portfolio/db/ai-insight-runs";
-import { getAiModelDisplayName } from "@portfolio/validators";
+import { getActiveLlmRun, getLlmRuns } from "@portfolio/db/llm-runs";
+import { resolveVisibleModelName } from "@portfolio/validators";
 
 import { EmptyPanel } from "@/components/empty-panel";
 import { GenerateInsightsButton } from "@/components/insights/generate-insights-button";
@@ -22,8 +22,8 @@ export const dynamic = "force-dynamic";
 
 export default async function AiInsightsPage() {
   const [runs, activeRun, llmStatuses] = await Promise.all([
-    getAiInsightRuns(40),
-    getActiveAiInsightRun(),
+    getLlmRuns({ workflow: "aiInsights", limit: 40 }),
+    getActiveLlmRun("aiInsights"),
     getLlmConnectionStatuses(),
   ]);
 
@@ -45,8 +45,13 @@ export default async function AiInsightsPage() {
 
       <section>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="ui-section-title">Generation runs</h2>
-          {runs.length > 0 ? <span className="ui-chip tabular-nums">{runs.length} runs</span> : null}
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="ui-section-title">Generation runs</h2>
+            {runs.length > 0 ? <span className="ui-chip tabular-nums">{runs.length} runs</span> : null}
+          </div>
+          <Link href="/llm-runs?workflow=aiInsights" className="ui-btn-outline">
+            View in LLM Runs
+          </Link>
         </div>
 
         {runs.length === 0 ? (
@@ -79,7 +84,11 @@ export default async function AiInsightsPage() {
                       </td>
                       <td className="px-4 py-3 text-muted">
                         <span className="text-ink">
-                          {getAiModelDisplayName({ provider: run.provider, model: run.model })}
+                          {resolveVisibleModelName({
+                            visibleModelName: run.visibleModelName,
+                            provider: run.provider,
+                            model: run.model,
+                          })}
                         </span>
                       </td>
                       <td className="px-4 py-3 tabular-nums text-muted">

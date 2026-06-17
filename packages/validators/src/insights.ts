@@ -295,7 +295,6 @@ export const portfolioInsightOutputSchema = z
       .strict(),
     recruiterSimulation: recruiterSimulationSchema,
     opportunityHeatmap: z.array(opportunitySchema).min(1).max(8),
-    signalRadar: signalRadarSchema,
     groundedDataNotes: z.array(z.string().trim().min(1).max(300)).min(1).max(8),
     homePageContent: homePageContentSchema.optional(),
   })

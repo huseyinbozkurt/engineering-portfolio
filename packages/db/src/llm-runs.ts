@@ -13,8 +13,14 @@ import {
   type LlmRunSuggestionStatusValue,
 } from "./schema";
 
+export type { LlmRunAttempt } from "./schema";
+
 export type LlmRunRecord = InferSelectModel<typeof llmRuns>;
 export type LlmRunSuggestionRecord = InferSelectModel<typeof llmRunSuggestions>;
+
+export interface LlmRunWithSuggestions extends LlmRunRecord {
+  suggestions: LlmRunSuggestionRecord[];
+}
 
 type TokenUsage = LlmRunRecord["tokenUsage"];
 
@@ -111,11 +117,10 @@ export async function createLlmRun(input: CreateLlmRunInput): Promise<LlmRunReco
   return record;
 }
 
-export async function updateLlmRun(
-  id: string,
+/** Map an update patch onto the row columns, always touching `updatedAt`. */
+function buildLlmRunUpdateValues(
   input: UpdateLlmRunInput,
-  options: { onlyIfActive?: boolean } = {},
-): Promise<LlmRunRecord> {
+): Partial<typeof llmRuns.$inferInsert> {
   const values: Partial<typeof llmRuns.$inferInsert> = { updatedAt: new Date() };
 
   if (input.status !== undefined) values.status = input.status;
@@ -135,6 +140,16 @@ export async function updateLlmRun(
   if (input.publishedAt !== undefined) values.publishedAt = input.publishedAt;
   if (input.reviewedAt !== undefined) values.reviewedAt = input.reviewedAt;
 
+  return values;
+}
+
+export async function updateLlmRun(
+  id: string,
+  input: UpdateLlmRunInput,
+  options: { onlyIfActive?: boolean } = {},
+): Promise<LlmRunRecord> {
+  const values = buildLlmRunUpdateValues(input);
+
   const where = options.onlyIfActive
     ? and(eq(llmRuns.id, id), inArray(llmRuns.status, ["pending", "running"]))
     : eq(llmRuns.id, id);
@@ -149,6 +164,63 @@ export async function updateLlmRun(
     );
   }
   return record;
+}
+
+/**
+ * Terminal completion for review-style workflows (e.g. taxonomy review): apply
+ * the run update and replace its review-only suggestions in one transaction, so
+ * a succeeded run and its suggestions are always consistent. Replaces any
+ * existing suggestions for the run (a fresh run normally has none).
+ */
+export async function completeLlmRunWithSuggestions(
+  id: string,
+  input: UpdateLlmRunInput,
+  suggestions: CreateLlmRunSuggestionInput[],
+  options: { onlyIfActive?: boolean } = {},
+): Promise<LlmRunRecord> {
+  return getDb().transaction(async (tx) => {
+    await tx.delete(llmRunSuggestions).where(eq(llmRunSuggestions.runId, id));
+
+    if (suggestions.length > 0) {
+      await tx.insert(llmRunSuggestions).values(
+        suggestions.map((suggestion) => ({
+          runId: id,
+          suggestionType: suggestion.suggestionType,
+          targetGroup: suggestion.targetGroup ?? null,
+          targetRecordType: suggestion.targetRecordType ?? null,
+          targetRecordId: suggestion.targetRecordId ?? null,
+          relationType: suggestion.relationType ?? null,
+          action: suggestion.action,
+          currentValue: suggestion.currentValue ?? null,
+          proposedValue: suggestion.proposedValue ?? null,
+          originalValue: suggestion.originalValue ?? null,
+          reason: suggestion.reason,
+          confidence: suggestion.confidence ?? null,
+          evidenceRefs: suggestion.evidenceRefs ?? [],
+          affectedRecords: suggestion.affectedRecords ?? [],
+        })),
+      );
+    }
+
+    const where = options.onlyIfActive
+      ? and(eq(llmRuns.id, id), inArray(llmRuns.status, ["pending", "running"]))
+      : eq(llmRuns.id, id);
+
+    const [record] = await tx
+      .update(llmRuns)
+      .set(buildLlmRunUpdateValues(input))
+      .where(where)
+      .returning();
+
+    if (!record) {
+      throw new Error(
+        options.onlyIfActive
+          ? "LLM run completion skipped: the run is no longer active."
+          : "LLM run completion did not return a record.",
+      );
+    }
+    return record;
+  });
 }
 
 export async function getLlmRun(id: string): Promise<LlmRunRecord | null> {
@@ -191,6 +263,42 @@ export async function getLlmRuns(filter: LlmRunListFilter = {}): Promise<LlmRunR
   } catch (error) {
     console.error("[db] llm_runs list failed; treating as empty:", error);
     return [];
+  }
+}
+
+/**
+ * The latest run for a workflow with its review-only suggestions attached.
+ * Drives review surfaces (e.g. taxonomy review) that read from `llm_runs`.
+ */
+export async function getLatestLlmRunWithSuggestions(
+  workflow: LlmWorkflow,
+): Promise<LlmRunWithSuggestions | null> {
+  if (!hasDatabaseUrl()) {
+    return null;
+  }
+
+  try {
+    const [run] = await getDb()
+      .select()
+      .from(llmRuns)
+      .where(eq(llmRuns.workflow, workflow))
+      .orderBy(desc(llmRuns.createdAt))
+      .limit(1);
+
+    if (!run) {
+      return null;
+    }
+
+    const suggestions = await getDb()
+      .select()
+      .from(llmRunSuggestions)
+      .where(eq(llmRunSuggestions.runId, run.id))
+      .orderBy(llmRunSuggestions.targetGroup, llmRunSuggestions.createdAt);
+
+    return { ...run, suggestions };
+  } catch (error) {
+    console.error("[db] latest llm run with suggestions read failed; treating as missing:", error);
+    return null;
   }
 }
 
@@ -424,4 +532,32 @@ export async function setLlmRunSuggestionStatus(
     throw new Error("LLM run suggestion update did not return a record.");
   }
   return record;
+}
+
+/**
+ * Bulk approve/reject the still-pending suggestions of a run, optionally scoped
+ * to one `targetGroup`. Review-only: records the decision and timestamp,
+ * mutating no portfolio data. Returns how many suggestions changed.
+ */
+export async function bulkSetLlmRunSuggestionStatus(input: {
+  runId: string;
+  status: Extract<LlmRunSuggestionStatusValue, "approved" | "rejected">;
+  targetGroup?: string | null;
+}): Promise<number> {
+  const now = new Date();
+  const conditions: SQL[] = [
+    eq(llmRunSuggestions.runId, input.runId),
+    eq(llmRunSuggestions.status, "pending"),
+  ];
+  if (input.targetGroup) {
+    conditions.push(eq(llmRunSuggestions.targetGroup, input.targetGroup));
+  }
+
+  const records = await getDb()
+    .update(llmRunSuggestions)
+    .set({ status: input.status, reviewedAt: now, updatedAt: now })
+    .where(and(...conditions))
+    .returning({ id: llmRunSuggestions.id });
+
+  return records.length;
 }

@@ -2,15 +2,11 @@ import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import {
-  getAiInsightRun,
-  getAiInsightRuns,
-  type AiInsightRunRecord,
-} from "@portfolio/db/ai-insight-runs";
+import { getLlmRun, getLlmRuns, type LlmRunRecord } from "@portfolio/db/llm-runs";
 import {
   portfolioInsightInputSchema,
   portfolioInsightOutputSchema,
-  getAiModelDisplayName,
+  resolveVisibleModelName,
   type PortfolioInsightOutput,
 } from "@portfolio/validators";
 
@@ -43,13 +39,16 @@ interface RunPageProps {
 
 export default async function InsightRunPage({ params, searchParams }: RunPageProps) {
   const [{ id }, { vs }] = await Promise.all([params, searchParams]);
-  const [run, allRuns] = await Promise.all([getAiInsightRun(id), getAiInsightRuns(40)]);
+  const [run, allRuns] = await Promise.all([
+    getLlmRun(id),
+    getLlmRuns({ workflow: "aiInsights", limit: 40 }),
+  ]);
 
-  if (!run) {
+  if (!run || run.workflow !== "aiInsights") {
     notFound();
   }
 
-  const compareRun = vs ? await getAiInsightRun(vs) : null;
+  const compareRun = vs ? await getLlmRun(vs) : null;
   const output = parseOutput(run);
   const resolve = buildResolver(run);
   const isActive = run.status === "pending" || run.status === "running";
@@ -72,7 +71,11 @@ export default async function InsightRunPage({ params, searchParams }: RunPagePr
             </div>
             <div className="mt-3 flex flex-wrap gap-1.5">
               <span className="ui-chip">
-                {getAiModelDisplayName({ provider: run.provider, model: run.model })}
+                {resolveVisibleModelName({
+                  visibleModelName: run.visibleModelName,
+                  provider: run.provider,
+                  model: run.model,
+                })}
               </span>
               <span className="ui-chip tabular-nums">{formatDuration(run.durationMs)}</span>
               <span className="ui-chip tabular-nums">
@@ -150,7 +153,8 @@ export default async function InsightRunPage({ params, searchParams }: RunPagePr
                   .map((candidate) => (
                     <option key={candidate.id} value={candidate.id}>
                       {formatDate(candidate.createdAt)} · {candidate.status} ·{" "}
-                      {getAiModelDisplayName({
+                      {resolveVisibleModelName({
+                        visibleModelName: candidate.visibleModelName,
                         provider: candidate.provider,
                         model: candidate.model,
                       })}
@@ -214,7 +218,7 @@ export default async function InsightRunPage({ params, searchParams }: RunPagePr
                       className="rounded-lg border border-line bg-white/[0.02] px-3 py-2"
                     >
                       #{attempt.attemptNo} ·{" "}
-                      {getAiModelDisplayName({
+                      {resolveVisibleModelName({
                         provider: attempt.provider,
                         model: attempt.model,
                       })}{" "}
@@ -275,9 +279,9 @@ function CompareView({
   baseOutput,
   otherRun,
 }: {
-  baseRun: AiInsightRunRecord;
+  baseRun: LlmRunRecord;
   baseOutput: PortfolioInsightOutput | null;
-  otherRun: AiInsightRunRecord;
+  otherRun: LlmRunRecord;
 }) {
   const otherOutput = parseOutput(otherRun);
 
@@ -285,8 +289,16 @@ function CompareView({
     ["Status", baseRun.status, otherRun.status],
     [
       "Model",
-      getAiModelDisplayName({ provider: baseRun.provider, model: baseRun.model }),
-      getAiModelDisplayName({ provider: otherRun.provider, model: otherRun.model }),
+      resolveVisibleModelName({
+        visibleModelName: baseRun.visibleModelName,
+        provider: baseRun.provider,
+        model: baseRun.model,
+      }),
+      resolveVisibleModelName({
+        visibleModelName: otherRun.visibleModelName,
+        provider: otherRun.provider,
+        model: otherRun.model,
+      }),
     ],
     ["Duration", formatDuration(baseRun.durationMs), formatDuration(otherRun.durationMs)],
     [
@@ -387,7 +399,7 @@ function CompareColumn({
   );
 }
 
-function parseOutput(run: AiInsightRunRecord): PortfolioInsightOutput | null {
+function parseOutput(run: LlmRunRecord): PortfolioInsightOutput | null {
   if (!run.outputJson) {
     return null;
   }
@@ -395,7 +407,7 @@ function parseOutput(run: AiInsightRunRecord): PortfolioInsightOutput | null {
   return parsed.success ? parsed.data : null;
 }
 
-function buildResolver(run: AiInsightRunRecord): EvidenceResolver {
+function buildResolver(run: LlmRunRecord): EvidenceResolver {
   const parsed = portfolioInsightInputSchema.safeParse(run.inputSnapshot);
   if (!parsed.success) {
     return () => null;

@@ -2,8 +2,9 @@ import type { LLMGenerationSettings } from "./types";
 
 /**
  * Generation profile for the portfolio's structured-JSON analysis workflows
- * (AI insights, homepage insight content, taxonomy/relation review, content
- * review). These tasks must return deterministic, schema-valid JSON, so they
+ * (AI insights — which also produces the homepage insight content — taxonomy/
+ * relation review, content review). These tasks must return deterministic,
+ * schema-valid JSON, so they
  * run cool with nucleus sampling and a completion budget large enough to hold a
  * full report.
  *

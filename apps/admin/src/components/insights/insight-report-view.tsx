@@ -3,6 +3,7 @@ import type {
   HomePageContent,
   InsightConfidence,
   PortfolioInsightOutput,
+  SignalRadar
 } from "@portfolio/validators";
 
 /**
@@ -85,7 +86,7 @@ function SectionCard({
   );
 }
 
-const radarAxisLabels: Array<{ key: keyof PortfolioInsightOutput["signalRadar"]; label: string }> = [
+const radarAxisLabels: Array<{ key: keyof SignalRadar; label: string }> = [
   { key: "frontendEngineering", label: "Frontend Engineering" },
   { key: "technicalLeadership", label: "Technical Leadership" },
   { key: "systemDesign", label: "System Design" },
@@ -241,35 +242,6 @@ export function InsightReportView({
         </div>
       </SectionCard>
 
-      <SectionCard
-        title="Signal Radar"
-        description="Scores are capped by validation to what the cited evidence supports."
-      >
-        <div className="grid gap-3.5">
-          {radarAxisLabels.map(({ key, label }) => {
-            const axis = output.signalRadar[key];
-            return (
-              <div key={key}>
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-ink">{label}</span>
-                  <span className="tabular-nums text-muted">
-                    {axis.score === 0 && axis.evidence.length === 0
-                      ? "Insufficient data"
-                      : `${axis.score}/100`}
-                  </span>
-                </div>
-                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-                  <div
-                    className="h-full rounded-full bg-accent-400"
-                    style={{ width: `${Math.max(axis.score, 2)}%` }}
-                  />
-                </div>
-                <EvidenceList evidence={axis.evidence} resolve={resolve} />
-              </div>
-            );
-          })}
-        </div>
-      </SectionCard>
 
       <SectionCard
         title="Grounded Data Notes"

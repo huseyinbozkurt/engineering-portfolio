@@ -55,6 +55,13 @@ export interface RunPortfolioInsightOptions {
   adapter: LLMAdapter;
   store: InsightRunStore;
   promptVersion?: string;
+  /**
+   * Pre-rendered prompt to send instead of building it from `promptVersion`.
+   * The caller resolves the active DB prompt (or hardcoded fallback) and passes
+   * it here so the text sent to the model is exactly what was persisted on the
+   * run. When omitted, the runner builds the prompt from `promptVersion`.
+   */
+  prompt?: { system: string; user: string };
   logger?: InsightLogger;
   startedAt?: Date;
   /**
@@ -94,6 +101,7 @@ export async function runPortfolioInsight(
     adapter,
     store,
     promptVersion = latestInsightPromptVersion,
+    prompt: injectedPrompt,
     logger = silentInsightLogger,
     startedAt = new Date(),
     maxAttempts = 3,
@@ -136,11 +144,12 @@ export async function runPortfolioInsight(
 
   let prompt: { system: string; user: string };
   try {
-    prompt = getInsightPromptVersion(promptVersion).build(input);
+    prompt = injectedPrompt ?? getInsightPromptVersion(promptVersion).build(input);
     logger.event("prompt-built", {
       promptVersion,
       systemChars: prompt.system.length,
       userChars: prompt.user.length,
+      injected: Boolean(injectedPrompt),
     });
   } catch (error) {
     return finishFailed(

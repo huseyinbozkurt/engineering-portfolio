@@ -101,6 +101,15 @@ export function getTaxonomyReviewPromptVersion(
   return entry;
 }
 
+/**
+ * The JSON response-shape contract embedded in the taxonomy-review prompt,
+ * serialized. Exposed so a DB-managed `taxonomyReview` prompt template can be
+ * rendered with the same `{{responseShape}}` value the code builder uses.
+ */
+export function getTaxonomyReviewResponseShape(): string {
+  return JSON.stringify(responseShape(), null, 2);
+}
+
 function responseShape(): Record<string, unknown> {
   const evidenceRef = {
     type: "experience | caseStudy | project",

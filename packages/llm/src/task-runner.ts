@@ -12,11 +12,12 @@ import {
   setContentAiReviewProcessing,
   type AiReviewContentType,
 } from "@portfolio/db/content-ai-review";
+import { createLlmRun, updateLlmRun, type LlmRunAttempt } from "@portfolio/db/llm-runs";
 
 import { getCaseStudyById, getExperienceById, getProjectById } from "@portfolio/db/queries";
 
 import { resolveOnlineLlmAdapter } from "./adapters/online";
-import type { LLMAdapter } from "./adapters/types";
+import type { LLMAdapter, LLMUsage } from "./adapters/types";
 import {
   buildExperienceAiReviewPrompt,
   buildContentAiReviewPrompt,
@@ -150,6 +151,11 @@ async function processContentAiReviewTask(
   await setContentAiReviewProcessing(contentType, contentId);
   logLlmTaskEvent("started", taskLogFields(task));
 
+  // Best-effort unified audit record so every content-review execution shows up
+  // in Admin → LLM Runs alongside insights and taxonomy review. The llm_tasks
+  // queue still owns scheduling/concurrency; this is purely the audit trail.
+  let llmRunId: string | null = null;
+
   try {
     await updateLlmTask(task.id, {
       providerName: adapter.getProvider(),
@@ -157,6 +163,8 @@ async function processContentAiReviewTask(
     });
 
     const prompt = await getTaskPrompt(task, contentType, contentId);
+    llmRunId = await createContentReviewLlmRun(contentType, contentId, adapter, prompt, startedAt);
+
     const response = await adapter.generate({
       systemPrompt: prompt.system,
       userPrompt: prompt.user,
@@ -182,6 +190,15 @@ async function processContentAiReviewTask(
         completedAt: new Date(),
         durationMs: Date.now() - startedAt.getTime(),
       });
+      await finishContentReviewLlmRun(llmRunId, adapter, {
+        status: "failed",
+        startedAt,
+        rawResponse: response.text,
+        usage: response.usage ?? null,
+        errorStage: stage,
+        errorMessage: message,
+        validationErrorStage: stage,
+      });
       return;
     }
 
@@ -199,11 +216,109 @@ async function processContentAiReviewTask(
       completedAt: new Date(),
       durationMs: Date.now() - startedAt.getTime(),
     });
+    await finishContentReviewLlmRun(llmRunId, adapter, {
+      status: "succeeded",
+      startedAt,
+      rawResponse: response.text,
+      outputJson: output,
+      usage: response.usage ?? null,
+    });
   } catch (error) {
     const stage = error instanceof ExperienceAiReviewValidationError ? error.stage : "request";
     const message = error instanceof Error ? error.message : "Experience AI review failed.";
 
     await failContentReviewTask(task, contentType, contentId, stage, message, startedAt);
+    await finishContentReviewLlmRun(llmRunId, adapter, {
+      status: "failed",
+      startedAt,
+      errorStage: stage,
+      errorMessage: message,
+    });
+  }
+}
+
+/**
+ * Create the unified `llm_runs` audit record for a content-review execution.
+ * Best-effort: a failure here is logged but never blocks the review itself.
+ * Content review uses hardcoded prompts and the .env-resolved adapter, so the
+ * provenance is always `codeFallback` / `envFallback`.
+ */
+async function createContentReviewLlmRun(
+  contentType: AiReviewContentType,
+  contentId: string,
+  adapter: LLMAdapter,
+  prompt: { system: string; user: string },
+  startedAt: Date,
+): Promise<string | null> {
+  try {
+    const run = await createLlmRun({
+      workflow: "contentReview",
+      targetType: contentType,
+      targetId: contentId,
+      status: "running",
+      provider: adapter.getProvider(),
+      model: adapter.getModel() ?? null,
+      promptSource: "codeFallback",
+      configSource: "envFallback",
+      promptSystem: prompt.system,
+      promptUser: prompt.user,
+      startedAt,
+    });
+    return run.id;
+  } catch (error) {
+    console.error("[llm-tasks] failed to create content-review llm_runs record:", error);
+    return null;
+  }
+}
+
+interface ContentReviewLlmRunResult {
+  status: "succeeded" | "failed";
+  startedAt: Date;
+  rawResponse?: string | null;
+  outputJson?: unknown;
+  usage?: LLMUsage | null;
+  errorStage?: string | null;
+  errorMessage?: string | null;
+  validationErrorStage?: string | null;
+}
+
+/** Finalize the content-review audit record. Best-effort; never throws. */
+async function finishContentReviewLlmRun(
+  runId: string | null,
+  adapter: LLMAdapter,
+  result: ContentReviewLlmRunResult,
+): Promise<void> {
+  if (!runId) {
+    return;
+  }
+
+  const completedAt = new Date();
+  const attempt: LlmRunAttempt = {
+    attemptNo: 1,
+    provider: adapter.getProvider(),
+    model: adapter.getModel() ?? null,
+    startedAt: result.startedAt.toISOString(),
+    completedAt: completedAt.toISOString(),
+    errorMessage: result.errorMessage ?? null,
+    usage: result.usage ?? null,
+    validationErrorStage: result.validationErrorStage ?? null,
+    rawResponse: result.status === "failed" ? result.rawResponse ?? null : null,
+  };
+
+  try {
+    await updateLlmRun(runId, {
+      status: result.status,
+      rawResponse: result.rawResponse ?? null,
+      outputJson: result.outputJson,
+      tokenUsage: result.usage ?? null,
+      attempts: [attempt],
+      errorStage: result.errorStage ?? null,
+      errorMessage: result.errorMessage ?? null,
+      completedAt,
+      durationMs: completedAt.getTime() - result.startedAt.getTime(),
+    });
+  } catch (error) {
+    console.error("[llm-tasks] failed to finalize content-review llm_runs record:", error);
   }
 }
 

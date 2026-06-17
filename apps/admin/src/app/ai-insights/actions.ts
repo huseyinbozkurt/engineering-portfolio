@@ -2,24 +2,32 @@
 
 import { revalidatePath } from "next/cache";
 
+import { getActiveLlmConfiguration } from "@portfolio/db/llm-configurations";
+import { getActivePromptVersion } from "@portfolio/db/llm-prompt-versions";
 import {
-  createAiInsightRun,
-  getActiveAiInsightRun,
-  publishAiInsightRun,
-  unpublishAiInsightRun,
-  updateAiInsightRun,
-} from "@portfolio/db/ai-insight-runs";
+  createLlmRun,
+  getActiveLlmRun,
+  publishLlmRun,
+  unpublishLlmRun,
+  updateLlmRun,
+} from "@portfolio/db/llm-runs";
 import { getPublishedInsightSource } from "@portfolio/db/queries";
 import {
   buildPortfolioInsightInput,
   createInsightLogger,
   getInsightPromptVersion,
+  getInsightResponseShape,
   isInsightInputEmpty,
   latestInsightPromptVersion,
+  resolveWorkflowConfig,
+  resolveWorkflowPrompt,
   runPortfolioInsight,
+  type LLMGenerationSettings,
 } from "@portfolio/llm";
 
 import { resolveOnlineLlmAdapter } from "@/lib/llm/adapter";
+
+const AI_INSIGHTS_WORKFLOW = "aiInsights" as const;
 
 /**
  * Action state consumed by the Generate button via `useActionState`.
@@ -34,16 +42,30 @@ export interface AiInsightsActionState {
   taskId: string | null;
 }
 
+type InsightInput = ReturnType<typeof buildPortfolioInsightInput>;
+
+interface ResolvedInsightRun {
+  prompt: { system: string; user: string };
+  promptVersion: string;
+  generation: LLMGenerationSettings | undefined;
+}
+
 /**
  * Starts a new insight generation run. Admin-only by construction: this server
  * action exists solely in the admin app — the public site contains no
  * generation code and only reads published runs.
+ *
+ * Every execution is recorded in the unified `llm_runs` table under
+ * `workflow = "aiInsights"`; there is no longer a separate AI Insights run
+ * table. The prompt and configuration are resolved from DB-managed records when
+ * present and otherwise fall back to the hardcoded prompt / .env adapter, with
+ * the provenance persisted on the run.
  */
 export async function generateAiInsightsAction(
   _previousState: AiInsightsActionState,
   _formData: FormData,
 ): Promise<AiInsightsActionState> {
-  const active = await getActiveAiInsightRun();
+  const active = await getActiveLlmRun(AI_INSIGHTS_WORKFLOW);
   if (active) {
     return {
       status: "error",
@@ -81,34 +103,63 @@ export async function generateAiInsightsAction(
     draftCounts: input.meta.draftCounts,
   });
 
-  const promptVersion = latestInsightPromptVersion;
-  const prompt = getInsightPromptVersion(promptVersion).build(input);
+  // Resolve the prompt (DB-managed version → hardcoded fallback) and the
+  // configuration (DB-managed config → .env adapter fallback). Both record where
+  // they came from so the run carries full provenance.
+  const [activePrompt, activeConfig] = await Promise.all([
+    getActivePromptVersion(AI_INSIGHTS_WORKFLOW),
+    getActiveLlmConfiguration(AI_INSIGHTS_WORKFLOW),
+  ]);
+
+  const resolvedPrompt = resolveWorkflowPrompt({
+    workflow: AI_INSIGHTS_WORKFLOW,
+    activeVersion: activePrompt,
+    variables: {
+      responseShape: getInsightResponseShape(),
+      dataset: JSON.stringify(input),
+    },
+    fallback: () => getInsightPromptVersion(latestInsightPromptVersion).build(input),
+  });
+
+  const resolvedConfig = resolveWorkflowConfig(activeConfig);
+
+  // Only send explicit sampling settings when they come from a DB config. The
+  // .env fallback keeps today's behaviour: the adapter applies its own
+  // env-driven defaults (LLM_ANALYSIS_*) rather than being forced to the
+  // structured-profile ceiling.
+  const generation = resolvedConfig.source === "db" ? resolvedConfig.generation : undefined;
+  const promptVersionLabel = resolvedPrompt.promptVersion ?? latestInsightPromptVersion;
+
   const startedAt = new Date();
 
   let runId: string;
   try {
-    const run = await createAiInsightRun({
+    const run = await createLlmRun({
+      workflow: AI_INSIGHTS_WORKFLOW,
+      targetType: "portfolio",
+      targetId: null,
       status: "running",
-      provider: resolved.adapter.getProvider(),
-      model: resolved.adapter.getModel() ?? null,
-      promptVersion,
-      promptSystem: prompt.system,
-      promptUser: prompt.user,
+      provider: resolvedConfig.provider ?? resolved.adapter.getProvider(),
+      model: resolvedConfig.model ?? resolved.adapter.getModel() ?? null,
+      visibleModelName: resolvedConfig.visibleModelName,
+      promptSource: resolvedPrompt.source,
+      promptVersionId: resolvedPrompt.promptVersionId,
+      promptVersion: resolvedPrompt.promptVersion,
+      promptName: resolvedPrompt.promptName,
+      configSource: resolvedConfig.source,
+      llmConfigurationId: resolvedConfig.configurationId,
+      temperature: resolvedConfig.temperature,
+      topP: resolvedConfig.topP,
+      maxTokens: resolvedConfig.maxTokens,
+      maxRetries: resolvedConfig.maxRetries,
+      timeoutMs: resolvedConfig.timeoutMs,
+      promptSystem: resolvedPrompt.system,
+      promptUser: resolvedPrompt.user,
       inputSnapshot: input,
       startedAt,
     });
     runId = run.id;
-  } catch (error) {
-    // The partial unique index is the concurrency backstop for double-starts.
-    const message = error instanceof Error ? error.message : "";
-    if (message.includes("ai_insight_runs_single_active_idx")) {
-      return {
-        status: "error",
-        message: "An insight run is already in progress. Wait for it to finish first.",
-        report: null,
-        taskId: null,
-      };
-    }
+  } catch {
     return {
       status: "error",
       message:
@@ -121,10 +172,15 @@ export async function generateAiInsightsAction(
   // Fire-and-forget so the action returns immediately; the runs table
   // auto-refreshes while the run is active.
   setTimeout(() => {
-    void executeInsightRun(runId, input, startedAt);
+    void executeInsightRun(runId, input, startedAt, {
+      prompt: { system: resolvedPrompt.system, user: resolvedPrompt.user },
+      promptVersion: promptVersionLabel,
+      generation,
+    });
   }, 0);
 
   revalidatePath("/ai-insights");
+  revalidatePath("/llm-runs");
 
   return {
     status: "success",
@@ -136,15 +192,16 @@ export async function generateAiInsightsAction(
 
 async function executeInsightRun(
   runId: string,
-  input: Awaited<ReturnType<typeof buildPortfolioInsightInput>>,
+  input: InsightInput,
   startedAt: Date,
+  resolvedRun: ResolvedInsightRun,
 ): Promise<void> {
   const logger = createInsightLogger(runId);
 
   try {
     const resolved = await resolveOnlineLlmAdapter();
     if (!resolved) {
-      await updateAiInsightRun(
+      await updateLlmRun(
         runId,
         {
           status: "failed",
@@ -162,9 +219,12 @@ async function executeInsightRun(
       runId,
       input,
       adapter: resolved.adapter,
+      prompt: resolvedRun.prompt,
+      promptVersion: resolvedRun.promptVersion,
+      ...(resolvedRun.generation ? { generation: resolvedRun.generation } : {}),
       // Terminal writes only land while the run is still active, so a manual
       // cancel and a late runner result can never clobber each other.
-      store: { update: (id, patch) => updateAiInsightRun(id, patch, { onlyIfActive: true }) },
+      store: { update: (id, patch) => updateLlmRun(id, patch, { onlyIfActive: true }) },
       logger,
       startedAt,
     });
@@ -174,7 +234,7 @@ async function executeInsightRun(
       message: error instanceof Error ? error.message : "Unexpected runner failure.",
     });
     try {
-      await updateAiInsightRun(
+      await updateLlmRun(
         runId,
         {
           status: "failed",
@@ -191,24 +251,28 @@ async function executeInsightRun(
   } finally {
     revalidatePath("/ai-insights");
     revalidatePath(`/ai-insights/runs/${runId}`);
+    revalidatePath("/llm-runs");
+    revalidatePath(`/llm-runs/${runId}`);
   }
 }
 
 export async function publishInsightRunAction(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "");
-  const run = await publishAiInsightRun(id);
+  const run = await publishLlmRun(id);
 
   createInsightLogger(run.id).event("published", { promptVersion: run.promptVersion });
   revalidatePath("/ai-insights");
   revalidatePath(`/ai-insights/runs/${run.id}`);
+  revalidatePath("/llm-runs");
 }
 
 export async function unpublishInsightRunAction(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "");
-  const run = await unpublishAiInsightRun(id);
+  const run = await unpublishLlmRun(id);
 
   revalidatePath("/ai-insights");
   revalidatePath(`/ai-insights/runs/${run.id}`);
+  revalidatePath("/llm-runs");
 }
 
 /**
@@ -220,7 +284,7 @@ export async function cancelInsightRunAction(formData: FormData): Promise<void> 
   const id = String(formData.get("id") ?? "");
 
   try {
-    await updateAiInsightRun(
+    await updateLlmRun(
       id,
       {
         status: "failed",
@@ -236,4 +300,5 @@ export async function cancelInsightRunAction(formData: FormData): Promise<void> 
 
   revalidatePath("/ai-insights");
   revalidatePath(`/ai-insights/runs/${id}`);
+  revalidatePath("/llm-runs");
 }

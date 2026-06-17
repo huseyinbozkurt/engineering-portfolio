@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { getLatestPublishedAiInsightRun } from "@portfolio/db/ai-insight-runs";
 import {
   getCaseStudyBySlug,
   type CaseStudyDetailRecord,
@@ -9,11 +8,11 @@ import {
 import {
   portfolioInsightOutputSchema,
   type HomePageContent,
-  type SignalRadar,
 } from "@portfolio/validators";
 
 import { ComingSoon } from "@/components/coming-soon";
 import { HomeAiInsight } from "@/components/insights/home-ai-insight";
+import { getPublishedInsight } from "@/lib/ai-insights";
 import {
   CaseStudyCard,
   CTAButton,
@@ -134,7 +133,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <HomeAiInsight content={homeInsight?.content} signalRadar={homeInsight?.signalRadar} />
+      <HomeAiInsight content={homeInsight?.content} />
 
       {homepageMetrics.length > 0 ? (
         <section className="mx-auto max-w-7xl px-5 py-10 lg:px-8 lg:py-14">
@@ -404,20 +403,21 @@ function getHomepageMetrics(
 
 interface HomeAiInsightData {
   content: HomePageContent;
-  signalRadar: SignalRadar;
 }
 
 async function getHomeAiInsightContent(): Promise<HomeAiInsightData | undefined> {
   // Latest published report drives the section; absent/older reports (no
   // homePageContent) or any read error simply hide it — never crash the home page.
+  // Source of truth is the unified llm_runs table (workflow=aiInsights); the
+  // legacy table is consulted only as a fallback inside getPublishedInsight.
   try {
-    const run = await getLatestPublishedAiInsightRun();
+    const run = await getPublishedInsight();
     if (!run?.outputJson) {
       return undefined;
     }
     const parsed = portfolioInsightOutputSchema.safeParse(run.outputJson);
     return parsed.success && parsed.data.homePageContent
-      ? { content: parsed.data.homePageContent, signalRadar: parsed.data.signalRadar }
+      ? { content: parsed.data.homePageContent }
       : undefined;
   } catch {
     return undefined;

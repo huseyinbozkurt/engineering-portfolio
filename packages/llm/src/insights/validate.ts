@@ -254,15 +254,6 @@ export function validateInsightOutput(
     return { score: Math.min(axis.score, cap), evidence };
   };
 
-  const signalRadar = {
-    frontendEngineering: capRadarAxis(output.signalRadar.frontendEngineering, "signalRadar.frontendEngineering"),
-    technicalLeadership: capRadarAxis(output.signalRadar.technicalLeadership, "signalRadar.technicalLeadership"),
-    systemDesign: capRadarAxis(output.signalRadar.systemDesign, "signalRadar.systemDesign"),
-    devopsCloud: capRadarAxis(output.signalRadar.devopsCloud, "signalRadar.devopsCloud"),
-    aiEngineering: capRadarAxis(output.signalRadar.aiEngineering, "signalRadar.aiEngineering"),
-    peopleManagement: capRadarAxis(output.signalRadar.peopleManagement, "signalRadar.peopleManagement"),
-  };
-
   const homePageContent = output.homePageContent
     ? {
         ...output.homePageContent,
@@ -297,7 +288,6 @@ export function validateInsightOutput(
       careerTrajectory: { stages },
       recruiterSimulation,
       opportunityHeatmap,
-      signalRadar,
       groundedDataNotes: output.groundedDataNotes,
       ...(homePageContent ? { homePageContent } : {}),
     },

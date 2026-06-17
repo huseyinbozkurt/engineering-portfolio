@@ -346,15 +346,20 @@ export function ContactForm() {
       />
 
       {turnstileSiteKey ? (
-        <Turnstile
-          ref={turnstileRef}
-          siteKey={turnstileSiteKey}
-          onSuccess={(token) => setTurnstileToken(token)}
-          onExpire={() => setTurnstileToken(null)}
-          onError={() => setTurnstileToken(null)}
-          options={{ appearance: "interaction-only", size: "flexible", theme: "dark" }}
-          className="w-full min-w-0"
-        />
+        // min-w-0 + overflow-x-auto keep the widget inside the form box: when a
+        // challenge appears, the flexible widget fills wide layouts but can never
+        // overflow narrow (small-phone) ones. It stays mostly invisible (managed
+        // + interaction-only) for legitimate visitors.
+        <div className="min-w-0 overflow-x-auto">
+          <Turnstile
+            ref={turnstileRef}
+            siteKey={turnstileSiteKey}
+            onSuccess={(token) => setTurnstileToken(token)}
+            onExpire={() => setTurnstileToken(null)}
+            onError={() => setTurnstileToken(null)}
+            options={{ appearance: "interaction-only", size: "flexible", theme: "dark" }}
+          />
+        </div>
       ) : null}
 
       <button

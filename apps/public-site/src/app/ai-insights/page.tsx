@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
-import { getLatestPublishedAiInsightRun } from "@portfolio/db/ai-insight-runs";
 import {
-  getAiModelDisplayName,
   portfolioInsightInputSchema,
   portfolioInsightOutputSchema,
+  resolveVisibleModelName,
   type EvidenceRef,
   type PortfolioInsightOutput,
 } from "@portfolio/validators";
@@ -15,6 +14,7 @@ import { EmptyState } from "@/components/empty-state";
 import { ConfidencePill } from "@/components/insights/insight-primitives";
 import { InsightRadar } from "@/components/insights/insight-radar";
 import { SectionHeader } from "@/components/portfolio-ui";
+import { getPublishedInsight } from "@/lib/ai-insights";
 import { getPublicSiteAvailability } from "@/lib/site-availability";
 
 export const metadata: Metadata = {
@@ -48,7 +48,7 @@ export default async function AiInsightsPage() {
     return <ComingSoon />;
   }
 
-  const run = await getLatestPublishedAiInsightRun();
+  const run = await getPublishedInsight();
   const parsedOutput = run ? portfolioInsightOutputSchema.safeParse(run.outputJson) : null;
 
   if (!run || !parsedOutput?.success) {
@@ -100,7 +100,11 @@ export default async function AiInsightsPage() {
             />
             <HeroMeta
               label="Model"
-              value={getAiModelDisplayName({ provider: run.provider, model: run.model })}
+              value={resolveVisibleModelName({
+                visibleModelName: run.visibleModelName,
+                provider: run.provider,
+                model: run.model,
+              })}
             />
           </dl>
         </div>
@@ -203,7 +207,6 @@ export default async function AiInsightsPage() {
         <SectionHeader
           eyebrow="Signal Radar"
           title="Where the signals concentrate"
-          description="Scores are capped by validation to what the cited evidence supports — axes without enough records are shown as insufficient rather than estimated."
         />
         <div className="glass-panel rounded-lg p-6 md:p-8">
           <InsightRadar content={output.homePageContent} />
@@ -230,8 +233,12 @@ export default async function AiInsightsPage() {
         <p className="mt-8 border-t border-line pt-5 text-xs leading-6 text-muted">
           {INTEGRITY_LINE} Generated{" "}
           {run.completedAt ? formatDate(run.completedAt) : formatDate(run.createdAt)} with{" "}
-          {getAiModelDisplayName({ provider: run.provider, model: run.model })}. Reviewed and
-          published from the portfolio admin.
+          {resolveVisibleModelName({
+            visibleModelName: run.visibleModelName,
+            provider: run.provider,
+            model: run.model,
+          })}
+          . Reviewed and published from the portfolio admin.
         </p>
       </section>
     </div>

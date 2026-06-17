@@ -375,6 +375,15 @@ export function getInsightPromptVersion(version: string): InsightPromptVersion {
   return entry;
 }
 
+/**
+ * The JSON response-shape contract embedded in the latest insight prompt,
+ * serialized. Exposed so a DB-managed `aiInsights` prompt template can be
+ * rendered with the same `{{responseShape}}` value the code builder uses.
+ */
+export function getInsightResponseShape(): string {
+  return JSON.stringify(responseShape(), null, 2);
+}
+
 function responseShape(): Record<string, unknown> {
   return buildResponseShape({
     label: "Capability name",
@@ -473,14 +482,6 @@ function buildResponseShape(homepageCapability: Record<string, unknown>): Record
         evidence,
       },
     ],
-    signalRadar: {
-      frontendEngineering: { score: 0, evidence },
-      technicalLeadership: { score: 0, evidence },
-      systemDesign: { score: 0, evidence },
-      devopsCloud: { score: 0, evidence },
-      aiEngineering: { score: 0, evidence },
-      peopleManagement: { score: 0, evidence },
-    },
     groundedDataNotes: ["Real limitation of this dataset."],
   };
 }

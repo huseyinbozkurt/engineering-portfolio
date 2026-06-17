@@ -1,6 +1,5 @@
 import {
   type HomePageContent,
-  type SignalRadar,
 } from "@portfolio/validators";
 
 import { ConfidencePill } from "@/components/insights/insight-primitives";
@@ -16,10 +15,8 @@ import { InsightRadar } from "./insight-radar";
  */
 export function HomeAiInsight({
   content,
-  signalRadar,
 }: {
   content: HomePageContent | undefined;
-  signalRadar: SignalRadar | undefined;
 }) {
   if (!content) {
     return null;

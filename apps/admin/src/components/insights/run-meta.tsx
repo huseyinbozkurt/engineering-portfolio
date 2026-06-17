@@ -1,20 +1,21 @@
-import type { AiInsightRunRecord } from "@portfolio/db/ai-insight-runs";
+import type { LlmRunRecord } from "@portfolio/db/llm-runs";
 import { portfolioInsightInputSchema } from "@portfolio/validators";
 
-export function RunStatusBadge({ status }: { status: AiInsightRunRecord["status"] }) {
-  const classes: Record<AiInsightRunRecord["status"], string> = {
+export function RunStatusBadge({ status }: { status: LlmRunRecord["status"] }) {
+  const classes: Record<LlmRunRecord["status"], string> = {
     pending: "ui-badge ui-badge-neutral",
     running: "ui-badge ui-badge-accent",
     succeeded: "ui-badge ui-badge-success",
     failed: "ui-badge ui-badge-danger",
     published: "ui-badge ui-badge-accent",
+    reviewed: "ui-badge ui-badge-success",
   };
 
   return <span className={`${classes[status]} capitalize`}>{status}</span>;
 }
 
 /** Total records in the run's input snapshot, or null when unreadable. */
-export function recordsAnalyzed(run: AiInsightRunRecord): number | null {
+export function recordsAnalyzed(run: Pick<LlmRunRecord, "inputSnapshot">): number | null {
   const parsed = portfolioInsightInputSchema.safeParse(run.inputSnapshot);
   if (!parsed.success) {
     return null;

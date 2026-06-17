@@ -69,6 +69,13 @@ export interface RunTaxonomyReviewOptions {
   adapter: LLMAdapter;
   store: TaxonomyReviewRunStore;
   promptVersion?: string;
+  /**
+   * Pre-rendered prompt to send instead of building it from `promptVersion`.
+   * The caller resolves the active DB prompt (or hardcoded fallback) and passes
+   * it here so the text sent to the model is exactly what was persisted on the
+   * run. When omitted, the runner builds the prompt from `promptVersion`.
+   */
+  prompt?: { system: string; user: string };
   startedAt?: Date;
   /**
    * Total attempts including the first call — covers transient transport errors
@@ -99,6 +106,7 @@ export async function runTaxonomyReview(
     adapter,
     store,
     promptVersion = latestTaxonomyReviewPromptVersion,
+    prompt: injectedPrompt,
     startedAt = new Date(),
     maxAttempts = 3,
     generation,
@@ -137,7 +145,7 @@ export async function runTaxonomyReview(
 
   let prompt: { system: string; user: string };
   try {
-    prompt = getTaxonomyReviewPromptVersion(promptVersion).build(input);
+    prompt = injectedPrompt ?? getTaxonomyReviewPromptVersion(promptVersion).build(input);
   } catch (error) {
     return finishFailed(
       "prompt",

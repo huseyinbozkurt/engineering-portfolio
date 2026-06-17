@@ -21,7 +21,7 @@ for (const line of envFile.split("\n")) {
 }
 
 const { getPublishedInsightSource } = await import("@portfolio/db/queries");
-const { createAiInsightRun, updateAiInsightRun } = await import("@portfolio/db/ai-insight-runs");
+const { createLlmRun, updateLlmRun } = await import("@portfolio/db/llm-runs");
 const { closeDb } = await import("@portfolio/db/client");
 const {
   MockAdapter,
@@ -135,14 +135,6 @@ const report = {
       evidence: cite(ref.caseStudy),
     },
   ],
-  signalRadar: {
-    frontendEngineering: { score: 65, evidence: cite(ref.project, ref.skill) },
-    technicalLeadership: { score: 38, evidence: cite(ref.experience) },
-    systemDesign: { score: 35, evidence: cite(ref.caseStudy) },
-    devopsCloud: { score: 0, evidence: [] },
-    aiEngineering: { score: 0, evidence: [] },
-    peopleManagement: { score: 30, evidence: cite(ref.experience) },
-  },
   homePageContent: {
     eyebrow: "AI Portfolio Insight",
     headline: "Delivery ownership with product-minded systems work.",
@@ -193,10 +185,16 @@ const promptVersion = latestInsightPromptVersion;
 const prompt = getInsightPromptVersion(promptVersion).build(input);
 const startedAt = new Date();
 
-const run = await createAiInsightRun({
+const run = await createLlmRun({
+  workflow: "aiInsights",
+  targetType: "portfolio",
+  targetId: null,
   status: "running",
   provider: "mock",
   model: "mock-pipeline-check",
+  visibleModelName: null,
+  promptSource: "codeFallback",
+  configSource: "envFallback",
   promptVersion,
   promptSystem: prompt.system,
   promptUser: prompt.user,
@@ -207,12 +205,14 @@ const run = await createAiInsightRun({
 const result = await runPortfolioInsight({
   runId: run.id,
   input,
+  prompt,
+  promptVersion,
   adapter: new MockAdapter({
     model: "mock-pipeline-check",
     respond: () => JSON.stringify(report),
     usage: { promptTokens: 4200, completionTokens: 1100, totalTokens: 5300 },
   }),
-  store: { update: (id, patch) => updateAiInsightRun(id, patch, { onlyIfActive: true }) },
+  store: { update: (id, patch) => updateLlmRun(id, patch, { onlyIfActive: true }) },
   logger: createInsightLogger(run.id),
   startedAt,
 });

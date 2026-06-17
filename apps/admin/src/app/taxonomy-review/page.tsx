@@ -1,17 +1,20 @@
 import Link from "next/link";
 
 import type {
+  TaxonomyEvidenceRef,
   TaxonomySuggestionStatus,
   TaxonomyTargetGroup,
 } from "@portfolio/validators";
-import { getAiModelDisplayName } from "@portfolio/validators";
 import {
-  getActiveTaxonomyReviewRun,
-  getLatestTaxonomyReviewRunWithSuggestions,
-  getTaxonomyReviewRuns,
-  type TaxonomyReviewRunRecord,
-  type TaxonomyReviewSuggestionRecord,
-} from "@portfolio/db/taxonomy-review";
+  resolveVisibleModelName,
+  taxonomyTargetGroupSchema,
+} from "@portfolio/validators";
+import {
+  getActiveLlmRun,
+  getLatestLlmRunWithSuggestions,
+  type LlmRunRecord,
+  type LlmRunSuggestionRecord,
+} from "@portfolio/db/llm-runs";
 
 import { EmptyPanel } from "@/components/empty-panel";
 import { LlmStatusPanel } from "@/components/llm-status-panel";
@@ -57,10 +60,9 @@ export default async function TaxonomyReviewPage({
   const selectedGroup = parseGroupFilter(query.group);
   const selectedStatus = parseStatusFilter(query.status);
 
-  const [run, runs, activeRun, llmStatuses] = await Promise.all([
-    getLatestTaxonomyReviewRunWithSuggestions(),
-    getTaxonomyReviewRuns(8),
-    getActiveTaxonomyReviewRun(),
+  const [run, activeRun, llmStatuses] = await Promise.all([
+    getLatestLlmRunWithSuggestions("taxonomyReview"),
+    getActiveLlmRun("taxonomyReview"),
     getLlmConnectionStatuses(),
   ]);
 
@@ -71,7 +73,9 @@ export default async function TaxonomyReviewPage({
       ? "No LLM connection is online. Configure a provider before generating."
       : null;
 
-  const suggestions = run?.suggestions ?? [];
+  const suggestions: TaxonomySuggestionView[] = (run?.suggestions ?? [])
+    .map(toSuggestionView)
+    .filter((suggestion): suggestion is TaxonomySuggestionView => suggestion !== null);
   const counts = summarizeSuggestions(suggestions);
   const filtered = suggestions.filter(
     (suggestion) =>
@@ -202,46 +206,20 @@ export default async function TaxonomyReviewPage({
         </div>
       )}
 
-      {runs.length > 0 ? (
-        <section className="mt-8">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="ui-section-title">Recent runs</h2>
-            <span className="ui-chip tabular-nums">{runs.length} shown</span>
+      <section className="mt-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="ui-section-title">Run history</h2>
+            <p className="mt-1 text-sm leading-6 text-muted">
+              Every taxonomy review is recorded in the unified LLM Runs audit log alongside its
+              prompt, configuration, and output.
+            </p>
           </div>
-          <div className="ui-card overflow-hidden shadow-card">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[46rem] text-left text-sm">
-                <thead className="ui-table-head border-b border-line bg-white/[0.015]">
-                  <tr>
-                    <th className="px-4 py-2.5 font-semibold">Status</th>
-                    <th className="px-4 py-2.5 font-semibold">Model</th>
-                    <th className="px-4 py-2.5 font-semibold">Generated</th>
-                    <th className="px-4 py-2.5 font-semibold">Reviewed</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {runs.map((item) => (
-                    <tr key={item.id} className="ui-row">
-                      <td className="px-4 py-3">
-                        <RunStatusBadge status={item.status} />
-                      </td>
-                      <td className="px-4 py-3 text-muted">
-                        <span className="text-ink">
-                          {getAiModelDisplayName({ provider: item.provider, model: item.model })}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-muted">
-                        {formatDate(item.generatedAt ?? item.createdAt)}
-                      </td>
-                      <td className="px-4 py-3 text-muted">{formatDate(item.reviewedAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-      ) : null}
+          <Link href="/llm-runs?workflow=taxonomyReview" className="ui-btn-outline">
+            View in LLM Runs
+          </Link>
+        </div>
+      </section>
 
       <LlmStatusPanel statuses={llmStatuses} />
     </main>
@@ -252,7 +230,7 @@ function RunSummary({
   run,
   counts,
 }: {
-  run: TaxonomyReviewRunRecord;
+  run: LlmRunRecord;
   counts: SuggestionCounts;
 }) {
   return (
@@ -265,9 +243,13 @@ function RunSummary({
         <div className="flex flex-wrap items-center gap-2">
           <RunStatusBadge status={run.status} />
           <span className="ui-chip">
-            {getAiModelDisplayName({ provider: run.provider, model: run.model })}
+            {resolveVisibleModelName({
+              visibleModelName: run.visibleModelName,
+              provider: run.provider,
+              model: run.model,
+            })}
           </span>
-          <span className="ui-chip">generated {formatDate(run.generatedAt ?? run.createdAt)}</span>
+          <span className="ui-chip">generated {formatDate(run.completedAt ?? run.createdAt)}</span>
           {run.reviewedAt ? <span className="ui-chip">reviewed {formatDate(run.reviewedAt)}</span> : null}
         </div>
         {run.validationNotes?.length ? (
@@ -367,7 +349,7 @@ function StatusFilterForm({
 function SuggestionGrid({
   suggestions,
 }: {
-  suggestions: TaxonomyReviewSuggestionRecord[];
+  suggestions: TaxonomySuggestionView[];
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -381,7 +363,7 @@ function SuggestionGrid({
 function SuggestionCard({
   suggestion,
 }: {
-  suggestion: TaxonomyReviewSuggestionRecord;
+  suggestion: TaxonomySuggestionView;
 }) {
   const evidenceRefs = Array.isArray(suggestion.evidenceRefs)
     ? suggestion.evidenceRefs
@@ -451,7 +433,7 @@ function EvidenceList({
   refs,
 }: {
   title: string;
-  refs: TaxonomyReviewSuggestionRecord["evidenceRefs"];
+  refs: TaxonomySuggestionView["evidenceRefs"];
 }) {
   if (!Array.isArray(refs) || refs.length === 0) {
     return null;
@@ -560,6 +542,48 @@ function ConfidenceBadge({ confidence }: { confidence: string }) {
   return <span className={`ui-badge capitalize ${tone}`}>{confidence}</span>;
 }
 
+/**
+ * Presentation view of a unified review-only suggestion as a taxonomy suggestion.
+ * `llm_run_suggestions` stores `targetGroup`/`confidence` as free text and the
+ * evidence arrays as jsonb, so they are narrowed back to the taxonomy shape here.
+ * Rows whose group is not a known taxonomy group are skipped.
+ */
+interface TaxonomySuggestionView {
+  id: string;
+  targetGroup: TaxonomyTargetGroup;
+  action: string;
+  confidence: string;
+  status: TaxonomySuggestionStatus;
+  currentValue: string | null;
+  proposedValue: string | null;
+  reason: string;
+  evidenceRefs: TaxonomyEvidenceRef[];
+  affectedRecords: TaxonomyEvidenceRef[];
+}
+
+function asEvidenceRefs(value: unknown): TaxonomyEvidenceRef[] {
+  return Array.isArray(value) ? (value as TaxonomyEvidenceRef[]) : [];
+}
+
+function toSuggestionView(record: LlmRunSuggestionRecord): TaxonomySuggestionView | null {
+  const group = taxonomyTargetGroupSchema.safeParse(record.targetGroup);
+  if (!group.success) {
+    return null;
+  }
+  return {
+    id: record.id,
+    targetGroup: group.data,
+    action: record.action,
+    confidence: record.confidence ?? "low",
+    status: record.status,
+    currentValue: record.currentValue,
+    proposedValue: record.proposedValue,
+    reason: record.reason,
+    evidenceRefs: asEvidenceRefs(record.evidenceRefs),
+    affectedRecords: asEvidenceRefs(record.affectedRecords),
+  };
+}
+
 interface SuggestionCounts {
   total: number;
   pending: number;
@@ -569,7 +593,7 @@ interface SuggestionCounts {
 }
 
 function summarizeSuggestions(
-  suggestions: TaxonomyReviewSuggestionRecord[],
+  suggestions: TaxonomySuggestionView[],
 ): SuggestionCounts {
   const empty = () => ({ total: 0, pending: 0, approved: 0, rejected: 0 });
   const counts: SuggestionCounts = {

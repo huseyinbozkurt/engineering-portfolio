@@ -981,8 +981,9 @@ export const llmConfigurations = pgTable(
 );
 
 /**
- * Unified LLM run audit log. Every new LLM execution (insights, content review,
- * taxonomy/relation review, homepage insight) writes here with its full prompt
+ * Unified LLM run audit log. Every new LLM execution (insights — including the
+ * homepage insight content carried in the aiInsights output — content review,
+ * taxonomy/relation review) writes here with its full prompt
  * + config provenance, rendered prompts, raw + validated output, attempts, and
  * token usage. `outputJson` is `unknown` on purpose — readers re-validate with
  * the workflow's Zod schema before use.
