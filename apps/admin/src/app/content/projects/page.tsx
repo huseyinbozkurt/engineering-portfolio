@@ -33,7 +33,7 @@ export default async function ProjectsPage() {
   const [projects, content, llmStatuses] = await Promise.all([
     getProjectListRecords(),
     getAdminContentIndex(),
-    getLlmConnectionStatuses(),
+    getLlmConnectionStatuses("contentReview"),
   ]);
 
   const experienceNames = new Map(

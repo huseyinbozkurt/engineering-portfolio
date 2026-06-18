@@ -1,7 +1,13 @@
 import Link from "next/link";
 
 import { getLlmPromptVersions } from "@portfolio/db/llm-prompt-versions";
-import { LLM_WORKFLOW_LABELS, LLM_WORKFLOWS, type LlmWorkflow } from "@portfolio/validators";
+import {
+  CONTENT_REVIEW_TARGET_TYPE_LABELS,
+  isContentReviewTargetType,
+  LLM_WORKFLOW_LABELS,
+  LLM_WORKFLOWS,
+  type LlmWorkflow,
+} from "@portfolio/validators";
 
 import { PageTitle } from "@/components/page-title";
 import { formatDate } from "@/lib/format";
@@ -27,7 +33,7 @@ export default async function PromptVersionsPage() {
     <main className="px-5 py-8 lg:px-8">
       <PageTitle
         title="Prompt Versions"
-        description="DB-managed prompts per workflow. When no version is active, the workflow uses its hardcoded fallback prompt. Prompt versions are admin-only and never shown in the public site."
+        description="DB-managed prompts per workflow. Each workflow requires an active prompt before it can run. Prompt versions are admin-only and never shown in the public site."
         actions={
           <Link className="ui-btn-primary" href="/llm-settings/prompts/new">
             New version
@@ -44,13 +50,13 @@ export default async function PromptVersionsPage() {
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h2 className="ui-section-title">{LLM_WORKFLOW_LABELS[workflow]}</h2>
                 <span className={hasActive ? "ui-badge-success" : "ui-badge-warning"}>
-                  {hasActive ? "Active DB prompt" : "Hardcoded fallback"}
+                  {hasActive ? "Active DB prompt" : "No active prompt"}
                 </span>
               </div>
 
               {rows.length === 0 ? (
                 <p className="text-sm text-muted">
-                  No prompt versions yet — this workflow uses its hardcoded prompt.
+                  No prompt versions yet — this workflow cannot run until one is created and activated.
                 </p>
               ) : (
                 <ul className="grid gap-2">
@@ -60,8 +66,13 @@ export default async function PromptVersionsPage() {
                       className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-white/[0.02] px-4 py-3"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="flex items-center gap-2 text-sm font-medium text-ink">
+                        <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink">
                           {row.name}
+                          {isContentReviewTargetType(row.targetType) ? (
+                            <span className="ui-badge-neutral">
+                              {CONTENT_REVIEW_TARGET_TYPE_LABELS[row.targetType]}
+                            </span>
+                          ) : null}
                           <span className="ui-chip">{row.version}</span>
                           {row.isActive ? <span className="ui-badge-success">Active</span> : null}
                         </p>

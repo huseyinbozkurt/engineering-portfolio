@@ -3,10 +3,6 @@ import type { TaxonomyReviewInput, TaxonomyReviewOutput } from "@portfolio/valid
 import { LlmHttpError } from "../adapters/http";
 import type { LLMAdapter, LLMGenerationSettings, LLMUsage } from "../adapters/types";
 import {
-  getTaxonomyReviewPromptVersion,
-  latestTaxonomyReviewPromptVersion,
-} from "./prompt";
-import {
   TaxonomyReviewValidationError,
   validateTaxonomyReviewOutput,
 } from "./validate";
@@ -70,12 +66,10 @@ export interface RunTaxonomyReviewOptions {
   store: TaxonomyReviewRunStore;
   promptVersion?: string;
   /**
-   * Pre-rendered prompt to send instead of building it from `promptVersion`.
-   * The caller resolves the active DB prompt (or hardcoded fallback) and passes
-   * it here so the text sent to the model is exactly what was persisted on the
-   * run. When omitted, the runner builds the prompt from `promptVersion`.
+   * Pre-rendered active DB prompt. The text sent to the model is exactly what
+   * was persisted on the run.
    */
-  prompt?: { system: string; user: string };
+  prompt: { system: string; user: string };
   startedAt?: Date;
   /**
    * Total attempts including the first call — covers transient transport errors
@@ -105,8 +99,7 @@ export async function runTaxonomyReview(
     input,
     adapter,
     store,
-    promptVersion = latestTaxonomyReviewPromptVersion,
-    prompt: injectedPrompt,
+    prompt,
     startedAt = new Date(),
     maxAttempts = 3,
     generation,
@@ -142,17 +135,6 @@ export async function runTaxonomyReview(
     }
     return { status: "failed", errorStage: stage };
   };
-
-  let prompt: { system: string; user: string };
-  try {
-    prompt = injectedPrompt ?? getTaxonomyReviewPromptVersion(promptVersion).build(input);
-  } catch (error) {
-    return finishFailed(
-      "prompt",
-      error instanceof Error ? error.message : "Prompt build failed.",
-      null,
-    );
-  }
 
   // One attempt = generate → validate. A transient transport error OR a
   // schema/JSON/evidence validation failure is retried with a fresh generation

@@ -13,23 +13,22 @@ export function LlmStatusPanel({ statuses }: LlmStatusPanelProps) {
     <section className="mt-10">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-ink">LLM Connections</h2>
+          <h2 className="text-lg font-semibold text-ink">LLM Configurations</h2>
           <p className="mt-1 text-sm text-muted">
-            Configured from environment variables. API keys are never shown in the UI.
+            Workflow provider and model settings stored in the database.
           </p>
         </div>
         {statuses.length > 0 ? (
           <span className="ui-chip font-medium tabular-nums">
-            {onlineCount}/{statuses.length} online
+            {onlineCount}/{statuses.length} active
           </span>
         ) : null}
       </div>
       {statuses.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-line bg-white/[0.025] p-5">
-          <h3 className="text-base font-semibold text-ink">No LLM providers configured</h3>
+          <h3 className="text-base font-semibold text-ink">No LLM configurations</h3>
           <p className="mt-2 text-sm leading-6 text-muted">
-            Add provider settings to `.env`, such as `LLM_PROVIDERS` and provider API keys, to
-            enable connection checks.
+            Add and activate a workflow configuration in LLM Settings.
           </p>
         </div>
       ) : (
@@ -85,7 +84,7 @@ function StatusBadge({ status }: { status: LlmConnectionStatus["status"] }) {
           isOnline ? "size-1.5 rounded-full bg-success-400" : "size-1.5 rounded-full bg-danger-200"
         }
       />
-      {isOnline ? "Online" : "Offline"}
+      {isOnline ? "Active" : "Inactive"}
     </span>
   );
 }

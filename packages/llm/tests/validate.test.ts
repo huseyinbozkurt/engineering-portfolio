@@ -201,42 +201,6 @@ describe("confidence enforcement", () => {
   });
 });
 
-describe("signal radar caps", () => {
-  it("caps a score backed by one record at 40", () => {
-    const output = makeOutput();
-    output.signalRadar.technicalLeadership = { score: 90, evidence: evidence(REFS.experience) };
-    const result = run(output);
-
-    expect(result.output.signalRadar.technicalLeadership.score).toBe(40);
-    expect(result.notes.some((note) => note.includes("Capped"))).toBe(true);
-  });
-
-  it("forces a score with no valid evidence to 0", () => {
-    const output = makeOutput();
-    output.signalRadar.devopsCloud = { score: 55, evidence: evidence("project:imaginary") };
-    const result = run(output);
-
-    expect(result.output.signalRadar.devopsCloud.score).toBe(0);
-    expect(result.output.signalRadar.devopsCloud.evidence).toHaveLength(0);
-  });
-
-  it("caps two-record axes at 70 and leaves 3+ uncapped", () => {
-    const output = makeOutput();
-    output.signalRadar.frontendEngineering = {
-      score: 95,
-      evidence: evidence(REFS.project, REFS.skill),
-    };
-    output.signalRadar.systemDesign = {
-      score: 88,
-      evidence: evidence(REFS.caseStudy, REFS.project, REFS.experience),
-    };
-    const result = run(output);
-
-    expect(result.output.signalRadar.frontendEngineering.score).toBe(70);
-    expect(result.output.signalRadar.systemDesign.score).toBe(88);
-  });
-});
-
 describe("clean output", () => {
   it("passes a fully supported report through without notes", () => {
     const result = run(makeOutput());

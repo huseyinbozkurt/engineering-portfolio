@@ -20,7 +20,6 @@ import { EmptyPanel } from "@/components/empty-panel";
 import { LlmStatusPanel } from "@/components/llm-status-panel";
 import { PageTitle } from "@/components/page-title";
 import { TasksAutoRefresh } from "@/components/tasks-auto-refresh";
-import { TestLlmButton } from "@/components/test-llm-button";
 import { GenerateTaxonomyReviewButton } from "@/components/taxonomy-review/generate-taxonomy-review-button";
 import { formatDate } from "@/lib/format";
 import { getLlmConnectionStatuses } from "@/lib/llm-config";
@@ -63,7 +62,7 @@ export default async function TaxonomyReviewPage({
   const [run, activeRun, llmStatuses] = await Promise.all([
     getLatestLlmRunWithSuggestions("taxonomyReview"),
     getActiveLlmRun("taxonomyReview"),
-    getLlmConnectionStatuses(),
+    getLlmConnectionStatuses("taxonomyReview"),
   ]);
 
   const onlineCount = llmStatuses.filter((status) => status.status === "online").length;
@@ -89,12 +88,7 @@ export default async function TaxonomyReviewPage({
       <PageTitle
         title="Taxonomy Review"
         description="LLM-generated suggestions for supporting portfolio taxonomy. Canonical experiences, projects, and case studies are analysis-only and are never modified by this workflow."
-        actions={
-          <div className="flex items-center gap-3">
-            <TestLlmButton disabled={!Boolean(onlineCount > 0)} />
-            <GenerateTaxonomyReviewButton disabledReason={disabledReason} />
-          </div>
-        }
+        actions={<GenerateTaxonomyReviewButton disabledReason={disabledReason} />}
       />
 
       {!run ? (

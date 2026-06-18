@@ -27,6 +27,36 @@ export const LLM_WORKFLOW_LABELS: Record<LlmWorkflow, string> = {
 };
 
 /**
+ * Content types `contentReview` keeps a distinct DB prompt for. These match the
+ * runtime `AiReviewContentType` exactly so a prompt is resolved by direct
+ * equality on the content type being reviewed.
+ */
+export const CONTENT_REVIEW_TARGET_TYPES = ["experience", "project", "case_study"] as const;
+export type ContentReviewTargetType = (typeof CONTENT_REVIEW_TARGET_TYPES)[number];
+
+export const CONTENT_REVIEW_TARGET_TYPE_LABELS: Record<ContentReviewTargetType, string> = {
+  experience: "Experience",
+  project: "Project",
+  case_study: "Case Study",
+};
+
+export function isContentReviewTargetType(value: unknown): value is ContentReviewTargetType {
+  return (
+    typeof value === "string" &&
+    (CONTENT_REVIEW_TARGET_TYPES as readonly string[]).includes(value)
+  );
+}
+
+/**
+ * Whether a workflow scopes its active prompt by a `targetType`. Only
+ * `contentReview` does today; every other workflow keeps a single active prompt
+ * (the empty-string sentinel).
+ */
+export function workflowUsesTargetType(workflow: LlmWorkflow): boolean {
+  return workflow === "contentReview";
+}
+
+/**
  * The variable contract per workflow. `required` template variables MUST appear
  * in a prompt's `userPromptTemplate` before it can be saved/activated, and MUST
  * be supplied at render time. `optional` variables may appear but are not
@@ -38,8 +68,11 @@ export const LLM_WORKFLOW_LABELS: Record<LlmWorkflow, string> = {
  */
 export const LLM_PROMPT_VARIABLES = {
   aiInsights: {
-    required: ["responseShape", "dataset"],
-    optional: [],
+    // `responseShape` is enforced in code (portfolioInsightOutputSchema), not by
+    // the prompt — it is no longer injected, so it is optional (kept allowed so
+    // pre-existing DB templates that still reference it remain valid).
+    required: ["dataset"],
+    optional: ["responseShape"],
   },
   taxonomyReview: {
     required: ["responseShape", "dataset"],
@@ -199,6 +232,14 @@ export const llmWorkflowSchema = z.enum(LLM_WORKFLOWS);
 
 const promptVersionBaseSchema = z.object({
   workflow: llmWorkflowSchema,
+  /**
+   * Sub-scope within the workflow. Empty for portfolio-level workflows; one of
+   * CONTENT_REVIEW_TARGET_TYPES for contentReview. Enforced in the refine below.
+   */
+  targetType: z.preprocess(
+    (value) => (typeof value === "string" ? value.trim() : ""),
+    z.string().max(40),
+  ),
   version: trimmedRequired("Version", 60),
   name: trimmedRequired("Name", 200),
   description: z.preprocess(emptyToNull, z.string().trim().max(2000).nullable().default(null)),
@@ -236,13 +277,41 @@ const enforceTemplateContract = (
   }
 };
 
+/**
+ * Full prompt-version validation: the template variable contract plus the
+ * `targetType` scoping rule (required + valid for contentReview, empty for every
+ * other workflow).
+ */
+const enforcePromptVersionRules = (
+  value: { workflow: LlmWorkflow; userPromptTemplate: string; targetType: string },
+  ctx: z.RefinementCtx,
+): void => {
+  enforceTemplateContract(value, ctx);
+
+  if (value.workflow === "contentReview") {
+    if (!isContentReviewTargetType(value.targetType)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["targetType"],
+        message: `Content review prompts need a content type: ${CONTENT_REVIEW_TARGET_TYPES.join(", ")}.`,
+      });
+    }
+  } else if (value.targetType !== "") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["targetType"],
+      message: "Only content review prompts use a target type.",
+    });
+  }
+};
+
 export const createPromptVersionSchema = promptVersionBaseSchema.superRefine(
-  enforceTemplateContract,
+  enforcePromptVersionRules,
 );
 
 export const updatePromptVersionSchema = promptVersionBaseSchema
   .extend({ id: z.string().uuid() })
-  .superRefine(enforceTemplateContract);
+  .superRefine(enforcePromptVersionRules);
 
 export type CreatePromptVersionInput = z.infer<typeof createPromptVersionSchema>;
 export type UpdatePromptVersionInput = z.infer<typeof updatePromptVersionSchema>;

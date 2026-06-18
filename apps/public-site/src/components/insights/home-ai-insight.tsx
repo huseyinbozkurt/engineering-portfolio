@@ -2,7 +2,6 @@ import {
   type HomePageContent,
 } from "@portfolio/validators";
 
-import { ConfidencePill } from "@/components/insights/insight-primitives";
 import { CTAButton, SectionHeader } from "@/components/portfolio-ui";
 import { InsightRadar } from "./insight-radar";
 
@@ -10,8 +9,7 @@ import { InsightRadar } from "./insight-radar";
  * Homepage "AI Portfolio Insight" section — a credibility-focused preview of the
  * latest published AI Insight report. Pure presentation: the page resolves and
  * passes `homePageContent`; when it is absent (older reports, no published run)
- * the section renders nothing. Reuses the site's section header, CTA button and
- * confidence pill so it shares one visual language.
+ * the section renders nothing. Reuses the site's section header and CTA button.
  */
 export function HomeAiInsight({
   content,
@@ -37,12 +35,9 @@ export function HomeAiInsight({
               key={signal.title}
               className="glass-panel h-full w-full min-w-0 max-w-full rounded-lg p-5"
             >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="min-w-0 break-words text-base font-semibold text-ink">
-                  {signal.title}
-                </h3>
-                <ConfidencePill confidence={signal.confidence} />
-              </div>
+              <h3 className="min-w-0 break-words text-base font-semibold text-ink">
+                {signal.title}
+              </h3>
               <p className="mt-3 break-words text-sm leading-7 text-muted">{signal.summary}</p>
             </article>
           ))}

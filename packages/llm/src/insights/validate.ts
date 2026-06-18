@@ -15,8 +15,7 @@ import { ZodError } from "zod";
  *  3. evidence — every evidence ref must exist in the input snapshot; unknown
  *                refs are dropped; claims left unsupported are removed (or, for
  *                gap-style sections, downgraded to low confidence); confidence
- *                levels and radar scores are clamped to what the surviving
- *                evidence can carry.
+ *                levels are clamped to what the surviving evidence can carry.
  *
  * Unsupported claims never survive. Every mutation is recorded as a
  * human-readable note persisted with the run for the admin debug view.
@@ -41,6 +40,36 @@ export interface ValidatedInsight {
 
 export interface ValidateInsightOutputOptions {
   requireHomePageContent?: boolean;
+}
+
+/**
+ * Homepage-content rules enforced on top of the Zod schema for the active DB
+ * prompt: `homePageContent` must exist, every
+ * `capabilitySnapshot` item must carry a `radarKey`, and none may carry a legacy
+ * `score`. Returns a human-readable violation message, or `null` when the rules
+ * pass. Shared by the runner's validation path and the insight cache, which must
+ * not serve a cached output that no longer satisfies the current homepage rules.
+ */
+export function homePageContentRuleViolation(output: PortfolioInsightOutput): string | null {
+  if (!output.homePageContent) {
+    return "Output failed schema validation — homePageContent is required for the current prompt version.";
+  }
+
+  const missingRadarKey = output.homePageContent.capabilitySnapshot.find(
+    (capability) => !capability.radarKey,
+  );
+  if (missingRadarKey) {
+    return `Output failed schema validation — homePageContent.capabilitySnapshot "${missingRadarKey.label}" must include radarKey.`;
+  }
+
+  const duplicatedScore = output.homePageContent.capabilitySnapshot.find(
+    (capability) => capability.score !== undefined,
+  );
+  if (duplicatedScore) {
+    return `Output failed schema validation — homePageContent.capabilitySnapshot "${duplicatedScore.label}" must not include score; use radarKey instead.`;
+  }
+
+  return null;
 }
 
 /** All refs issued by the input normalizer — the only legal evidence targets. */
@@ -86,31 +115,9 @@ export function validateInsightOutput(
   }
 
   if (options.requireHomePageContent) {
-    if (!output.homePageContent) {
-      throw new InsightValidationError(
-        "schema",
-        "Output failed schema validation — homePageContent is required for the current prompt version.",
-      );
-    }
-
-    const missingRadarKey = output.homePageContent.capabilitySnapshot.find(
-      (capability) => !capability.radarKey,
-    );
-    if (missingRadarKey) {
-      throw new InsightValidationError(
-        "schema",
-        `Output failed schema validation — homePageContent.capabilitySnapshot "${missingRadarKey.label}" must include radarKey.`,
-      );
-    }
-
-    const duplicatedScore = output.homePageContent.capabilitySnapshot.find(
-      (capability) => capability.score !== undefined,
-    );
-    if (duplicatedScore) {
-      throw new InsightValidationError(
-        "schema",
-        `Output failed schema validation — homePageContent.capabilitySnapshot "${duplicatedScore.label}" must not include score; use radarKey instead.`,
-      );
+    const violation = homePageContentRuleViolation(output);
+    if (violation) {
+      throw new InsightValidationError("schema", violation);
     }
   }
 
@@ -239,23 +246,7 @@ export function validateInsightOutput(
     return { ...item, evidence };
   });
 
-  // Radar: deterministic caps — scores cannot exceed what evidence supports.
-  const capRadarAxis = (
-    axis: { score: number; evidence: EvidenceRef[] },
-    where: string,
-  ): { score: number; evidence: EvidenceRef[] } => {
-    const evidence = keepValid(axis.evidence, where);
-    const cap = evidence.length === 0 ? 0 : evidence.length === 1 ? 40 : evidence.length === 2 ? 70 : 100;
-    if (axis.score > cap) {
-      notes.push(
-        `Capped ${where} score from ${axis.score} to ${cap} (${evidence.length} supporting record${evidence.length === 1 ? "" : "s"}).`,
-      );
-    }
-    return { score: Math.min(axis.score, cap), evidence };
-  };
-
-  const homePageContent = output.homePageContent
-    ? {
+  const homePageContent = {
         ...output.homePageContent,
         primarySignals: output.homePageContent.primarySignals.map((signal) => {
           const where = `homePageContent.primarySignals "${signal.title}"`;
@@ -277,8 +268,7 @@ export function validateInsightOutput(
             `homePageContent.capabilitySnapshot "${capability.label}"`,
           ),
         })),
-      }
-    : undefined;
+      };
 
   return {
     output: {
@@ -289,7 +279,7 @@ export function validateInsightOutput(
       recruiterSimulation,
       opportunityHeatmap,
       groundedDataNotes: output.groundedDataNotes,
-      ...(homePageContent ? { homePageContent } : {}),
+      homePageContent,
     },
     notes,
   };

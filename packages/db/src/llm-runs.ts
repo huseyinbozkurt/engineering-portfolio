@@ -1,4 +1,14 @@
-import { and, desc, eq, gte, inArray, lte, type InferSelectModel, type SQL } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lte,
+  type InferSelectModel,
+  type SQL,
+} from "drizzle-orm";
 
 import type { LlmWorkflow } from "@portfolio/validators";
 
@@ -46,6 +56,10 @@ export interface CreateLlmRunInput {
   promptSystem: string;
   promptUser: string;
   inputSnapshot?: unknown;
+  /** Cache identity + whether this run reused a prior output (AI insights). */
+  datasetHash?: string | null;
+  configHash?: string | null;
+  cacheHit?: boolean;
   startedAt?: Date | null;
 }
 
@@ -61,6 +75,9 @@ export interface UpdateLlmRunInput {
   attempts?: LlmRunAttempt[] | null;
   errorStage?: string | null;
   errorMessage?: string | null;
+  datasetHash?: string | null;
+  configHash?: string | null;
+  cacheHit?: boolean;
   startedAt?: Date | null;
   completedAt?: Date | null;
   durationMs?: number | null;
@@ -107,6 +124,9 @@ export async function createLlmRun(input: CreateLlmRunInput): Promise<LlmRunReco
       promptSystem: input.promptSystem,
       promptUser: input.promptUser,
       inputSnapshot: input.inputSnapshot ?? null,
+      datasetHash: input.datasetHash ?? null,
+      configHash: input.configHash ?? null,
+      cacheHit: input.cacheHit ?? false,
       startedAt: input.startedAt ?? null,
     })
     .returning();
@@ -134,6 +154,9 @@ function buildLlmRunUpdateValues(
   if (input.attempts !== undefined) values.attempts = input.attempts;
   if (input.errorStage !== undefined) values.errorStage = input.errorStage;
   if (input.errorMessage !== undefined) values.errorMessage = input.errorMessage;
+  if (input.datasetHash !== undefined) values.datasetHash = input.datasetHash;
+  if (input.configHash !== undefined) values.configHash = input.configHash;
+  if (input.cacheHit !== undefined) values.cacheHit = input.cacheHit;
   if (input.startedAt !== undefined) values.startedAt = input.startedAt;
   if (input.completedAt !== undefined) values.completedAt = input.completedAt;
   if (input.durationMs !== undefined) values.durationMs = input.durationMs;
@@ -340,6 +363,62 @@ export async function getLatestPublishedLlmRun(
     return record ?? null;
   } catch (error) {
     console.error("[db] published llm run read failed; treating as missing:", error);
+    return null;
+  }
+}
+
+/** Run statuses that represent a usable, successful output for cache reuse. */
+export const SUCCESSFUL_LLM_RUN_STATUSES = ["succeeded", "published", "reviewed"] as const;
+
+/** The full cache key for an AI-insight run (see `llm_runs` cache columns). */
+export interface InsightCacheIdentity {
+  workflow: LlmWorkflow;
+  datasetHash: string;
+  configHash: string;
+  model: string | null;
+  promptVersionId: string | null;
+  promptVersion: string | null;
+}
+
+/**
+ * Newest successful run matching a full cache identity — the AI-insight cache
+ * lookup. A hit means the dataset AND the prompt/model/config that would be used
+ * now are all unchanged since this run succeeded, so its output can be reused
+ * without calling the LLM. Null-safe on prompt identity (a code-fallback run has
+ * no `promptVersionId`). Only succeeded/published/reviewed runs qualify, so a
+ * failed or invalid run is never served from cache.
+ */
+export async function getLatestSuccessfulInsightRunByIdentity(
+  identity: InsightCacheIdentity,
+): Promise<LlmRunRecord | null> {
+  if (!hasDatabaseUrl()) {
+    return null;
+  }
+
+  const conditions: SQL[] = [
+    eq(llmRuns.workflow, identity.workflow),
+    eq(llmRuns.datasetHash, identity.datasetHash),
+    eq(llmRuns.configHash, identity.configHash),
+    inArray(llmRuns.status, [...SUCCESSFUL_LLM_RUN_STATUSES]),
+    identity.model === null ? isNull(llmRuns.model) : eq(llmRuns.model, identity.model),
+    identity.promptVersionId === null
+      ? isNull(llmRuns.promptVersionId)
+      : eq(llmRuns.promptVersionId, identity.promptVersionId),
+    identity.promptVersion === null
+      ? isNull(llmRuns.promptVersion)
+      : eq(llmRuns.promptVersion, identity.promptVersion),
+  ];
+
+  try {
+    const [record] = await getDb()
+      .select()
+      .from(llmRuns)
+      .where(and(...conditions))
+      .orderBy(desc(llmRuns.createdAt))
+      .limit(1);
+    return record ?? null;
+  } catch (error) {
+    console.error("[db] insight cache lookup failed; treating as a miss:", error);
     return null;
   }
 }

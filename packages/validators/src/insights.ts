@@ -296,10 +296,39 @@ export const portfolioInsightOutputSchema = z
     recruiterSimulation: recruiterSimulationSchema,
     opportunityHeatmap: z.array(opportunitySchema).min(1).max(8),
     groundedDataNotes: z.array(z.string().trim().min(1).max(300)).min(1).max(8),
-    homePageContent: homePageContentSchema.optional(),
+    homePageContent: homePageContentSchema.required(),
   })
   .strict();
 export type PortfolioInsightOutput = z.infer<typeof portfolioInsightOutputSchema>;
+
+/**
+ * Compact, human-authored schema of {@link portfolioInsightOutputSchema} for the
+ * LLM prompt — a terse type outline instead of a large example-laden JSON
+ * object, to minimize prompt tokens. This is GUIDANCE only; the model's response
+ * is verified in code by `portfolioInsightOutputSchema`. A drift-guard test
+ * asserts this string names every top-level key of that schema, so adding a
+ * field fails the test until this outline is updated.
+ */
+export const PORTFOLIO_INSIGHT_RESPONSE_SCHEMA = [
+  "executiveSummary: { summary, confidence, evidence }",
+  "strengthSignals: { title, summary, confidence, evidence }[]                                  // 1-6",
+  "blindSpots: { title, summary, impact, recommendation, confidence, evidence }[]               // 1-6",
+  "careerTrajectory: { stages: { title, timeframe, explanation, evidence }[] }                  // 2-6 stages",
+  "recruiterSimulation: { recruiter, hiringManager, staffEngineer, startupFounder }             // each: { summary, confidence, evidence }",
+  "opportunityHeatmap: { opportunity, expectedImpact, estimatedEffort, recommendation, evidence }[]  // 1-8",
+  "groundedDataNotes: string[]                                                                  // 1-8",
+  "homePageContent: {",
+  "  eyebrow, headline, summary,",
+  "  primarySignals: { title, summary, confidence, evidence }[]                                 // 1-3",
+  "  proofPoints: { label, value, context, evidence }[]                                         // 1-4",
+  "  capabilitySnapshot: { label, radarKey, summary, evidence, score }[]                               // 1-6",
+  "  cta: { label, href }",
+  "}",
+  "",
+  'confidence | expectedImpact | estimatedEffort = "low" | "medium" | "high".',
+  'radarKey = "frontendEngineering" | "technicalLeadership" | "systemDesign" | "devopsCloud" | "aiEngineering" | "peopleManagement".',
+  "evidence = { ref, note? }[]; every ref MUST exist in the dataset. capabilitySnapshot items use radarKey (never score).",
+].join("\n");
 
 // ---------------------------------------------------------------------------
 // Run lifecycle

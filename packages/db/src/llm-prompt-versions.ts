@@ -51,12 +51,15 @@ export async function getLlmPromptVersion(id: string): Promise<LlmPromptVersionR
 }
 
 /**
- * The active prompt version for a workflow — the runtime's first choice. Returns
- * null when none is active, which is the signal to fall back to the hardcoded
- * prompt. Tolerates a missing DB so generation still works on the .env path.
+ * The active prompt version for a workflow (and optional target type) — the
+ * runtime's required source. `targetType` defaults to the empty-string sentinel
+ * used by portfolio-level workflows; pass a content type (e.g. "experience")
+ * for `contentReview`. Returns null when none is active, which prevents that
+ * workflow from running.
  */
 export async function getActivePromptVersion(
   workflow: LlmWorkflow,
+  targetType = "",
 ): Promise<LlmPromptVersionRecord | null> {
   if (!hasDatabaseUrl()) {
     return null;
@@ -66,7 +69,13 @@ export async function getActivePromptVersion(
     const [record] = await getDb()
       .select()
       .from(llmPromptVersions)
-      .where(and(eq(llmPromptVersions.workflow, workflow), eq(llmPromptVersions.isActive, true)))
+      .where(
+        and(
+          eq(llmPromptVersions.workflow, workflow),
+          eq(llmPromptVersions.targetType, targetType),
+          eq(llmPromptVersions.isActive, true),
+        ),
+      )
       .limit(1);
     return record ?? null;
   } catch (error) {
@@ -80,18 +89,24 @@ export async function createLlmPromptVersion(
 ): Promise<LlmPromptVersionRecord> {
   return getDb().transaction(async (tx) => {
     if (input.isActive) {
-      // Only one active version per workflow — clear the rest first so the
-      // partial unique index can never be violated mid-transaction.
+      // Only one active version per (workflow, targetType) — clear the rest
+      // first so the partial unique index can never be violated mid-transaction.
       await tx
         .update(llmPromptVersions)
         .set({ isActive: false, updatedAt: new Date() })
-        .where(eq(llmPromptVersions.workflow, input.workflow));
+        .where(
+          and(
+            eq(llmPromptVersions.workflow, input.workflow),
+            eq(llmPromptVersions.targetType, input.targetType),
+          ),
+        );
     }
 
     const [record] = await tx
       .insert(llmPromptVersions)
       .values({
         workflow: input.workflow,
+        targetType: input.targetType,
         version: input.version,
         name: input.name,
         description: input.description ?? null,
@@ -119,6 +134,7 @@ export async function updateLlmPromptVersion(
         .where(
           and(
             eq(llmPromptVersions.workflow, input.workflow),
+            eq(llmPromptVersions.targetType, input.targetType),
             ne(llmPromptVersions.id, input.id),
           ),
         );
@@ -128,6 +144,7 @@ export async function updateLlmPromptVersion(
       .update(llmPromptVersions)
       .set({
         workflow: input.workflow,
+        targetType: input.targetType,
         version: input.version,
         name: input.name,
         description: input.description ?? null,
@@ -169,7 +186,13 @@ export async function setLlmPromptVersionActive(
       await tx
         .update(llmPromptVersions)
         .set({ isActive: false, updatedAt: new Date() })
-        .where(and(eq(llmPromptVersions.workflow, target.workflow), ne(llmPromptVersions.id, id)));
+        .where(
+          and(
+            eq(llmPromptVersions.workflow, target.workflow),
+            eq(llmPromptVersions.targetType, target.targetType),
+            ne(llmPromptVersions.id, id),
+          ),
+        );
     }
 
     const [record] = await tx
@@ -196,6 +219,7 @@ export async function duplicateLlmPromptVersion(id: string): Promise<LlmPromptVe
     .insert(llmPromptVersions)
     .values({
       workflow: source.workflow,
+      targetType: source.targetType,
       version: `${source.version}-copy`,
       name: `${source.name} (copy)`,
       description: source.description,

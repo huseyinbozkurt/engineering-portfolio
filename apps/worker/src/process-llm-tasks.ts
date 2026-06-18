@@ -1,5 +1,5 @@
 import { getDb } from "@portfolio/db/client";
-import { processNextPendingTask, setGlobalDb } from "@portfolio/llm/task-runner";
+import { processNextPendingTask, setGlobalDb } from "../../../packages/llm/src/task-runner";
 
 /**
  * Worker entry point for processing LLM tasks.

@@ -11,7 +11,6 @@ import {
 
 import { ComingSoon } from "@/components/coming-soon";
 import { EmptyState } from "@/components/empty-state";
-import { ConfidencePill } from "@/components/insights/insight-primitives";
 import { InsightRadar } from "@/components/insights/insight-radar";
 import { SectionHeader } from "@/components/portfolio-ui";
 import { getPublishedInsight } from "@/lib/ai-insights";
@@ -81,12 +80,9 @@ export default async function AiInsightsPage() {
         </div>
 
         <div className="glass-panel min-w-0 rounded-lg p-6 shadow-glow md:p-8">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-300">
-              Executive summary
-            </span>
-            <ConfidencePill confidence={output.executiveSummary.confidence} />
-          </div>
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-300">
+            Executive summary
+          </span>
           <p className="mt-4 break-words text-base leading-8 text-ink/95 md:text-lg md:leading-9">
             {output.executiveSummary.summary}
           </p>
@@ -120,10 +116,7 @@ export default async function AiInsightsPage() {
         <div className="grid gap-4 md:grid-cols-2">
           {output.strengthSignals.map((signal) => (
             <article key={signal.title} className="glass-panel h-full w-full min-w-0 max-w-full rounded-lg p-5 md:p-6">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="min-w-0 break-words text-lg font-semibold text-ink">{signal.title}</h3>
-                <ConfidencePill confidence={signal.confidence} />
-              </div>
+              <h3 className="min-w-0 break-words text-lg font-semibold text-ink">{signal.title}</h3>
               <p className="mt-3 break-words text-sm leading-7 text-muted">{signal.summary}</p>
               <EvidenceChips evidence={signal.evidence} resolve={resolve} />
             </article>

@@ -33,6 +33,7 @@ export default async function EditPromptVersionPage({ params }: EditPromptVersio
           initial={{
             id: version.id,
             workflow: version.workflow,
+            targetType: version.targetType,
             version: version.version,
             name: version.name,
             description: version.description,

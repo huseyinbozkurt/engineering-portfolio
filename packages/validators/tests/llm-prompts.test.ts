@@ -29,9 +29,10 @@ describe("validateTemplateForWorkflow", () => {
   });
 
   it("flags missing required variables", () => {
-    const result = validateTemplateForWorkflow("aiInsights", "Only {{dataset}} here.");
+    // `dataset` is the required aiInsights variable; `responseShape` is now optional.
+    const result = validateTemplateForWorkflow("aiInsights", "Only {{responseShape}} here.");
     expect(result.ok).toBe(false);
-    expect(result.missingRequired).toEqual(["responseShape"]);
+    expect(result.missingRequired).toEqual(["dataset"]);
   });
 
   it("flags unknown variables not in the workflow contract", () => {
@@ -46,13 +47,13 @@ describe("validateTemplateForWorkflow", () => {
   it("treats contentReview optional variables as allowed but not required", () => {
     const required = validateTemplateForWorkflow(
       "contentReview",
-      "{{contentType}} {{contentRecord}} {{responseShape}}",
+      "{{contentRecord}} {{responseShape}}",
     );
     expect(required.ok).toBe(true);
 
     const withOptional = validateTemplateForWorkflow(
       "contentReview",
-      "{{contentType}} {{contentRecord}} {{responseShape}} {{reviewCriteria}}",
+      "{{contentRecord}} {{responseShape}} {{reviewCriteria}}",
     );
     expect(withOptional.ok).toBe(true);
     expect(withOptional.unknown).toEqual([]);
@@ -83,8 +84,9 @@ describe("renderWorkflowUserPrompt", () => {
   });
 
   it("throws PromptRenderError when a required variable is absent", () => {
+    // `dataset` is required; omitting it (even with responseShape present) must throw.
     expect(() =>
-      renderWorkflowUserPrompt("aiInsights", goodAiInsightsTemplate, { dataset: "x" }),
+      renderWorkflowUserPrompt("aiInsights", goodAiInsightsTemplate, { responseShape: "x" }),
     ).toThrow(PromptRenderError);
   });
 });
@@ -105,7 +107,7 @@ describe("createPromptVersionSchema", () => {
   it("rejects a template missing a required variable", () => {
     const result = createPromptVersionSchema.safeParse({
       ...base,
-      userPromptTemplate: "Only {{dataset}}",
+      userPromptTemplate: "Only {{responseShape}}",
     });
     expect(result.success).toBe(false);
   });
@@ -117,6 +119,34 @@ describe("createPromptVersionSchema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  const contentReviewBase = {
+    workflow: "contentReview",
+    version: "v1",
+    name: "Experience review",
+    systemPrompt: "You are an editorial reviewer.",
+    userPromptTemplate: "{{contentRecord}} {{responseShape}}",
+  };
+
+  it("requires a valid content type for contentReview prompts", () => {
+    // Missing target type is rejected.
+    expect(createPromptVersionSchema.safeParse(contentReviewBase).success).toBe(false);
+    // A known content type is accepted.
+    expect(
+      createPromptVersionSchema.safeParse({ ...contentReviewBase, targetType: "experience" })
+        .success,
+    ).toBe(true);
+    // An unknown content type is rejected.
+    expect(
+      createPromptVersionSchema.safeParse({ ...contentReviewBase, targetType: "bogus" }).success,
+    ).toBe(false);
+  });
+
+  it("rejects a target type on workflows that do not use one", () => {
+    expect(createPromptVersionSchema.safeParse({ ...base, targetType: "experience" }).success).toBe(
+      false,
+    );
+  });
 });
 
 describe("createLlmConfigurationSchema", () => {
@@ -126,7 +156,7 @@ describe("createLlmConfigurationSchema", () => {
     const parsed = createLlmConfigurationSchema.parse(base);
     expect(parsed.temperature).toBe(0.2);
     expect(parsed.topP).toBe(0.9);
-    expect(parsed.maxTokens).toBe(12000);
+    expect(parsed.maxTokens).toBe(0);
     expect(parsed.maxRetries).toBe(2);
     expect(parsed.timeoutMs).toBeNull();
   });

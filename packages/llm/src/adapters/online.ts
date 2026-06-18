@@ -35,6 +35,17 @@ export interface ResolvedLlmAdapter {
   connection: LlmConnectionConfig;
 }
 
+export interface DbLlmConfiguration {
+  id: string;
+  provider: string;
+  model: string;
+  baseUrl: string | null;
+  timeoutMs: number | null;
+  maxTokens: number;
+  temperature: number;
+  topP: number;
+}
+
 const providerDefaults: Record<
   BuiltInProvider,
   { name: string; baseUrl: string; model: string; apiKeyEnv: string }
@@ -63,6 +74,69 @@ const defaultStatusTimeoutMs = 5000;
 const defaultGenerationTimeoutMs = 900000;
 /** Generation requests never run with less than 15 minutes, regardless of env. */
 const minimumGenerationTimeoutMs = 900000;
+
+/** Build an adapter from the active workflow configuration stored in the DB. */
+export function resolveConfiguredLlmAdapter(
+  configuration: DbLlmConfiguration,
+): ResolvedLlmAdapter | null {
+  const provider = configuration.provider.toLowerCase();
+  if (provider !== "openai" && provider !== "anthropic" && provider !== "deepseek" && provider !== "custom") {
+    return null;
+  }
+
+  const builtIn = provider === "custom" ? null : providerDefaults[provider];
+  const baseUrl = configuration.baseUrl || builtIn?.baseUrl;
+  if (!baseUrl) return null;
+
+  const apiKey =
+    provider === "custom"
+      ? env("CUSTOM_LLM_API_KEY")
+      : env(providerDefaults[provider].apiKeyEnv);
+  if (provider !== "custom" && !apiKey) return null;
+
+  const connection: LlmConnectionConfig = {
+    id: configuration.id,
+    name: provider === "custom" ? "Custom" : providerDefaults[provider].name,
+    provider,
+    baseUrl,
+    statusUrl: joinUrl(baseUrl, "models"),
+    apiKey,
+    model: configuration.model,
+    requiresApiKey: provider !== "custom",
+  };
+  const timeoutMs = Math.max(configuration.timeoutMs ?? defaultGenerationTimeoutMs, minimumGenerationTimeoutMs);
+  const maxTokens = configuration.maxTokens > 0 ? configuration.maxTokens : undefined;
+
+  if (provider === "anthropic") {
+    return {
+      connection,
+      adapter: new AnthropicAdapter({
+        baseUrl,
+        apiKey: apiKey!,
+        model: configuration.model,
+        timeoutMs,
+        ...(maxTokens === undefined ? {} : { maxTokens }),
+        temperature: configuration.temperature,
+        topP: configuration.topP,
+      }),
+    };
+  }
+
+  return {
+    connection,
+    adapter: new OpenAiCompatibleAdapter({
+      provider: provider === "custom" ? "custom" : provider,
+      baseUrl,
+      apiKey,
+      model: configuration.model,
+      timeoutMs,
+      ...(maxTokens === undefined ? {} : { maxTokens }),
+      temperature: configuration.temperature,
+      topP: configuration.topP,
+      jsonResponseFormat: provider !== "custom",
+    }),
+  };
+}
 
 export function getLlmConnectionConfigs(): LlmConnectionConfig[] {
   return [...getBuiltInProviderConfigs(), ...getCustomProviderConfigs()];

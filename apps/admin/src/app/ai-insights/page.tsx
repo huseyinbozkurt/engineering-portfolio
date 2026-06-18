@@ -6,7 +6,6 @@ import { resolveVisibleModelName } from "@portfolio/validators";
 
 import { EmptyPanel } from "@/components/empty-panel";
 import { GenerateInsightsButton } from "@/components/insights/generate-insights-button";
-import { TestLlmButton } from "@/components/test-llm-button";
 import {
   RunStatusBadge,
   formatDuration,
@@ -24,7 +23,7 @@ export default async function AiInsightsPage() {
   const [runs, activeRun, llmStatuses] = await Promise.all([
     getLlmRuns({ workflow: "aiInsights", limit: 40 }),
     getActiveLlmRun("aiInsights"),
-    getLlmConnectionStatuses(),
+    getLlmConnectionStatuses("aiInsights"),
   ]);
 
   const onlineCount = llmStatuses.filter((status) => status.status === "online").length;
@@ -40,7 +39,7 @@ export default async function AiInsightsPage() {
       <PageTitle
         title="AI Insights"
         description="Evidence-driven analysis of the published portfolio. Every run is validated against the data it was given, stored with its full audit trail, and only goes public when you explicitly publish it."
-        actions={<div className="flex items-center gap-3"><TestLlmButton disabled={!Boolean(onlineCount > 0)} /><GenerateInsightsButton disabledReason={disabledReason} /></div>}
+        actions={<GenerateInsightsButton disabledReason={disabledReason} />}
       />
 
       <section>

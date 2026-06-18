@@ -12,15 +12,8 @@ export interface RecruiterTabView {
   id: string;
   label: string;
   summary: string;
-  confidence: "low" | "medium" | "high";
   evidence: RecruiterTabEvidence[];
 }
-
-const confidenceClasses: Record<RecruiterTabView["confidence"], string> = {
-  high: "border-emerald-300/30 bg-emerald-300/10 text-emerald-200",
-  medium: "border-amber-300/30 bg-amber-300/10 text-amber-200",
-  low: "border-line bg-white/[0.04] text-muted",
-};
 
 /**
  * Reader-perspective tabs: the same portfolio interpreted by four different
@@ -59,12 +52,7 @@ export function RecruiterTabs({ views }: { views: RecruiterTabView[] }) {
       </div>
 
       <div role="tabpanel" className="mt-5">
-        <span
-          className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${confidenceClasses[active.confidence]}`}
-        >
-          {active.confidence} confidence
-        </span>
-        <p className="mt-3 text-sm leading-7 text-ink/90">{active.summary}</p>
+        <p className="text-sm leading-7 text-ink/90">{active.summary}</p>
 
         {active.evidence.length > 0 ? (
           <div className="mt-4 flex flex-wrap gap-1.5">

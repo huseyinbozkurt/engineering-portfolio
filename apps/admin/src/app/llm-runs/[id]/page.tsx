@@ -200,7 +200,7 @@ export default async function LlmRunDetailPage({ params }: LlmRunDetailPageProps
             <div>
               <dt className="ui-label">Prompt version</dt>
               <dd className="text-ink">
-                {run.promptVersion ? `${run.promptName ?? ""} (${run.promptVersion})` : "hardcoded fallback"}
+                {run.promptVersion ? `${run.promptName ?? ""} (${run.promptVersion})` : "Legacy prompt"}
               </dd>
             </div>
             <div>

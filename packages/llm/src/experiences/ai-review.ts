@@ -8,8 +8,6 @@ import {
 export const experienceAiReviewTaskType = "experience_ai_review";
 export const projectAiReviewTaskType = "project_ai_review";
 export const caseStudyAiReviewTaskType = "case_study_ai_review";
-export const latestExperienceAiReviewPromptVersion = "experience-ai-review-v1";
-export const latestContentAiReviewPromptVersion = "content-ai-review-v1";
 
 export type ContentAiReviewEntityType = "experience" | "project" | "case_study";
 
@@ -38,11 +36,11 @@ export interface ContentAiReviewInput {
   relations?: Record<string, string[] | string | null> | undefined;
 }
 
-export function buildExperienceAiReviewPrompt(input: ExperienceAiReviewInput): {
-  system: string;
-  user: string;
-} {
-  return buildContentAiReviewPrompt({
+/** Normalize an experience into the generic content-review record shape. */
+export function experienceToContentAiReviewInput(
+  input: ExperienceAiReviewInput,
+): ContentAiReviewInput {
+  return {
     entityType: "experience",
     id: input.id,
     status: input.status,
@@ -59,46 +57,38 @@ export function buildExperienceAiReviewPrompt(input: ExperienceAiReviewInput): {
       details: input.details,
       awards: input.awards,
     },
-  });
+  };
 }
 
-export function buildContentAiReviewPrompt(input: ContentAiReviewInput): {
-  system: string;
-  user: string;
+/** The output contract the parser expects and DB templates receive as `{{responseShape}}`. */
+const CONTENT_AI_REVIEW_OUTPUT_SHAPE = {
+  qualityScore: "integer from 0 to 100",
+  summary: "short, useful admin review summary",
+  strengths: "array of grounded strengths in the existing record",
+  issues: "array of grounded content gaps or risks",
+  suggestions: "array of editorial/structural suggestions only",
+} as const;
+
+/**
+ * The JSON output-shape contract embedded in the content-review prompt,
+ * serialized. Exposed so a DB-managed `contentReview` prompt template can be
+ * rendered with the same `{{responseShape}}` value the code builder uses.
+ */
+export function getContentReviewResponseShape(): string {
+  return JSON.stringify(CONTENT_AI_REVIEW_OUTPUT_SHAPE, null, 2);
+}
+
+/**
+ * Template variables for a DB-managed `contentReview` prompt, matching the
+ * workflow's variable contract (`contentRecord`, `responseShape`).
+ */
+export function buildContentReviewVariables(input: ContentAiReviewInput): {
+  contentRecord: string;
+  responseShape: string;
 } {
   return {
-    system: [
-      "You are an editorial reviewer for a software engineering portfolio CMS.",
-      "Analyze only the single content record provided by the user.",
-      "Do not invent achievements, metrics, employers, dates, responsibilities, outcomes, tools, or claims.",
-      "If the record is incomplete, say so plainly.",
-      "Suggestions must be editorial or structural improvements only, never fake career claims.",
-      "Return strict JSON only. Do not include markdown, prose outside JSON, or code fences.",
-      `Current date: ${new Date().toISOString().split("T")[0]} Do not flag future/past dates. Date validation is handled by the application.`,
-      "If an awards field is present, it may contain unstructured text about awards, recognitions, or accomplishments. Extract only grounded strengths from it, and do not infer or assume any specific awards if not explicitly stated.",
-      "if the type of record is project and it's not open source it should not have gitHub url present, if it's incomplete it should not have url and end date field present"
-    ].join("\n"),
-    user: JSON.stringify(
-      {
-        task: `Review this ${input.entityType.replace("_", " ")} record for admin-only editorial quality metadata.`,
-        outputShape: {
-          qualityScore: "integer from 0 to 100",
-          summary: "short, useful admin review summary",
-          strengths: "array of grounded strengths in the existing record",
-          issues: "array of grounded content gaps or risks",
-          suggestions: "array of editorial/structural suggestions only",
-        },
-        rules: [
-          "Ground every observation in the provided record.",
-          "Do not imply missing information is true.",
-          "Do not add new metrics, accomplishments, technologies, employers, or outcomes.",
-          "Lower the score for incomplete or thin drafts.",
-        ],
-        record: input,
-      },
-      null,
-      2,
-    ),
+    contentRecord: JSON.stringify(input, null, 2),
+    responseShape: getContentReviewResponseShape(),
   };
 }
 

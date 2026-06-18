@@ -89,6 +89,7 @@ function makeStore() {
 }
 
 const noSleep = async () => {};
+const prompt = { system: "Test system prompt", user: "Test user prompt" };
 
 describe("runTaxonomyReview", () => {
   it("retries a schema-validation failure and completes on a later attempt", async () => {
@@ -108,6 +109,7 @@ describe("runTaxonomyReview", () => {
       input,
       adapter,
       store,
+      prompt,
       sleep: noSleep,
     });
 
@@ -139,6 +141,7 @@ describe("runTaxonomyReview", () => {
       input,
       adapter,
       store,
+      prompt,
       generation: { temperature: 0.2, topP: 0.9, maxTokens: 32000 },
       sleep: noSleep,
     });
@@ -155,6 +158,7 @@ describe("runTaxonomyReview", () => {
       input,
       adapter,
       store,
+      prompt,
       maxAttempts: 2,
       sleep: noSleep,
     });

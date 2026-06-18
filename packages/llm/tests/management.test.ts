@@ -4,8 +4,6 @@ import { STRUCTURED_JSON_GENERATION } from "../src/adapters/generation";
 import { resolveWorkflowConfig } from "../src/management/config-resolution";
 import { resolveWorkflowPrompt } from "../src/management/prompt-resolution";
 
-const fallback = () => ({ system: "HARDCODED SYSTEM", user: "HARDCODED USER" });
-
 describe("resolveWorkflowPrompt", () => {
   it("renders the active DB prompt version and records provenance", () => {
     const resolved = resolveWorkflowPrompt({
@@ -18,7 +16,6 @@ describe("resolveWorkflowPrompt", () => {
         userPromptTemplate: "SHAPE:\n{{responseShape}}\nDATA:\n{{dataset}}",
       },
       variables: { responseShape: "{schema}", dataset: "{records}" },
-      fallback,
     });
 
     expect(resolved.source).toBe("db");
@@ -29,21 +26,8 @@ describe("resolveWorkflowPrompt", () => {
     expect(resolved.system).toBe("You are an analyst.");
   });
 
-  it("falls back to the hardcoded prompt when no active version exists", () => {
-    const resolved = resolveWorkflowPrompt({
-      workflow: "aiInsights",
-      activeVersion: null,
-      variables: { responseShape: "x", dataset: "y" },
-      fallback,
-    });
-
-    expect(resolved.source).toBe("codeFallback");
-    expect(resolved.promptVersionId).toBeNull();
-    expect(resolved.system).toBe("HARDCODED SYSTEM");
-    expect(resolved.user).toBe("HARDCODED USER");
-  });
-
-  it("throws when an active template is missing a required variable", () => {
+  it("throws when a required variable value is missing at render time", () => {
+    // `dataset` is the required aiInsights variable (responseShape is now optional).
     expect(() =>
       resolveWorkflowPrompt({
         workflow: "aiInsights",
@@ -52,12 +36,11 @@ describe("resolveWorkflowPrompt", () => {
           version: "v1",
           name: "Broken",
           systemPrompt: "sys",
-          userPromptTemplate: "only {{dataset}}",
+          userPromptTemplate: "needs {{dataset}}",
         },
-        variables: { dataset: "y" },
-        fallback,
+        variables: { responseShape: "x" },
       }),
-    ).toThrow(/responseShape/);
+    ).toThrow(/dataset/);
   });
 });
 

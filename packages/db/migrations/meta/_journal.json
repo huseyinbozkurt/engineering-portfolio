@@ -22,6 +22,20 @@
       "when": 1781715922871,
       "tag": "0002_backfill_ai_insight_runs_into_llm_runs",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1781743315353,
+      "tag": "0003_prompt_version_target_type",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781758861520,
+      "tag": "0004_llm_runs_cache_identity",
+      "breakpoints": true
     }
   ]
 }

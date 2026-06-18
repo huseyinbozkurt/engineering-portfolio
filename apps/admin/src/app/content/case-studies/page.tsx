@@ -28,7 +28,7 @@ export default async function CaseStudiesPage() {
   const [caseStudies, content, llmStatuses] = await Promise.all([
     getCaseStudyListRecords(),
     getAdminContentIndex(),
-    getLlmConnectionStatuses(),
+    getLlmConnectionStatuses("contentReview"),
   ]);
 
   const experienceNames = new Map(

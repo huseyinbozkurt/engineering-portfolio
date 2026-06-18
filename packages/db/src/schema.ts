@@ -900,7 +900,7 @@ export const llmRunSuggestionStatusEnum = pgEnum("llm_run_suggestion_status", [
 export type LlmRunSuggestionStatusValue =
   (typeof llmRunSuggestionStatusEnum.enumValues)[number];
 
-/** Whether a run used a DB prompt version or fell back to the hardcoded prompt. */
+/** Prompt provenance. `codeFallback` is retained for historical run rows only. */
 export type LlmPromptSource = "db" | "codeFallback";
 /** Whether a run used a DB configuration or fell back to .env config. */
 export type LlmConfigSource = "db" | "envFallback";
@@ -923,15 +923,25 @@ export interface LlmRunAttempt {
 }
 
 /**
- * DB-managed prompt versions. At most one active version per workflow (partial
- * unique index). When no active version exists for a workflow the runtime falls
- * back to the hardcoded prompt — see prompt resolution in @portfolio/llm.
+ * DB-managed prompt versions. At most one active version per (workflow,
+ * targetType) (partial unique index). `targetType` scopes a workflow that needs
+ * several prompts — e.g. `contentReview` keeps a distinct prompt per content
+ * type (experience/project/case_study). Portfolio-level workflows (aiInsights,
+ * taxonomyReview) leave it as the empty-string sentinel, so they keep exactly
+ * one active version each. A workflow cannot run without an active version for
+ * its workflow and target type.
  */
 export const llmPromptVersions = pgTable(
   "llm_prompt_versions",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     workflow: varchar("workflow", { length: 60 }).$type<LlmWorkflow>().notNull(),
+    /**
+     * Sub-scope within a workflow. Empty string for portfolio-level workflows;
+     * the content type ("experience" | "project" | "case_study") for
+     * contentReview. Validated in code (`@portfolio/validators`).
+     */
+    targetType: varchar("target_type", { length: 40 }).notNull().default(""),
     version: varchar("version", { length: 60 }).notNull(),
     name: varchar("name", { length: 200 }).notNull(),
     description: text("description"),
@@ -942,9 +952,9 @@ export const llmPromptVersions = pgTable(
   },
   (table) => [
     index("llm_prompt_versions_workflow_idx").on(table.workflow),
-    // At most one active prompt version per workflow.
+    // At most one active prompt version per workflow + target type.
     uniqueIndex("llm_prompt_versions_single_active_idx")
-      .on(table.workflow)
+      .on(table.workflow, table.targetType)
       .where(sql`${table.isActive} = true`),
   ],
 );
@@ -1029,6 +1039,18 @@ export const llmRuns = pgTable(
     durationMs: integer("duration_ms"),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    /**
+     * Cache identity. `datasetHash` is the SHA-256 of the normalized portfolio
+     * dataset; `configHash` is the SHA-256 of the output-affecting resolved
+     * config (provider/model/sampling/schema mode). Together with workflow,
+     * promptVersionId/promptVersion, and model they form the AI-insight cache
+     * key — a later run with the same identity reuses this output. Nullable:
+     * only insight runs populate them.
+     */
+    datasetHash: varchar("dataset_hash", { length: 64 }),
+    configHash: varchar("config_hash", { length: 64 }),
+    /** True when this run reused a prior successful output instead of calling the LLM. */
+    cacheHit: boolean("cache_hit").notNull().default(false),
     ...timestamps,
   },
   (table) => [
@@ -1036,6 +1058,8 @@ export const llmRuns = pgTable(
     index("llm_runs_status_idx").on(table.status),
     index("llm_runs_created_at_idx").on(table.createdAt),
     index("llm_runs_target_idx").on(table.targetType, table.targetId),
+    // Cache lookup: newest successful run matching a full cache identity.
+    index("llm_runs_cache_identity_idx").on(table.workflow, table.datasetHash, table.configHash),
     // At most one published run per workflow (the public source of truth, e.g. AI Insights).
     uniqueIndex("llm_runs_single_published_idx")
       .on(table.workflow)

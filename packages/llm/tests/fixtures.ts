@@ -147,14 +147,6 @@ export function makeOutput(overrides: Partial<PortfolioInsightOutput> = {}): Por
         evidence: evidence(REFS.caseStudy),
       },
     ],
-    signalRadar: {
-      frontendEngineering: { score: 70, evidence: evidence(REFS.project, REFS.skill) },
-      technicalLeadership: { score: 40, evidence: evidence(REFS.experience) },
-      systemDesign: { score: 35, evidence: evidence(REFS.caseStudy) },
-      devopsCloud: { score: 0, evidence: [] },
-      aiEngineering: { score: 0, evidence: [] },
-      peopleManagement: { score: 30, evidence: evidence(REFS.experience) },
-    },
     groundedDataNotes: ["Leadership signals originate from a single employer's records."],
     homePageContent: {
       eyebrow: "AI Portfolio Insight",

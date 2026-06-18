@@ -74,7 +74,7 @@ export default async function EditCaseStudyPage({ params }: EditPageProps) {
   const [caseStudy, content, llmStatuses] = await Promise.all([
     getCaseStudyById(id),
     getAdminContentIndex(),
-    getLlmConnectionStatuses(),
+    getLlmConnectionStatuses("contentReview"),
   ]);
 
   if (!caseStudy) {

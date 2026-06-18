@@ -20,6 +20,7 @@ export interface PromptVersionFormState {
 function readPromptForm(formData: FormData) {
   return {
     workflow: String(formData.get("workflow") ?? ""),
+    targetType: String(formData.get("targetType") ?? ""),
     version: String(formData.get("version") ?? ""),
     name: String(formData.get("name") ?? ""),
     description: String(formData.get("description") ?? ""),

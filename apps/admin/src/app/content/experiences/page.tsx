@@ -40,7 +40,7 @@ export default async function ExperiencesPage() {
     getPrinciples(),
     getSkills(),
     getTags(),
-    getLlmConnectionStatuses(),
+    getLlmConnectionStatuses("contentReview"),
   ]);
 
   const lensNames = new Map(lenses.map((lens) => [lens.id, lens.name]));

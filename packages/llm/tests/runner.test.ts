@@ -22,6 +22,7 @@ function makeStore(options: { failOnSucceeded?: boolean } = {}) {
 }
 
 const noSleep = async () => {};
+const prompt = { system: "Test system prompt", user: "Test user prompt" };
 
 describe("runPortfolioInsight", () => {
   it("persists a succeeded run with output, notes, usage, and attempts", async () => {
@@ -37,6 +38,7 @@ describe("runPortfolioInsight", () => {
       input: makeInput(),
       adapter,
       store,
+      prompt,
       sleep: noSleep,
     });
 
@@ -60,6 +62,7 @@ describe("runPortfolioInsight", () => {
       input: makeInput(),
       adapter,
       store,
+      prompt,
       sleep: noSleep,
     });
 
@@ -90,6 +93,7 @@ describe("runPortfolioInsight", () => {
       input: makeInput(),
       adapter: flaky,
       store,
+      prompt,
       sleep: noSleep,
     });
 
@@ -112,6 +116,7 @@ describe("runPortfolioInsight", () => {
       input: makeInput(),
       adapter,
       store,
+      prompt,
       maxAttempts: 2,
       sleep: noSleep,
     });
@@ -131,6 +136,7 @@ describe("runPortfolioInsight", () => {
       input: makeInput(),
       adapter,
       store,
+      prompt,
       sleep: noSleep,
     });
 
@@ -147,6 +153,7 @@ describe("runPortfolioInsight", () => {
       input: makeInput(),
       adapter,
       store,
+      prompt,
       sleep: noSleep,
     });
 
@@ -171,6 +178,7 @@ describe("runPortfolioInsight", () => {
       input: makeInput(),
       adapter,
       store,
+      prompt,
       sleep: noSleep,
     });
 
@@ -201,6 +209,7 @@ describe("runPortfolioInsight", () => {
       input: makeInput(),
       adapter,
       store,
+      prompt,
       maxAttempts: 3,
       sleep: noSleep,
     });
@@ -230,6 +239,7 @@ describe("runPortfolioInsight", () => {
       input: makeInput(),
       adapter,
       store,
+      prompt,
       generation: { temperature: 0.1, topP: 0.8, maxTokens: 30001 },
       sleep: noSleep,
     });
@@ -240,6 +250,7 @@ describe("runPortfolioInsight", () => {
       input: makeInput(),
       adapter,
       store,
+      prompt,
       sleep: noSleep,
     });
     // Unset → the runner sends no per-call generation, so adapter defaults apply.

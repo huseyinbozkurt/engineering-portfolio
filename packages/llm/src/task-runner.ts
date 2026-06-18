@@ -1,5 +1,7 @@
 import {
   claimNextPendingLlmTask,
+  createLlmTask,
+  getActiveLlmTaskForTarget,
   recoverStuckLlmTasks,
   updateLlmTask,
   type LlmTaskRecord,
@@ -9,20 +11,28 @@ import { STUCK_TASK_ERROR_MESSAGE } from "@portfolio/db/llm-task-scheduling";
 import {
   saveContentAiReviewFailure,
   saveContentAiReviewSuccess,
+  setContentAiReviewQueued,
   setContentAiReviewProcessing,
   type AiReviewContentType,
 } from "@portfolio/db/content-ai-review";
 import { createLlmRun, updateLlmRun, type LlmRunAttempt } from "@portfolio/db/llm-runs";
+import { getActivePromptVersion } from "@portfolio/db/llm-prompt-versions";
+import { getActiveLlmConfiguration } from "@portfolio/db/llm-configurations";
 
 import { getCaseStudyById, getExperienceById, getProjectById } from "@portfolio/db/queries";
+import {
+  renderPromptTemplate,
+  renderWorkflowUserPrompt,
+  validateTemplateForWorkflow,
+} from "@portfolio/validators";
 
-import { resolveOnlineLlmAdapter } from "./adapters/online";
+import { resolveConfiguredLlmAdapter } from "./adapters/online";
 import type { LLMAdapter, LLMUsage } from "./adapters/types";
 import {
-  buildExperienceAiReviewPrompt,
-  buildContentAiReviewPrompt,
+  buildContentReviewVariables,
   caseStudyAiReviewTaskType,
   type ContentAiReviewInput,
+  experienceToContentAiReviewInput,
   ExperienceAiReviewValidationError,
   experienceAiReviewTaskType,
   parseExperienceAiReviewOutput,
@@ -33,6 +43,61 @@ import {
 export function setGlobalDb(_db: unknown): void {
   // Compatibility shim for the worker entry point. The DB package owns its
   // global connection cache, so no explicit injection is needed here.
+}
+
+export interface TriggerContentReviewResult {
+  taskId: string;
+  status: "created" | "alreadyRunning" | "error";
+  error?: string;
+}
+
+/** Internal content-review trigger used by the package's single public entry point. */
+export async function triggerContentReviewTask(
+  contentType: AiReviewContentType,
+  contentId: string,
+): Promise<TriggerContentReviewResult> {
+  const configuration = await getActiveLlmConfiguration("contentReview");
+  if (!configuration || !resolveConfiguredLlmAdapter(configuration)) {
+    return {
+      taskId: "",
+      status: "error",
+      error: "Content review requires an active, usable DB configuration.",
+    };
+  }
+  const taskType =
+    contentType === "experience"
+      ? experienceAiReviewTaskType
+      : contentType === "project"
+        ? projectAiReviewTaskType
+        : caseStudyAiReviewTaskType;
+
+  const active = await getActiveLlmTaskForTarget(taskType, contentId);
+  if (active) {
+    return { taskId: active.id, status: "alreadyRunning" };
+  }
+
+  try {
+    const input = await buildContentAiReviewInputForTask(contentType, contentId);
+    const prompt = await resolveContentReviewPrompt(contentType, input);
+    const task = await createLlmTask({
+      taskType,
+      targetType: contentType,
+      targetId: contentId,
+      title: `AI review: ${input.title.trim() || `Untitled draft ${contentId.slice(0, 8)}`}`,
+      status: "pending",
+      promptSystem: prompt.system,
+      promptUser: prompt.user,
+    });
+    await setContentAiReviewQueued(contentType, contentId);
+    startQueuedLlmTaskProcessing();
+    return { taskId: task.id, status: "created" };
+  } catch (error) {
+    return {
+      taskId: "",
+      status: "error",
+      error: error instanceof Error ? error.message : "Could not start content review.",
+    };
+  }
 }
 
 let activeQueuedTaskRun: Promise<number> | null = null;
@@ -75,7 +140,8 @@ export async function processNextPendingTask(_options: { db?: unknown } = {}): P
   // queue never deadlocks waiting on a zombie "running" row.
   await recoverStuckContentReviewTasks();
 
-  const resolved = await resolveOnlineLlmAdapter();
+  const configuration = await getActiveLlmConfiguration("contentReview");
+  const resolved = configuration ? resolveConfiguredLlmAdapter(configuration) : null;
 
   if (!resolved) {
     return null;
@@ -162,7 +228,10 @@ async function processContentAiReviewTask(
       providerModel: adapter.getModel() ?? null,
     });
 
-    const prompt = await getTaskPrompt(task, contentType, contentId);
+    const prompt = await resolveContentReviewPrompt(
+      contentType,
+      await buildContentAiReviewInputForTask(contentType, contentId),
+    );
     llmRunId = await createContentReviewLlmRun(contentType, contentId, adapter, prompt, startedAt);
 
     const response = await adapter.generate({
@@ -239,18 +308,18 @@ async function processContentAiReviewTask(
 
 /**
  * Create the unified `llm_runs` audit record for a content-review execution.
- * Best-effort: a failure here is logged but never blocks the review itself.
- * Content review uses hardcoded prompts and the .env-resolved adapter, so the
- * provenance is always `codeFallback` / `envFallback`.
+ * Best-effort: a failure here is logged but never blocks the review itself. The
+ * prompt source is always the active per-type DB prompt.
  */
 async function createContentReviewLlmRun(
   contentType: AiReviewContentType,
   contentId: string,
   adapter: LLMAdapter,
-  prompt: { system: string; user: string },
+  prompt: ResolvedContentPrompt,
   startedAt: Date,
 ): Promise<string | null> {
   try {
+    const configuration = await getActiveLlmConfiguration("contentReview");
     const run = await createLlmRun({
       workflow: "contentReview",
       targetType: contentType,
@@ -258,8 +327,18 @@ async function createContentReviewLlmRun(
       status: "running",
       provider: adapter.getProvider(),
       model: adapter.getModel() ?? null,
-      promptSource: "codeFallback",
-      configSource: "envFallback",
+      promptSource: prompt.source,
+      promptVersionId: prompt.promptVersionId,
+      promptVersion: prompt.promptVersion,
+      promptName: prompt.promptName,
+      configSource: "db",
+      llmConfigurationId: configuration?.id ?? null,
+      visibleModelName: configuration?.visibleModelName ?? null,
+      temperature: configuration?.temperature ?? null,
+      topP: configuration?.topP ?? null,
+      maxTokens: configuration && configuration.maxTokens > 0 ? configuration.maxTokens : null,
+      maxRetries: configuration?.maxRetries ?? 0,
+      timeoutMs: configuration?.timeoutMs ?? null,
       promptSystem: prompt.system,
       promptUser: prompt.user,
       startedAt,
@@ -322,29 +401,60 @@ async function finishContentReviewLlmRun(
   }
 }
 
-async function getTaskPrompt(
-  task: LlmTaskRecord,
+/** A resolved content-review prompt plus where it came from (for the audit row). */
+interface ResolvedContentPrompt {
+  system: string;
+  user: string;
+  source: "db";
+  promptVersionId: string;
+  promptVersion: string;
+  promptName: string;
+}
+
+/**
+ * Resolve the active DB prompt for a content-review record.
+ */
+async function resolveContentReviewPrompt(
+  contentType: AiReviewContentType,
+  input: ContentAiReviewInput,
+): Promise<ResolvedContentPrompt> {
+  const active = await getActivePromptVersion("contentReview", contentType);
+  if (!active) {
+    throw new Error(
+      `No active DB prompt is configured for contentReview target "${contentType}".`,
+    );
+  }
+  const validation = validateTemplateForWorkflow("contentReview", active.userPromptTemplate);
+  if (!validation.ok) {
+    throw new Error(
+      `The active contentReview prompt for "${contentType}" violates its variable contract.`,
+    );
+  }
+  const variables = buildContentReviewVariables(input);
+  return {
+    system: renderPromptTemplate(active.systemPrompt, variables).text,
+    user: renderWorkflowUserPrompt("contentReview", active.userPromptTemplate, variables),
+    source: "db",
+    promptVersionId: active.id,
+    promptVersion: active.version,
+    promptName: active.name,
+  };
+}
+
+/** Fetch a content record and normalize it into the generic content-review shape. */
+async function buildContentAiReviewInputForTask(
   contentType: AiReviewContentType,
   contentId: string,
-): Promise<{ system: string; user: string }> {
-  if (task.promptSystem.trim() && task.promptUser.trim()) {
-    return {
-      system: task.promptSystem,
-      user: task.promptUser,
-    };
-  }
-
+): Promise<ContentAiReviewInput> {
   if (contentType === "experience") {
     const experience = await getExperienceById(contentId);
-
     if (!experience) {
       throw new Error("Experience record was not found.");
     }
-
-    return buildExperienceAiReviewPrompt(toExperienceAiReviewInput(experience));
+    return experienceToContentAiReviewInput(toExperienceAiReviewInput(experience));
   }
 
-  return buildContentAiReviewPrompt(await toContentAiReviewInput(contentType, contentId));
+  return toContentAiReviewInput(contentType, contentId);
 }
 
 async function failContentReviewTask(

@@ -3,10 +3,14 @@
 import { useActionState, useState } from "react";
 
 import {
+  CONTENT_REVIEW_TARGET_TYPE_LABELS,
+  CONTENT_REVIEW_TARGET_TYPES,
+  isContentReviewTargetType,
   LLM_PROMPT_VARIABLES,
   LLM_WORKFLOW_LABELS,
   LLM_WORKFLOWS,
   validateTemplateForWorkflow,
+  workflowUsesTargetType,
   type LlmWorkflow,
 } from "@portfolio/validators";
 
@@ -20,6 +24,7 @@ interface PromptVersionFormProps {
   initial?: {
     id?: string;
     workflow?: LlmWorkflow;
+    targetType?: string;
     version?: string;
     name?: string;
     description?: string | null;
@@ -31,13 +36,31 @@ interface PromptVersionFormProps {
 
 const initialState: PromptVersionFormState = { status: "idle", message: "" };
 
+/** Normalize the target type for a workflow: a valid content type for contentReview, else empty. */
+function normalizeTargetType(workflow: LlmWorkflow, current: string): string {
+  if (!workflowUsesTargetType(workflow)) {
+    return "";
+  }
+  return isContentReviewTargetType(current) ? current : CONTENT_REVIEW_TARGET_TYPES[0];
+}
+
 export function PromptVersionForm({ action, submitLabel, initial }: PromptVersionFormProps) {
   const [state, formAction, pending] = useActionState(action, initialState);
-  const [workflow, setWorkflow] = useState<LlmWorkflow>(initial?.workflow ?? "aiInsights");
+  const initialWorkflow = initial?.workflow ?? "aiInsights";
+  const [workflow, setWorkflow] = useState<LlmWorkflow>(initialWorkflow);
+  const [targetType, setTargetType] = useState(
+    normalizeTargetType(initialWorkflow, initial?.targetType ?? ""),
+  );
   const [template, setTemplate] = useState(initial?.userPromptTemplate ?? "");
 
   const contract = LLM_PROMPT_VARIABLES[workflow];
   const validation = validateTemplateForWorkflow(workflow, template);
+  const showTargetType = workflowUsesTargetType(workflow);
+
+  const handleWorkflowChange = (next: LlmWorkflow) => {
+    setWorkflow(next);
+    setTargetType((current) => normalizeTargetType(next, current));
+  };
 
   return (
     <form action={formAction} className="grid gap-5">
@@ -52,7 +75,7 @@ export function PromptVersionForm({ action, submitLabel, initial }: PromptVersio
             name="workflow"
             className="ui-select"
             value={workflow}
-            onChange={(event) => setWorkflow(event.target.value as LlmWorkflow)}
+            onChange={(event) => handleWorkflowChange(event.target.value as LlmWorkflow)}
           >
             {LLM_WORKFLOWS.map((value) => (
               <option key={value} value={value}>
@@ -61,6 +84,31 @@ export function PromptVersionForm({ action, submitLabel, initial }: PromptVersio
             ))}
           </select>
         </label>
+
+        {showTargetType ? (
+          <label className="ui-field">
+            <span className="ui-label">
+              Content type <span className="ui-required">*</span>
+            </span>
+            <select
+              name="targetType"
+              className="ui-select"
+              value={targetType}
+              onChange={(event) => setTargetType(event.target.value)}
+            >
+              {CONTENT_REVIEW_TARGET_TYPES.map((value) => (
+                <option key={value} value={value}>
+                  {CONTENT_REVIEW_TARGET_TYPE_LABELS[value]}
+                </option>
+              ))}
+            </select>
+            <span className="ui-hint">
+              Content review keeps a separate prompt per type; each type has its own active version.
+            </span>
+          </label>
+        ) : (
+          <input type="hidden" name="targetType" value="" />
+        )}
 
         <label className="ui-field">
           <span className="ui-label">
@@ -150,7 +198,10 @@ export function PromptVersionForm({ action, submitLabel, initial }: PromptVersio
           className="ui-checkbox"
           defaultChecked={initial?.isActive ?? false}
         />
-        <span className="ui-label !mb-0">Active (deactivates any other version for this workflow)</span>
+        <span className="ui-label !mb-0">
+          Active (deactivates any other version for this workflow
+          {showTargetType ? " + content type" : ""})
+        </span>
       </label>
 
       {state.status === "error" ? <p className="ui-error">{state.message}</p> : null}

@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { setFlash } from "@/lib/flash";
+import { hasOnlineLlmConnection as hasConfiguredLlmConnection } from "@/lib/llm-config";
 
 import {
   bulkUpsertSkills,
@@ -47,15 +48,7 @@ import {
   upsertHomepageSettings,
   upsertSiteSettings,
 } from "@portfolio/db/admin";
-import {
-  setContentAiReviewQueued,
-  type AiReviewContentType,
-} from "@portfolio/db/content-ai-review";
-import { setExperienceAiReviewQueued } from "@portfolio/db/experience-ai-review";
-import {
-  createLlmTask,
-  getActiveLlmTaskForTarget,
-} from "@portfolio/db/llm-tasks";
+import type { AiReviewContentType } from "@portfolio/db/content-ai-review";
 import {
   deleteUnreferencedProjectEvidenceAssets,
   setProjectEvidenceAsset,
@@ -121,22 +114,16 @@ import {
 import { selectStaleReviewTargets } from "@portfolio/db/ai-review-freshness";
 import { describeBulkEnqueue } from "@portfolio/db/llm-task-scheduling";
 import { logLlmTaskEvent } from "@portfolio/db/llm-task-log";
-import {
-  buildContentAiReviewPrompt,
-  buildExperienceAiReviewPrompt,
-  caseStudyAiReviewTaskType,
-  experienceAiReviewTaskType,
-  hasOnlineLlmConnection,
-  projectAiReviewTaskType,
-  type ContentAiReviewInput,
-  type ExperienceAiReviewInput,
-} from "@portfolio/llm";
-import { startQueuedLlmTaskProcessing } from "@portfolio/llm/task-runner";
+import { runLlmTask } from "@portfolio/llm";
 import type { z } from "zod";
 
 function text(formData: FormData, key: string): string {
   const value = formData.get(key);
   return typeof value === "string" ? value : "";
+}
+
+function hasOnlineLlmConnection(): Promise<boolean> {
+  return hasConfiguredLlmConnection("contentReview");
 }
 
 function ids(formData: FormData, key: string): string[] {
@@ -363,94 +350,10 @@ async function publishExperienceRecord(id: string): Promise<{ ok: true } | { ok:
 type QueueExperienceAiReviewResult = "queued" | "skipped" | "missing";
 
 async function queueExperienceAiReview(id: string): Promise<QueueExperienceAiReviewResult> {
-  const experience = await getExperienceById(id);
-
-  if (!experience) {
-    return "missing";
-  }
-
-  if (experience.aiReviewStatus === "queued" || experience.aiReviewStatus === "processing") {
-    return "skipped";
-  }
-
-  const activeTask = await getActiveLlmTaskForTarget(experienceAiReviewTaskType, id);
-  if (activeTask) {
-    logLlmTaskEvent("skipped", {
-      id: activeTask.id,
-      taskType: experienceAiReviewTaskType,
-      targetType: "experience",
-      targetId: id,
-      status: activeTask.status,
-      detail: "duplicate_active",
-    });
-    return "skipped";
-  }
-
-  const prompt = buildExperienceAiReviewPrompt(toExperienceAiReviewInput(experience));
-  const title = experienceAiReviewTaskTitle(experience);
-
-  try {
-    await createLlmTask({
-      taskType: experienceAiReviewTaskType,
-      targetType: "experience",
-      targetId: id,
-      title: `AI review: ${title}`,
-      status: "pending",
-      promptSystem: prompt.system,
-      promptUser: prompt.user,
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "";
-    if (message.includes("llm_tasks_active_experience_ai_review_idx")) {
-      return "skipped";
-    }
-
-    throw error;
-  }
-
-  await setExperienceAiReviewQueued(id);
-  return "queued";
-}
-
-function toExperienceAiReviewInput(experience: {
-  id: string;
-  status: string;
-  slug: string | null;
-  company: string;
-  role: string;
-  location: string | null;
-  startDate: string | null;
-  endDate: string | null;
-  isCurrent: boolean;
-  summary: string;
-  details: string;
-  awards: string;
-}): ExperienceAiReviewInput {
-  return {
-    id: experience.id,
-    status: experience.status,
-    slug: experience.slug,
-    company: experience.company,
-    role: experience.role,
-    location: experience.location,
-    startDate: experience.startDate,
-    endDate: experience.endDate,
-    isCurrent: experience.isCurrent,
-    summary: experience.summary,
-    details: experience.details,
-    awards: experience.awards,
-  };
-}
-
-function experienceAiReviewTaskTitle(experience: { role: string; company: string; id: string }): string {
-  const role = experience.role.trim();
-  const company = experience.company.trim();
-
-  if (role && company) {
-    return `${role} at ${company}`;
-  }
-
-  return role || company || `Untitled draft ${experience.id.slice(0, 8)}`;
+  const result = await runLlmTask({ workflow: "contentReview", entityType: "experience", entityId: id });
+  if (result.status === "created") return "queued";
+  if (result.status === "alreadyRunning") return "skipped";
+  return "missing";
 }
 
 function draftSlug(prefix: string): string {
@@ -689,164 +592,16 @@ async function publishCaseStudyRecord(id: string): Promise<{ ok: true } | { ok: 
   return { ok: true };
 }
 
-function contentAiReviewTaskType(contentType: EditorialContentType): string {
-  if (contentType === "experience") return experienceAiReviewTaskType;
-  if (contentType === "project") return projectAiReviewTaskType;
-  return caseStudyAiReviewTaskType;
-}
-
 type QueueContentAiReviewResult = "queued" | "skipped" | "missing";
 
 async function queueContentAiReview(
   contentType: EditorialContentType,
   id: string,
 ): Promise<QueueContentAiReviewResult> {
-  const input = await getContentAiReviewInput(contentType, id);
-
-  if (!input) {
-    return "missing";
-  }
-
-  if (input.aiReviewStatus === "queued" || input.aiReviewStatus === "processing") {
-    return "skipped";
-  }
-
-  const taskType = contentAiReviewTaskType(contentType);
-  const activeTask = await getActiveLlmTaskForTarget(taskType, id);
-  if (activeTask) {
-    logLlmTaskEvent("skipped", {
-      id: activeTask.id,
-      taskType,
-      targetType: contentType,
-      targetId: id,
-      status: activeTask.status,
-      detail: "duplicate_active",
-    });
-    return "skipped";
-  }
-
-  const prompt =
-    contentType === "experience"
-      ? buildExperienceAiReviewPrompt(input.promptInput as ExperienceAiReviewInput)
-      : buildContentAiReviewPrompt(input.promptInput as ContentAiReviewInput);
-
-  try {
-    await createLlmTask({
-      taskType,
-      targetType: contentType,
-      targetId: id,
-      title: `AI review: ${input.title}`,
-      status: "pending",
-      promptSystem: prompt.system,
-      promptUser: prompt.user,
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "";
-    if (
-      message.includes("llm_tasks_active_experience_ai_review_idx") ||
-      message.includes("llm_tasks_active_project_ai_review_idx") ||
-      message.includes("llm_tasks_active_case_study_ai_review_idx")
-    ) {
-      return "skipped";
-    }
-
-    throw error;
-  }
-
-  await setContentAiReviewQueued(contentType, id);
-  return "queued";
-}
-
-async function getContentAiReviewInput(
-  contentType: EditorialContentType,
-  id: string,
-): Promise<{
-  aiReviewStatus: string;
-  title: string;
-  promptInput: ExperienceAiReviewInput | ContentAiReviewInput;
-} | null> {
-  if (contentType === "experience") {
-    const experience = await getExperienceById(id);
-    if (!experience) return null;
-
-    return {
-      aiReviewStatus: experience.aiReviewStatus,
-      title: experienceAiReviewTaskTitle(experience),
-      promptInput: toExperienceAiReviewInput(experience),
-    };
-  }
-
-  if (contentType === "project") {
-    const project = await getProjectById(id);
-    if (!project) return null;
-
-    return {
-      aiReviewStatus: project.aiReviewStatus,
-      title: project.name.trim() || `Untitled draft ${project.id.slice(0, 8)}`,
-      promptInput: {
-        entityType: "project",
-        id: project.id,
-        status: project.status,
-        slug: project.slug,
-        title: project.name,
-        fields: {
-          name: project.name,
-          description: project.description,
-          details: project.details,
-          architecture: project.architecture,
-          developmentTechStack: project.developmentTechStack,
-          qaTechStack: project.qaTechStack,
-          aiIntegrationTechStack: project.aiIntegrationTechStack,
-          deploymentTechStack: project.deploymentTechStack,
-          startDate: project.startDate,
-          endDate: project.endDate,
-          url: project.url,
-          githubUrl: project.githubUrl,
-        },
-        relations: {
-          experienceId: project.experienceId,
-          lensIds: project.lensIds,
-          principleIds: project.principleIds,
-          skillIds: project.skillIds,
-          tagIds: project.tagIds,
-        },
-      },
-    };
-  }
-
-  const caseStudy = await getCaseStudyById(id);
-  if (!caseStudy) return null;
-
-  return {
-    aiReviewStatus: caseStudy.aiReviewStatus,
-    title: caseStudy.title.trim() || `Untitled draft ${caseStudy.id.slice(0, 8)}`,
-    promptInput: {
-      entityType: "case_study",
-      id: caseStudy.id,
-      status: caseStudy.status,
-      slug: caseStudy.slug,
-      title: caseStudy.title,
-      fields: {
-        title: caseStudy.title,
-        excerpt: caseStudy.excerpt,
-        context: caseStudy.context,
-        problem: caseStudy.problem,
-        constraints: caseStudy.constraints,
-        action: caseStudy.action,
-        tradeoffs: caseStudy.tradeoffs,
-        outcome: caseStudy.outcome,
-        learning: caseStudy.learning,
-      },
-      relations: {
-        lensIds: caseStudy.lensIds,
-        principleIds: caseStudy.principleIds,
-        experienceIds: caseStudy.experienceIds,
-        projectIds: caseStudy.projectIds,
-        skillIds: caseStudy.skillIds,
-        tagIds: caseStudy.tagIds,
-      },
-    },
-  };
+  const result = await runLlmTask({ workflow: "contentReview", entityType: contentType, entityId: id });
+  if (result.status === "created") return "queued";
+  if (result.status === "alreadyRunning") return "skipped";
+  return "missing";
 }
 
 export async function createLensAction(formData: FormData): Promise<void> {
@@ -1059,7 +814,6 @@ export async function runExperienceAiReviewAction(formData: FormData): Promise<v
     await setFlash("AI review is already queued or processing for this experience.", "info");
   } else {
     await setFlash("AI review queued");
-    startQueuedLlmTaskProcessing();
   }
 
   refreshExperience(id);
@@ -1097,7 +851,6 @@ export async function runAllExperienceAiReviewsAction(_formData: FormData): Prom
       "info",
     );
   } else {
-    startQueuedLlmTaskProcessing();
     await setFlash(
       skipped > 0
         ? `Queued AI review for ${queued} experience${queued === 1 ? "" : "s"}; skipped ${skipped} active review${skipped === 1 ? "" : "s"}.`
@@ -1142,7 +895,6 @@ export async function updateRecordAiReviewAction(formData: FormData): Promise<vo
   } else if (result === "skipped") {
     await setFlash("AI review is already queued or processing for this record.", "info");
   } else {
-    startQueuedLlmTaskProcessing();
     await setFlash("AI review queued");
   }
 
@@ -1186,7 +938,6 @@ export async function updateAllStaleAiReviewsAction(_formData: FormData): Promis
   logLlmTaskEvent("bulk_queued", { detail: `queued=${queued} skipped=${skipped}` });
 
   if (queued > 0) {
-    startQueuedLlmTaskProcessing();
   }
 
   await setFlash(describeBulkEnqueue({ queued, skipped }), queued > 0 ? "success" : "info");
@@ -1472,7 +1223,6 @@ async function runSingleContentAiReview(
     );
   } else {
     await setFlash("AI review queued");
-    startQueuedLlmTaskProcessing();
   }
 
   refreshContent(contentType, id);
@@ -1518,7 +1268,6 @@ async function runAllContentAiReviews(
       "info",
     );
   } else {
-    startQueuedLlmTaskProcessing();
     await setFlash(
       skipped > 0
         ? `Queued AI review for ${queued} ${queued === 1 ? singularLabel : pluralLabel}; skipped ${skipped} active review${skipped === 1 ? "" : "s"}.`

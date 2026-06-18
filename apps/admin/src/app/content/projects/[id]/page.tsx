@@ -78,7 +78,7 @@ export default async function EditProjectPage({ params }: EditPageProps) {
   const [project, content, llmStatuses] = await Promise.all([
     getProjectById(id),
     getAdminContentIndex(),
-    getLlmConnectionStatuses(),
+    getLlmConnectionStatuses("contentReview"),
   ]);
 
   if (!project) {

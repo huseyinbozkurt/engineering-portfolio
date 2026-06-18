@@ -2,11 +2,6 @@ import type { PortfolioInsightInput, PortfolioInsightOutput } from "@portfolio/v
 
 import type { LLMAdapter, LLMGenerationSettings, LLMUsage } from "../adapters/types";
 import { LlmHttpError } from "../adapters/http";
-import {
-  PORTFOLIO_INSIGHT_PROMPT_V4,
-  getInsightPromptVersion,
-  latestInsightPromptVersion,
-} from "./prompt";
 import { InsightValidationError, validateInsightOutput } from "./validate";
 import { silentInsightLogger, type InsightLogger } from "./logger";
 
@@ -56,12 +51,10 @@ export interface RunPortfolioInsightOptions {
   store: InsightRunStore;
   promptVersion?: string;
   /**
-   * Pre-rendered prompt to send instead of building it from `promptVersion`.
-   * The caller resolves the active DB prompt (or hardcoded fallback) and passes
-   * it here so the text sent to the model is exactly what was persisted on the
-   * run. When omitted, the runner builds the prompt from `promptVersion`.
+   * Pre-rendered active DB prompt. The text sent to the model is exactly what
+   * was persisted on the run.
    */
-  prompt?: { system: string; user: string };
+  prompt: { system: string; user: string };
   logger?: InsightLogger;
   startedAt?: Date;
   /**
@@ -70,6 +63,11 @@ export interface RunPortfolioInsightOptions {
    * Default 3.
    */
   maxAttempts?: number;
+  /**
+   * Force homepage-content validation. Defaults to true because the active DB
+   * prompt must satisfy the current output contract.
+   */
+  requireHomePageContent?: boolean;
   /**
    * Per-call generation overrides forwarded to the adapter. Unset fields fall
    * back to the adapter's defaults (the structured-JSON profile / env config).
@@ -100,11 +98,12 @@ export async function runPortfolioInsight(
     input,
     adapter,
     store,
-    promptVersion = latestInsightPromptVersion,
-    prompt: injectedPrompt,
+    prompt,
+    promptVersion,
     logger = silentInsightLogger,
     startedAt = new Date(),
     maxAttempts = 3,
+    requireHomePageContent,
     generation,
     sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     retryDelayMs = 1500,
@@ -142,22 +141,12 @@ export async function runPortfolioInsight(
     return { status: "failed", errorStage: stage };
   };
 
-  let prompt: { system: string; user: string };
-  try {
-    prompt = injectedPrompt ?? getInsightPromptVersion(promptVersion).build(input);
-    logger.event("prompt-built", {
-      promptVersion,
-      systemChars: prompt.system.length,
-      userChars: prompt.user.length,
-      injected: Boolean(injectedPrompt),
-    });
-  } catch (error) {
-    return finishFailed(
-      "prompt",
-      error instanceof Error ? error.message : "Prompt build failed.",
-      null,
-    );
-  }
+  logger.event("prompt-built", {
+    promptVersion,
+    systemChars: prompt.system.length,
+    userChars: prompt.user.length,
+    injected: true,
+  });
 
   // One attempt = generate → validate. A transient transport error (timeout,
   // 5xx, 429) OR a schema/JSON/evidence validation failure is retried with a
@@ -219,7 +208,7 @@ export async function runPortfolioInsight(
 
     try {
       const attemptValidated = validateInsightOutput(attemptResponse.text, input, {
-        requireHomePageContent: promptVersion === PORTFOLIO_INSIGHT_PROMPT_V4,
+        requireHomePageContent: requireHomePageContent ?? true,
       });
       attempts.push({
         attemptNo,

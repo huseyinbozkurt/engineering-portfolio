@@ -48,7 +48,7 @@ export default async function EditExperiencePage({ params }: EditPageProps) {
   const [experience, content, llmStatuses] = await Promise.all([
     getExperienceById(id),
     getAdminContentIndex(),
-    getLlmConnectionStatuses(),
+    getLlmConnectionStatuses("contentReview"),
   ]);
 
   if (!experience) {
