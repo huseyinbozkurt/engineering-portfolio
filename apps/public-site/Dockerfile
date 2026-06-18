@@ -25,6 +25,14 @@ COPY packages/db ./packages/db
 COPY packages/types ./packages/types
 COPY packages/validators ./packages/validators
 
+# Public Cloudflare Turnstile site key. NEXT_PUBLIC_* values are inlined into the
+# client bundle by `next build`, so the key must be present at build time — a
+# runtime env var would never reach the browser. The deploy workflow passes this
+# from the Terraform `turnstile_site_key` output. It defaults to empty so local
+# builds and previews still work (the contact form disables Turnstile when unset).
+ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY=""
+ENV NEXT_PUBLIC_TURNSTILE_SITE_KEY=${NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+
 RUN pnpm --filter @portfolio/public-site build
 RUN mkdir -p apps/public-site/public
 

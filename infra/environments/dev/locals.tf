@@ -8,9 +8,12 @@ locals {
       DATABASE_SSL_CA_FILE             = var.database_ssl_ca_file
       DATABASE_SSL_CA_URL              = var.database_ssl_ca_url
 
-      # Public Turnstile site key — safe to expose to the browser. Sourced from
-      # the Terraform-managed Cloudflare widget, not hardcoded.
-      NEXT_PUBLIC_TURNSTILE_SITE_KEY = cloudflare_turnstile_widget.portfolio_contact.sitekey
+      # NEXT_PUBLIC_TURNSTILE_SITE_KEY is intentionally NOT set here. As a
+      # NEXT_PUBLIC_* value consumed by a client component, it is inlined by
+      # `next build` and must be supplied at Docker build time, not as a runtime
+      # ECS env var (which never reaches the browser). The deploy workflow passes
+      # it as a build arg from the `turnstile_site_key` output (see turnstile.tf,
+      # outputs.tf, and apps/public-site/Dockerfile).
     },
     var.database_ssl_mode == null ? {} : {
       DATABASE_SSL_MODE = var.database_ssl_mode

@@ -83,9 +83,15 @@ jobs:
         run: |
           IMAGE_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY_PUBLIC_SITE}"
 
+          # The public Turnstile site key is produced by the apply above and must
+          # be inlined into the client bundle at build time (NEXT_PUBLIC_* is not
+          # read at runtime in the browser). Read it from the non-sensitive output.
+          TURNSTILE_SITE_KEY="$(terraform -chdir="${TF_WORKING_DIR}" output -raw turnstile_site_key)"
+
           docker buildx build \
             --platform linux/amd64 \
             -f apps/public-site/Dockerfile \
+            --build-arg NEXT_PUBLIC_TURNSTILE_SITE_KEY="${TURNSTILE_SITE_KEY}" \
             -t "${IMAGE_URI}:${GITHUB_SHA}" \
             -t "${IMAGE_URI}:latest" \
             --push .

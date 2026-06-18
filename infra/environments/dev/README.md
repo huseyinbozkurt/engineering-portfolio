@@ -20,9 +20,12 @@ domain `huseyinbozkurt.dev`, mode `managed`, region `world`) in
 
 - **`NEXT_PUBLIC_TURNSTILE_SITE_KEY`** — the widget's public site key. It is read
   from the Terraform-managed widget (`cloudflare_turnstile_widget.portfolio_contact.sitekey`),
-  never hardcoded, and injected as a normal ECS container environment variable
-  (see `locals.tf`). It is also exposed as the non-sensitive `turnstile_site_key`
-  output for deployment visibility.
+  never hardcoded, and exposed as the non-sensitive `turnstile_site_key` output.
+  Because it is a `NEXT_PUBLIC_*` value used by a client component, it is inlined
+  into the browser bundle by `next build`, so the deploy workflow reads that output
+  after `apply` and passes it to the image as the `NEXT_PUBLIC_TURNSTILE_SITE_KEY`
+  Docker build arg (see `apps/public-site/Dockerfile` and `terraform-deploy.yml`).
+  It is **not** set as a runtime ECS env var, which would never reach the browser.
 - **`TURNSTILE_SECRET_KEY`** — the server-side secret. Its value comes from the
   sensitive `turnstile_secret_key` variable, is stored in AWS Secrets Manager
   (`portfolio/dev/TURNSTILE_SECRET_KEY`), and is injected into the container as an
@@ -31,11 +34,10 @@ domain `huseyinbozkurt.dev`, mode `managed`, region `world`) in
   scoped to exactly this secret's ARN (plus the existing app secrets), with no
   wildcard.
 
-> Note: `NEXT_PUBLIC_*` values are normally inlined at Next.js build time. If the
-> contact form reads the site key in a client component, ensure the build also
-> receives `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (e.g. as a Docker build arg), or read
-> it server-side and pass it to the client. The infrastructure provides it at
-> runtime as specified.
+> Note: the Docker build arg defaults to empty, so local image builds and Next.js
+> previews work without a key — the contact form simply runs without Turnstile
+> until `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is provided (locally via `.env`, or in CI
+> via the build arg the deploy workflow injects).
 
 ### Required Terraform variables
 
