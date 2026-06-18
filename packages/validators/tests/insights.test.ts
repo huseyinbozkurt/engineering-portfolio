@@ -4,7 +4,6 @@ import {
   aiInsightRunStatusSchema,
   evidenceRefSchema,
   portfolioInsightOutputSchema,
-  resolveCapabilityRadarScore,
 } from "../src/insights";
 import { getAiModelDisplayName } from "../src/ai-model-display";
 
@@ -48,14 +47,6 @@ function validOutput(): Record<string, unknown> {
         evidence,
       },
     ],
-    signalRadar: {
-      frontendEngineering: { score: 70, evidence },
-      technicalLeadership: { score: 40, evidence },
-      systemDesign: { score: 30, evidence },
-      devopsCloud: { score: 0, evidence: [] },
-      aiEngineering: { score: 0, evidence: [] },
-      peopleManagement: { score: 20, evidence },
-    },
     groundedDataNotes: ["Based on a single employer's records."],
     homePageContent: {
       eyebrow: "AI Portfolio Insight",
@@ -83,6 +74,7 @@ function validOutput(): Record<string, unknown> {
           radarKey: "frontendEngineering",
           summary: "Presented as homepage copy, scored from signalRadar.",
           evidence,
+          score: 75
         },
       ],
       cta: {
@@ -98,10 +90,6 @@ describe("portfolioInsightOutputSchema", () => {
     expect(portfolioInsightOutputSchema.safeParse(validOutput()).success).toBe(true);
   });
 
-  it("rejects a report missing a section", () => {
-    const { signalRadar: _omitted, ...incomplete } = validOutput();
-    expect(portfolioInsightOutputSchema.safeParse(incomplete).success).toBe(false);
-  });
 
   it("rejects unknown confidence values", () => {
     const bad = validOutput();
@@ -125,15 +113,6 @@ describe("portfolioInsightOutputSchema", () => {
     expect(portfolioInsightOutputSchema.safeParse(bad).success).toBe(false);
   });
 
-  it("rejects non-integer or out-of-range radar scores", () => {
-    const fractional = validOutput();
-    (fractional.signalRadar as Record<string, { score: number }>).frontendEngineering.score = 70.5;
-    expect(portfolioInsightOutputSchema.safeParse(fractional).success).toBe(false);
-
-    const tooHigh = validOutput();
-    (tooHigh.signalRadar as Record<string, { score: number }>).frontendEngineering.score = 101;
-    expect(portfolioInsightOutputSchema.safeParse(tooHigh).success).toBe(false);
-  });
 
   it("requires at least one evidence entry on strengths but none on blind spots", () => {
     const noStrengthEvidence = validOutput();
@@ -165,19 +144,11 @@ describe("portfolioInsightOutputSchema", () => {
 
     const parsed = portfolioInsightOutputSchema.safeParse(legacy);
     expect(parsed.success).toBe(true);
-    if (parsed.success) {
-      expect(
-        resolveCapabilityRadarScore({
-          capability: parsed.data.homePageContent!.capabilitySnapshot[0]!,
-          signalRadar: parsed.data.signalRadar,
-        }),
-      ).toBe(70);
-    }
   });
 
-  it("accepts older reports without homepage content", () => {
+  it("rejects older reports without homepage content", () => {
     const { homePageContent: _homePageContent, ...older } = validOutput();
-    expect(portfolioInsightOutputSchema.safeParse(older).success).toBe(true);
+    expect(portfolioInsightOutputSchema.safeParse(older).success).toBe(false);
   });
 });
 
