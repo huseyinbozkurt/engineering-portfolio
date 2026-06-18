@@ -3,7 +3,7 @@ name: Development Checks
 on:
   push:
     branches:
-      - Development
+      - development
 
 permissions:
   contents: read
